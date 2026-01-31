@@ -401,11 +401,22 @@ const CONFIG = {
             name: '暗黑城堡',
             icon: '🏰',
             vars: {
-                '--dnd-bg-main': '#0a0a0c',
-                '--dnd-bg-panel': 'rgba(22, 22, 24, 0.95)',
+                '--dnd-bg-main': '#0f0b0a',
+                '--dnd-bg-panel': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
+                '--dnd-bg-card': 'linear-gradient(135deg, #242424 0%, #1a1a1c 100%)',
+                '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
+                '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99))',
+                '--dnd-bg-item': 'rgba(255,255,255,0.03)',
                 '--dnd-border-gold': '#9d8b6c',
+                '--dnd-border-inner': '#5c4b35',
+                '--dnd-text-main': '#dcd0c0',
+                '--dnd-text-header': '#e6dcca',
                 '--dnd-text-highlight': '#ffdb85',
-                '--dnd-accent-green': '#3a6b4a'
+                '--dnd-text-dim': '#888',
+                '--dnd-accent-red': '#8a2c2c',
+                '--dnd-accent-green': '#3a6b4a',
+                '--dnd-accent-blue': '#2c4c8a',
+                '--dnd-shadow': '0 5px 20px rgba(0,0,0,0.8)'
             }
         },
         forest: {
@@ -413,32 +424,65 @@ const CONFIG = {
             icon: '🌲',
             vars: {
                 '--dnd-bg-main': '#0c1210',
-                '--dnd-bg-panel': 'rgba(18, 32, 26, 0.95)',
+                '--dnd-bg-panel': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
+                '--dnd-bg-card': 'linear-gradient(135deg, #1c2e24 0%, #0f1c16 100%)',
+                '--dnd-bg-hud': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
+                '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 32, 26, 0.99), rgba(10, 20, 16, 0.99))',
+                '--dnd-bg-item': 'rgba(255,255,255,0.05)',
                 '--dnd-border-gold': '#5a8a6a',
+                '--dnd-border-inner': '#2c4a3a',
+                '--dnd-text-main': '#c0dcd0',
+                '--dnd-text-header': '#cae6da',
                 '--dnd-text-highlight': '#85ffb5',
-                '--dnd-accent-green': '#3a8b5a'
+                '--dnd-text-dim': '#6a8a7a',
+                '--dnd-accent-red': '#8a4a4a',
+                '--dnd-accent-green': '#3a8b5a',
+                '--dnd-accent-blue': '#2c6c8a',
+                '--dnd-shadow': '0 5px 20px rgba(0,20,10,0.8)'
             }
         },
         crimson: {
             name: '血色深渊',
             icon: '🔥',
             vars: {
-                '--dnd-bg-main': '#0c0808',
-                '--dnd-bg-panel': 'rgba(32, 18, 18, 0.95)',
+                '--dnd-bg-main': '#120808',
+                '--dnd-bg-panel': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
+                '--dnd-bg-card': 'linear-gradient(135deg, #2e1c1c 0%, #1c0f0f 100%)',
+                '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
+                '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(32, 20, 20, 0.99), rgba(20, 10, 10, 0.99))',
+                '--dnd-bg-item': 'rgba(255,200,200,0.03)',
                 '--dnd-border-gold': '#8a5a5a',
+                '--dnd-border-inner': '#4a2c2c',
+                '--dnd-text-main': '#dcc0c0',
+                '--dnd-text-header': '#e6cada',
                 '--dnd-text-highlight': '#ff8585',
-                '--dnd-accent-green': '#4a6b4a'
+                '--dnd-text-dim': '#8a6a6a',
+                '--dnd-accent-red': '#a82c2c',
+                '--dnd-accent-green': '#4a6b4a',
+                '--dnd-accent-blue': '#4a2c8a',
+                '--dnd-shadow': '0 5px 20px rgba(20,0,0,0.8)'
             }
         },
         arcane: {
             name: '奥术塔楼',
             icon: '🔮',
             vars: {
-                '--dnd-bg-main': '#0a0a10',
-                '--dnd-bg-panel': 'rgba(20, 20, 36, 0.95)',
+                '--dnd-bg-main': '#0a0a14',
+                '--dnd-bg-panel': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',
+                '--dnd-bg-card': 'linear-gradient(135deg, #1c1c2e 0%, #0f0f1c 100%)',
+                '--dnd-bg-hud': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',
+                '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 20, 36, 0.99), rgba(10, 10, 20, 0.99))',
+                '--dnd-bg-item': 'rgba(200,200,255,0.03)',
                 '--dnd-border-gold': '#6a6a9d',
+                '--dnd-border-inner': '#3a3a5a',
+                '--dnd-text-main': '#c0c0dc',
+                '--dnd-text-header': '#cacaE6',
                 '--dnd-text-highlight': '#b585ff',
-                '--dnd-accent-green': '#3a5a8b'
+                '--dnd-text-dim': '#6a6a8a',
+                '--dnd-accent-red': '#8a2c6c',
+                '--dnd-accent-green': '#2c6b8a',
+                '--dnd-accent-blue': '#3a5a8b',
+                '--dnd-shadow': '0 5px 20px rgba(10,10,30,0.8)'
             }
         }
     },
@@ -465,12 +509,17 @@ const addStyles = () => {
         :root {
             --dnd-bg-main: #0f0b0a;
             --dnd-bg-panel: linear-gradient(to bottom, #2b1b17, #1a100e);
+            --dnd-bg-card: linear-gradient(135deg, #242424 0%, #1a1a1c 100%);
+            --dnd-bg-hud: linear-gradient(to bottom, #2b1b17, #1a100e);
+            --dnd-bg-popup: linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99));
+            --dnd-bg-item: rgba(255,255,255,0.03);
             --dnd-bg-slot: rgba(0, 0, 0, 0.5);
             --dnd-border-gold: #9d8b6c;
             --dnd-border-inner: #5c4b35;
             --dnd-text-main: #dcd0c0;
             --dnd-text-header: #e6dcca;
             --dnd-text-highlight: #ffdb85;
+            --dnd-text-dim: #888;
             --dnd-accent-red: #8a2c2c;
             --dnd-accent-green: #3a6b4a;
             --dnd-accent-blue: #2c4c8a;
@@ -489,8 +538,8 @@ const addStyles = () => {
 
         /* 卡片通用样式 */
         .dnd-char-card {
-            background: linear-gradient(135deg, #242424 0%, #1a1a1c 100%) !important;
-            border: 1px solid #7a6b52 !important;
+            background: var(--dnd-bg-card) !important;
+            border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 6px !important;
             overflow: hidden !important;
             transition: all 0.2s !important;
@@ -562,7 +611,7 @@ const addStyles = () => {
         /* 导航侧边栏 */
         .dnd-nav-sidebar {
             width: 200px !important;
-            background: rgba(10, 10, 12, 0.8) !important;
+            background: var(--dnd-bg-hud) !important;
             border-right: 1px solid var(--dnd-border-inner) !important;
             display: flex !important;
             flex-direction: column !important;
@@ -673,10 +722,10 @@ const addStyles = () => {
             width: 380px !important;
             max-width: 92vw !important;
             max-height: 85vh !important;
-            background: linear-gradient(to bottom, rgba(22, 22, 24, 0.98), rgba(10, 10, 12, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-gold) !important;
             border-radius: 8px !important;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.8) !important;
+            box-shadow: var(--dnd-shadow) !important;
             z-index: 2147483643 !important; /* Raised above Dashboard */
             color: var(--dnd-text-main) !important;
             font-family: var(--dnd-font-sans) !important;
@@ -917,7 +966,7 @@ const addStyles = () => {
             justify-content: space-between !important;
             align-items: center !important;
             padding: 6px 8px !important;
-            background: rgba(255,255,255,0.03) !important;
+            background: var(--dnd-bg-item) !important;
             border-radius: 4px !important;
             cursor: pointer !important;
             transition: background 0.2s !important;
@@ -989,11 +1038,11 @@ const addStyles = () => {
             display: flex !important;
             flex-direction: column !important;
             
-            background: linear-gradient(to bottom, #2b1b17, #1a100e) !important;
+            background: var(--dnd-bg-hud) !important;
             
-            border: 2px solid #5c4b35 !important;
+            border: 2px solid var(--dnd-border-inner) !important;
             border-radius: 8px !important;
-            box-shadow: 0 0 0 2px #1a100e, 0 0 0 4px #9d8b6c, 0 5px 20px rgba(0,0,0,0.8) !important;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 0 4px var(--dnd-border-gold), var(--dnd-shadow) !important;
             
             overflow: visible !important;
             font-family: var(--dnd-font-sans) !important;
@@ -1396,7 +1445,7 @@ const addStyles = () => {
         /* 顶部栏 */
         .dnd-top-bar {
             height: 60px !important;
-            background: linear-gradient(to bottom, #1a1a1a, #0a0a0a) !important;
+            background: var(--dnd-bg-hud) !important;
             border-bottom: 2px solid var(--dnd-border-gold) !important;
             display: flex !important;
             align-items: center !important;
@@ -1435,7 +1484,7 @@ const addStyles = () => {
                     
                     width: 42px !important;
                     height: 42px !important;
-                    background: radial-gradient(circle at center, #2b1b17 0%, #0f0b0a 100%) !important;
+                    background: var(--dnd-bg-hud) !important;
                     border: 2px solid var(--dnd-border-gold) !important;
                     border-radius: 50% !important;
                     color: var(--dnd-border-gold) !important;
@@ -2024,7 +2073,7 @@ const addStyles = () => {
             align-items: flex-start !important;
             gap: 12px !important;
             padding: 14px 16px !important;
-            background: linear-gradient(135deg, rgba(30, 30, 32, 0.98), rgba(20, 20, 22, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 8px !important;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
@@ -2128,7 +2177,7 @@ const addStyles = () => {
             min-width: 320px !important;
             max-width: 90vw !important;
             max-height: 80vh !important;
-            background: linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-gold) !important;
             border-radius: 10px !important;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(157, 139, 108, 0.1) !important;

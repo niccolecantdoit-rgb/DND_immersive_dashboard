@@ -12,12 +12,17 @@ export const addStyles = () => {
         :root {
             --dnd-bg-main: #0f0b0a;
             --dnd-bg-panel: linear-gradient(to bottom, #2b1b17, #1a100e);
+            --dnd-bg-card: linear-gradient(135deg, #242424 0%, #1a1a1c 100%);
+            --dnd-bg-hud: linear-gradient(to bottom, #2b1b17, #1a100e);
+            --dnd-bg-popup: linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99));
+            --dnd-bg-item: rgba(255,255,255,0.03);
             --dnd-bg-slot: rgba(0, 0, 0, 0.5);
             --dnd-border-gold: #9d8b6c;
             --dnd-border-inner: #5c4b35;
             --dnd-text-main: #dcd0c0;
             --dnd-text-header: #e6dcca;
             --dnd-text-highlight: #ffdb85;
+            --dnd-text-dim: #888;
             --dnd-accent-red: #8a2c2c;
             --dnd-accent-green: #3a6b4a;
             --dnd-accent-blue: #2c4c8a;
@@ -36,8 +41,8 @@ export const addStyles = () => {
 
         /* 卡片通用样式 */
         .dnd-char-card {
-            background: linear-gradient(135deg, #242424 0%, #1a1a1c 100%) !important;
-            border: 1px solid #7a6b52 !important;
+            background: var(--dnd-bg-card) !important;
+            border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 6px !important;
             overflow: hidden !important;
             transition: all 0.2s !important;
@@ -109,7 +114,7 @@ export const addStyles = () => {
         /* 导航侧边栏 */
         .dnd-nav-sidebar {
             width: 200px !important;
-            background: rgba(10, 10, 12, 0.8) !important;
+            background: var(--dnd-bg-hud) !important;
             border-right: 1px solid var(--dnd-border-inner) !important;
             display: flex !important;
             flex-direction: column !important;
@@ -220,10 +225,10 @@ export const addStyles = () => {
             width: 380px !important;
             max-width: 92vw !important;
             max-height: 85vh !important;
-            background: linear-gradient(to bottom, rgba(22, 22, 24, 0.98), rgba(10, 10, 12, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-gold) !important;
             border-radius: 8px !important;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.8) !important;
+            box-shadow: var(--dnd-shadow) !important;
             z-index: 2147483643 !important; /* Raised above Dashboard */
             color: var(--dnd-text-main) !important;
             font-family: var(--dnd-font-sans) !important;
@@ -464,7 +469,7 @@ export const addStyles = () => {
             justify-content: space-between !important;
             align-items: center !important;
             padding: 6px 8px !important;
-            background: rgba(255,255,255,0.03) !important;
+            background: var(--dnd-bg-item) !important;
             border-radius: 4px !important;
             cursor: pointer !important;
             transition: background 0.2s !important;
@@ -536,11 +541,11 @@ export const addStyles = () => {
             display: flex !important;
             flex-direction: column !important;
             
-            background: linear-gradient(to bottom, #2b1b17, #1a100e) !important;
+            background: var(--dnd-bg-hud) !important;
             
-            border: 2px solid #5c4b35 !important;
+            border: 2px solid var(--dnd-border-inner) !important;
             border-radius: 8px !important;
-            box-shadow: 0 0 0 2px #1a100e, 0 0 0 4px #9d8b6c, 0 5px 20px rgba(0,0,0,0.8) !important;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 0 4px var(--dnd-border-gold), var(--dnd-shadow) !important;
             
             overflow: visible !important;
             font-family: var(--dnd-font-sans) !important;
@@ -943,7 +948,7 @@ export const addStyles = () => {
         /* 顶部栏 */
         .dnd-top-bar {
             height: 60px !important;
-            background: linear-gradient(to bottom, #1a1a1a, #0a0a0a) !important;
+            background: var(--dnd-bg-hud) !important;
             border-bottom: 2px solid var(--dnd-border-gold) !important;
             display: flex !important;
             align-items: center !important;
@@ -982,7 +987,7 @@ export const addStyles = () => {
                     
                     width: 42px !important;
                     height: 42px !important;
-                    background: radial-gradient(circle at center, #2b1b17 0%, #0f0b0a 100%) !important;
+                    background: var(--dnd-bg-hud) !important;
                     border: 2px solid var(--dnd-border-gold) !important;
                     border-radius: 50% !important;
                     color: var(--dnd-border-gold) !important;
@@ -1571,7 +1576,7 @@ export const addStyles = () => {
             align-items: flex-start !important;
             gap: 12px !important;
             padding: 14px 16px !important;
-            background: linear-gradient(135deg, rgba(30, 30, 32, 0.98), rgba(20, 20, 22, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 8px !important;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4) !important;
@@ -1675,7 +1680,7 @@ export const addStyles = () => {
             min-width: 320px !important;
             max-width: 90vw !important;
             max-height: 80vh !important;
-            background: linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99)) !important;
+            background: var(--dnd-bg-popup) !important;
             border: 1px solid var(--dnd-border-gold) !important;
             border-radius: 10px !important;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(157, 139, 108, 0.1) !important;
