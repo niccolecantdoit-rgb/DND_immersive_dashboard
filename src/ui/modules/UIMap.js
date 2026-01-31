@@ -403,16 +403,36 @@ export default {
             needsFullRedraw = true;
             
             $innerMap = $(`<div class="dnd-minimap-inner"
-                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:#000;"
+                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:#1a1a1c;"
                 data-cell-size="${cellSize}" data-cols="${cols}" data-rows="${rows}"></div>`);
             $el.append($innerMap);
 
+            // [新增] 战斗底图层 (Background Layer)
+            const bgId = `dnd-battle-bg-${locationName.replace(/\s+/g,'_')}`;
+            // 移除 opacity 限制，移除滤镜，确保亮度正常
+            $innerMap.append(`<div id="${bgId}" class="dnd-battle-bg-container" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;"></div>`);
+            
+            // 异步加载战斗底图
+            ExplorationMapManager.getBattleMap(locationName, gInfo['场景描述'], cols, rows, false).then(res => {
+                if (res.type === 'svg') {
+                    const $bg = $innerMap.find(`#${bgId}`);
+                    $bg.html(res.content);
+                    // 强制 SVG 拉伸适应 Grid
+                    $bg.find('svg').css({
+                        width: '100%',
+                        height: '100%',
+                        preserveAspectRatio: 'none'
+                        // 移除滤镜，防止过暗
+                    });
+                }
+            });
+
             // 绘制 Grid (SVG)
             const gridSvg = `
-                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;opacity:0.5;z-index:5;">
+                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;opacity:0.3;z-index:5;">
                     <defs>
                         <pattern id="miniGrid" width="${cellSize}" height="${cellSize}" patternUnits="userSpaceOnUse">
-                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
                         </pattern>
                     </defs>
                     <rect width="100%" height="100%" fill="url(#miniGrid)"/>
@@ -475,12 +495,17 @@ export default {
             // 绑定缩放 (仅在创建时绑定一次)
             this.bindMapZoom($el, $innerMap);
             
-            // UI Overlay (Round Info)
+            // UI Overlay (Round Info + Controls)
             $el.append(`
                 <div class="dnd-hud-overlay" style="pointer-events:none;z-index:30;">
                     <div style="position:absolute;top:2px;left:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">A1</div>
                     <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">${String.fromCharCode(64 + Math.min(cols, 26))}${rows}</div>
                     <div id="dnd-map-round-info" style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--dnd-text-highlight);background:rgba(0,0,0,0.5);padding:0 4px;border-radius:2px;">第 ${round} 回合</div>
+                    
+                    <!-- Battle Map Controls -->
+                    <div class="dnd-map-controls" style="position:absolute;top:2px;right:2px;display:flex;gap:2px;pointer-events:auto;opacity:0.8;">
+                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;">🎨 AI底图</button>
+                    </div>
                 </div>
             `);
         } else {
@@ -648,28 +673,67 @@ export default {
     // [新增] 重新生成地图 (Wrapper for onclick)
     async regenerateMap(locationName, mode) {
         const { $ } = getCore();
-        const confirmed = await NotificationSystem.confirm('确定要重新绘制地图图片吗？结构将保持不变。', {
+        const global = DataManager.getTable('SYS_GlobalState');
+        const isCombat = global && global[0] && global[0]['战斗模式'] === '战斗中';
+        
+        let confirmMsg = '确定要重新绘制地图图片吗？结构将保持不变。';
+        if (isCombat) confirmMsg = '确定要重新生成战斗场景底图吗？这需要消耗 tokens。';
+
+        const confirmed = await NotificationSystem.confirm(confirmMsg, {
             title: '重绘地图',
             confirmText: '重绘',
             type: 'warning'
         });
         if (!confirmed) return;
 
-        const $container = $('#dnd-hud-minimap-content');
-        $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;flex-direction:column;gap:5px;">
-            <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
-            <div style="font-size:11px;">AI 正在绘图...</div>
-        </div>`);
+        // Show spinner
+        let $container = $('#dnd-hud-minimap-content');
+        // If in combat mode, we might want to keep the grid and just show a spinner overlay,
+        // but for simplicity, full blocking spinner is fine or finding the inner container.
+        
+        if (isCombat) {
+             // Find specific bg container or overlay
+             const $bg = $('.dnd-minimap-inner');
+             if ($bg.length) {
+                 // Add loading overlay to map only
+                 $bg.append(`<div id="dnd-map-loading-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;color:#fff;">
+                    <div style="text-align:center;">
+                        <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;margin:0 auto 5px;"></div>
+                        <div style="font-size:10px;">AI 正在构筑战场...</div>
+                    </div>
+                 </div>`);
+             }
+        } else {
+             $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;flex-direction:column;gap:5px;">
+                <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
+                <div style="font-size:11px;">AI 正在绘图...</div>
+            </div>`);
+        }
 
         try {
-            // Force regen based on mode (Only support SVG regen now)
-            const forceParam = true; // true means regen SVG only
-            
-            // We need to pass description again, fetch from GlobalState
-            const global = DataManager.getTable('SYS_GlobalState');
             const desc = (global && global[0]) ? global[0]['场景描述'] : '';
 
-            await ExplorationMapManager.getMap(locationName, desc, forceParam);
+            if (isCombat) {
+                // Battle Map Regen
+                const mapData = DataManager.getTable('COMBAT_BattleMap');
+                const config = mapData ? mapData.find(m => m['类型'] === 'Config') : null;
+                let cols = 20, rows = 20;
+                if (config && config['坐标']) {
+                    const size = DataManager.parseValue(config['坐标'], 'size');
+                    if (size) { cols = size.w || 20; rows = size.h || 20; }
+                }
+                
+                await ExplorationMapManager.getBattleMap(locationName, desc, cols, rows, true); // true = force regen
+                
+                // Remove loading overlay
+                $('#dnd-map-loading-overlay').remove();
+                
+            } else {
+                // Exploration Map Regen
+                // Force regen based on mode (Only support SVG regen now)
+                const forceParam = true; // true means regen SVG only
+                await ExplorationMapManager.getMap(locationName, desc, forceParam);
+            }
             
             // Refresh HUD to render new map
             this.renderHUD();

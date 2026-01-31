@@ -200,7 +200,7 @@
       ]
     ],
     "updateConfig": {
-      "contextDepth": 3,
+      "contextDepth": -1,
       "updateFrequency": 1,
       "batchSize": 3,
       "uiSentinel": -1
@@ -232,7 +232,7 @@
       ]
     ],
     "updateConfig": {
-      "contextDepth": 3,
+      "contextDepth": -1,
       "updateFrequency": 1,
       "batchSize": 3,
       "uiSentinel": -1
@@ -403,6 +403,35 @@
       "entryName": "探索地图数据"
     },
     "orderNo": 18
+  },
+  "sheet_COMBAT_Map_Visuals": {
+    "uid": "sheet_COMBAT_Map_Visuals",
+    "name": "🖌️ 战斗地图绘制",
+    "sourceData": {
+      "note": "【战斗地图视觉表】存储战斗场景的视觉结构数据，用于生成底图。与COMBAT_BattleMap配合，后者存逻辑(墙/怪)，此表存视觉(地面/装饰)。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| SceneName | pk | 场景名称，通常对应全局状态的“当前场景” |\n| VisualJSON | text | 视觉结构数据(JSON)，包含地面材质、装饰物等 |\n| GridSize | string | 网格尺寸，格式: 20x20 |\n| LastUpdated | datetime | 最后更新时间 |\n\n【VisualJSON结构定义】\n{\n  \"mapName\": \"场景名\",\n  \"dimensions\": { \"width\": 20, \"height\": 20 },\n  \"ground\": \"grass/stone/wood_plank/water/lava/snow...\",\n  \"terrain_objects\": [\n    {\n      \"type\": \"tree/rock/wall/pillar/water_pool/furniture/rubble...\",\n      \"x\": 1, \"y\": 1, \"w\": 1, \"h\": 1,\n      \"rotation\": 0,\n      \"description\": \"描述\",\n      \"tactical\": \"cover/block/difficult\"\n    }\n  ]\n}",
+      "initNode": "【初始化】无需预填。",
+      "updateNode": "【触发条件】当战斗场景的环境发生重大视觉变化时更新。",
+      "insertNode": "【触发条件】当进入一场战斗，且该场景尚未在此表中存在记录时，根据正文剧情的环境描述生成视觉数据。\n操作指南：\n1. 提取剧情中的环境要素（如：酒馆地板是木质的，角落有翻倒的桌子）。\n2. 生成符合JSON格式的VisualJSON。\n3. GridSize 默认为 20x20，除非剧情暗示了极小或极大的空间。\n4. 这是生成地图底图的关键依据。",
+      "deleteNode": "【触发条件】场景不再需要或地图数据过旧时删除。"
+    },
+    "content": [
+      [
+        null,
+        "SceneName",
+        "VisualJSON",
+        "GridSize",
+        "LastUpdated"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 3,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "战斗绘制"
+    },
+    "orderNo": 19
   },
   "sheet_CHARACTER_Registry": {
     "uid": "sheet_CHARACTER_Registry",

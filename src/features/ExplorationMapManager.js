@@ -100,7 +100,68 @@ ${structureJSON}
 *   **标题位置**：将大标题放置在 \`y = -80\` 左右的位置（即地图上方），**绝对不要覆盖房间**！
 *   **边框位置**：边框应该包围整个视觉区域。
 
-不要使用markdown代码块。直接返回 <svg ...> ... </svg>。`
+不要使用markdown代码块。直接返回 <svg ...> ... </svg>。`,
+
+        battleStructure: (theme, width, height) => `你是一个专业的DND战斗地图环境设计师。请根据主题设计一个 ${width}x${height} 网格大小的战斗遭遇场景。
+
+主题：${theme}
+
+关键要求：
+1. **战术丰富性**：不仅仅是空地。包括障碍物（阻挡视线/移动）、危险地形（伤害/状态）、困难地形（移动消耗加倍）和有利位置（高地/掩体）。
+2. **环境叙事**：通过物体放置传达故事（例如翻倒的马车、祭坛、营火）。
+3. **坐标系统**：使用 1-based 坐标系 (x: 1-${width}, y: 1-${height})。
+
+请生成JSON格式数据：
+1. mapName: 场景名称
+2. dimensions: { width: ${width}, height: ${height} }
+3. ground: 地面类型 (grass / dirt / stone / wood_plank / water / lava / snow)
+4. terrain_objects: 地形物体列表，包含：
+   - type: 类型 (tree / rock / wall / pillar / water_pool / furniture / rubble / bush / statue)
+   - x, y: 左上角坐标
+   - w, h: 占据的格数 (可以是非整数，但尽量贴合网格)
+   - rotation: 旋转角度 (0, 90, 45...)
+   - description: 简短描述 (e.g. "古老的橡树", "破碎的雕像")
+   - tactical: 战术属性 (cover: 掩体, block: 阻挡, difficult: 困难地形)
+
+只返回JSON，不要其他解释。`,
+
+        battleSVG: (structureJSON) => `你是一个数字艺术地图绘制师。请根据以下结构数据，绘制一张**俯视视角 (Top-Down)** 的高精度战斗地图底图。
+
+${structureJSON}
+
+**绘图规范 (SVG)**：
+
+1.  **尺寸与视图**：
+    *   假设每个网格单位 (Unit) 为 50像素。
+    *   SVG \`width\` = dimensions.width * 50, \`height\` = dimensions.height * 50。
+    *   \`viewBox\` = "0 0 width height"。
+    *   **不要画网格线！** (Grid lines) - 网格线由上层UI负责，你只负责画底图。
+
+2.  **艺术风格 (Art Style)**：
+    *   **写实材质 + 手绘轮廓**：地面使用高质量的纹理图案 (Patterns)，物体使用有厚度的轮廓线。
+    *   **光影与立体感**：
+        - **必须使用投影 (Drop Shadow)**：为所有直立物体（树、墙、柱子）添加 \`<filter>\` 投影效果，模拟光照，产生立体感。
+        - **环境光遮蔽 (AO)**：在墙角或物体底部添加深色渐变。
+    *   **色彩**：饱和度适中，不要太鲜艳，稍微偏向 "Grim Dark" 或 "High Fantasy" 风格。
+
+3.  **图层处理**：
+    *   **底层 (Background)**：铺满全图的基础地面纹理（草地、石板路等）。使用 <pattern> 定义纹理细节，避免单色填充。
+    *   **装饰层 (Details)**：在地面上添加一些随机噪点、小石子、裂缝、污渍，打破单调。
+    *   **物体层 (Objects)**：绘制 terrain_objects。
+        - 树木：绘制树冠的俯视图（通常是不规则圆形），带有叶子纹理。
+        - 墙壁/柱子：要有顶部平面和侧面投影。
+        - 水面：使用半透明蓝色 + 波纹滤镜。
+
+4.  **技术细节**：
+    *   在 <defs> 中预定义好常用的滤镜 (Shadow, Glow) 和图案 (Grass, Stone, Water)。
+    *   所有坐标需乘以 50 转换为像素坐标。
+
+5.  **输出要求**：
+    *   只输出 <svg> 代码。
+    *   不需要文字标签。
+    *   不需要边框。
+
+直接返回 <svg ...> ... </svg>。`
     },
 
     // 1. Check if structure exists for location
@@ -229,7 +290,13 @@ ${structureJSON}
         
         // If no structure, fail (User requested to remove structure generation)
         if (!structure) {
-            return { type: 'error', message: '未找到地图结构数据，无法生成。请先在数据库中添加结构。' };
+            // [Modified] If no structure found, try to generate it automatically for better UX
+             try {
+                Logger.info('Structure not found, generating new structure for:', locationName);
+                structure = await ExplorationMapManager.generateStructure(locationName, description);
+            } catch (e) {
+                return { type: 'error', message: '结构生成失败: ' + e.message };
+            }
         }
 
         // 3. Generate SVG from Structure (Step 2)
@@ -238,6 +305,134 @@ ${structureJSON}
             return { type: 'svg', content: svg };
         } catch (e) {
             return { type: 'error', message: '绘图失败: ' + e.message };
+        }
+    },
+
+    // [New] Check Battle Map Structure from Table
+    checkBattleStructure: (sceneName) => {
+        const table = DataManager.getTable('COMBAT_Map_Visuals');
+        if (!table) return null;
+        // Try exact match or fuzzy match if needed. Using exact match for now.
+        const row = table.find(r => r['SceneName'] === sceneName);
+        return row ? row['VisualJSON'] : null;
+    },
+
+    // [New] Save Battle Map Structure to Table
+    saveBattleStructure: async (sceneName, jsonStr, width, height) => {
+        const rawData = DataManager.getAllData();
+        const tableKey = Object.keys(rawData).find(k => k.includes('COMBAT_Map_Visuals') || (rawData[k].name && rawData[k].name.includes('战斗地图绘制')));
+        
+        if (!tableKey) {
+            Logger.warn('Table COMBAT_Map_Visuals not found, skipping save.');
+            return;
+        }
+
+        const sheet = rawData[tableKey];
+        if (!sheet.content) sheet.content = [];
+        
+        const headers = sheet.content[0];
+        const nameIdx = headers.indexOf('SceneName');
+        const jsonIdx = headers.indexOf('VisualJSON');
+        const sizeIdx = headers.indexOf('GridSize');
+        const timeIdx = headers.indexOf('LastUpdated');
+
+        // Find or Insert
+        let row = sheet.content.slice(1).find(r => r[nameIdx] === sceneName);
+        const now = new Date().toISOString();
+        const sizeStr = `${width}x${height}`;
+
+        if (row) {
+            row[jsonIdx] = jsonStr;
+            row[sizeIdx] = sizeStr;
+            row[timeIdx] = now;
+        } else {
+            const newRow = new Array(headers.length).fill(null);
+            newRow[nameIdx] = sceneName;
+            newRow[jsonIdx] = jsonStr;
+            newRow[sizeIdx] = sizeStr;
+            newRow[timeIdx] = now;
+            sheet.content.push(newRow);
+        }
+
+        await DiceManager.saveData(rawData);
+    },
+
+    // [New] Generate Battle Map
+    getBattleMap: async (locationName, description, width, height, forceRegen = false) => {
+        const cacheKey = `BATTLE_MAP_${locationName}_${width}x${height}`;
+        
+        // 1. Check Cache (SVG)
+        if (!forceRegen) {
+            const cachedSVG = await DBAdapter.getSVG(cacheKey);
+            if (cachedSVG) return { type: 'svg', content: cachedSVG };
+        }
+
+        const apiConfig = await SettingsManager.getAPIConfig();
+        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
+
+        try {
+            // Step 1: Get Structure (From Table or Generate)
+            let jsonStr = null;
+            
+            // Try to load from table first (if not forced)
+            if (!forceRegen) {
+                jsonStr = ExplorationMapManager.checkBattleStructure(locationName);
+                if (jsonStr) Logger.info('[BattleMap] Loaded structure from table:', locationName);
+            }
+
+            // If not found or forced, generate new
+            if (!jsonStr) {
+                Logger.info('[BattleMap] Generating new structure for:', locationName);
+                const structurePrompt = ExplorationMapManager.prompts.battleStructure(locationName + " " + description, width, height);
+                const structureRes = await TavernAPI.generate([{ role: 'user', content: structurePrompt }], {
+                    customConfig: apiConfig,
+                    maxTokens: 2000
+                });
+                
+                jsonStr = structureRes;
+                const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/) || jsonStr.match(/```\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) jsonStr = jsonMatch[1];
+                
+                // Cleanup
+                jsonStr = jsonStr.trim();
+                if (!jsonStr.startsWith('{')) jsonStr = jsonStr.substring(jsonStr.indexOf('{'));
+                if (!jsonStr.endsWith('}')) jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf('}') + 1);
+
+                // Save to Table
+                await ExplorationMapManager.saveBattleStructure(locationName, jsonStr, width, height);
+            }
+
+            // Step 2: Generate SVG
+            Logger.info('[BattleMap] Generating SVG...');
+            const svgPrompt = ExplorationMapManager.prompts.battleSVG(jsonStr);
+            const svgRes = await TavernAPI.generate([{ role: 'user', content: svgPrompt }], {
+                customConfig: apiConfig,
+                maxTokens: 8192
+            });
+
+            let svgContent = svgRes;
+            const codeBlockMatch = svgContent.match(/```(?:xml|svg|html)?\s*([\s\S]*?)\s*```/i);
+            if (codeBlockMatch) svgContent = codeBlockMatch[1];
+            
+            const svgStartIndex = svgContent.indexOf('<svg');
+            const svgEndIndex = svgContent.lastIndexOf('</svg>');
+            
+            if (svgStartIndex !== -1 && svgEndIndex !== -1) {
+                svgContent = svgContent.substring(svgStartIndex, svgEndIndex + 6);
+            }
+
+            // Namespace fix
+            if(!svgContent.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+                svgContent = svgContent.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+
+            // Cache it
+            await DBAdapter.setSVG(cacheKey, svgContent);
+            return { type: 'svg', content: svgContent };
+
+        } catch (e) {
+            Logger.error('[BattleMap] Generation failed', e);
+            return { type: 'error', message: e.message };
         }
     }
 };
