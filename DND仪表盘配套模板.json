@@ -1,0 +1,641 @@
+{
+  "mate": {
+    "type": "chatSheets",
+    "version": 1,
+    "updateConfigUiSentinel": -1
+  },
+  "sheet_SYS_GlobalState": {
+    "uid": "sheet_SYS_GlobalState",
+    "name": "🌍 全局状态",
+    "sourceData": {
+      "note": "【系统核心表】记录游戏世界的全局状态，此表有且仅有一行数据。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| 当前场景 | string | 主角当前所在的具体场景名称 |\n| 场景描述 | string | 当前场景的环境描述（光线、氛围、危险度）|\n| 游戏时间 | datetime | 格式：YYYY-MM-DD HH:MM（必须精确，禁止模糊）|\n| 上轮时间 | datetime | 上一轮交互结束时的精确时间 |\n| 流逝时长 | string | 本轮与上轮的时间差（如：2小时30分钟）|\n| 天气状况 | string | 当前天气及对行动的影响 |\n| 战斗模式 | enum | 值域：[非战斗/战斗中/战斗结束]，决定战斗表是否激活 |\n| 当前回合 | int | 战斗中的回合计数，非战斗时为0 |\n| 系统通知 | string | 系统通知信息，由系统自动更新，禁止手动更改 |",
+      "initNode": "【初始化】\n1. 根据剧情设定填写初始场景和时间\n2. 时间必须是明确的日期时间，禁止使用\"未知\"或\"某天\"\n3. 战斗模式设为\"非战斗\"\n4. 当前回合设为0",
+      "updateNode": "【每轮必须更新】\n1. 将当前时间复制到上轮时间\n2. 根据剧情推进更新当前时间\n3. 计算并填写流逝时长\n4. 场景变化时更新场景信息\n5. 进入/退出战斗时更新战斗模式",
+      "insertNode": "【禁止】此表只能有一行",
+      "deleteNode": "【禁止】不允许删除"
+    },
+    "content": [
+      [
+        null,
+        "当前场景",
+        "场景描述",
+        "游戏时间",
+        "上轮时间",
+        "流逝时长",
+        "天气状况",
+        "战斗模式",
+        "当前回合",
+        "系统通知"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "全局状态"
+    },
+    "orderNo": 0
+  },
+  "sheet_NPC_Registry": {
+    "uid": "sheet_NPC_Registry",
+    "name": "👥 NPC注册表",
+    "sourceData": {
+      "note": "【NPC统一管理表】所有重要NPC的唯一数据源，通过NPC_ID关联其他表。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| NPC_ID | pk | 主键，格式：NPC_XXX（如NPC_001） |\n| 姓名 | string | NPC全名，死亡时在末尾加†符号 |\n| 种族/性别/年龄 | string | 基础信息 |\n| 职业/身份 | string | 社会角色或职业 |\n| 外貌描述 | text | 客观的外貌描写 |\n| 当前状态 | enum | [在场/离场/死亡/失踪] |\n| 所在位置 | string | 当前所在的场景名 |\n| 与主角关系 | string | 关系描述（如：盟友、敌人、雇主）|",
+      "initNode": "【初始化】为开局剧情中的重要NPC创建条目",
+      "updateNode": "【触发条件】\n- 状态变化时更新当前状态和位置\n- 关系变化时更新与主角关系\n- 死亡时在姓名后加†，状态改为死亡",
+      "insertNode": "【触发条件】新的重要NPC登场且需要长期追踪时添加",
+      "deleteNode": "【禁止】NPC数据不删除，只标记状态"
+    },
+    "content": [
+      [
+        null,
+        "NPC_ID",
+        "姓名",
+        "种族/性别/年龄",
+        "职业/身份",
+        "外貌描述",
+        "当前状态",
+        "所在位置",
+        "与主角关系",
+        "关键经历"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "NPC信息",
+      "splitByRow": true
+    },
+    "orderNo": 1
+  },
+  "sheet_ITEM_Inventory": {
+    "uid": "sheet_ITEM_Inventory",
+    "name": "🎒 背包",
+    "sourceData": {
+      "note": "【物品管理表】主角持有的所有物品。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| 物品ID | pk | 主键，格式：ITEM_XXX |\n| 物品名称 | string | 物品名 |\n| 类别 | enum | [武器/护甲/消耗品/工具/杂物/魔法物品] |\n| 数量 | int | 持有数量 |\n| 已装备 | bool | 是/否 |\n| 所属人 | string | 物品的持有者姓名，空则默认为公共/主角 |\n| 伤害 | string | 武器伤害骰，如 1d8+3 |\n| 特性 | string | 物品特性，如 轻型, 灵巧 |\n| 稀有度 | enum | [普通/非凡/稀有/极稀有/传说] |\n| 描述 | text | 物品功能和背景 |\n| 重量 | float | 磅数，用于负重计算 |\n| 价值 | string | 市场价值，如：50gp |",
+      "initNode": "【初始化】根据背景和职业添加初始装备",
+      "updateNode": "【触发条件】\n- 获得物品时数量+1或新增条目\n- 消耗物品时数量-1，归零则删除\n- 装备/卸下时更新已装备状态",
+      "insertNode": "【触发条件】获得背包中没有的新物品",
+      "deleteNode": "【触发条件】物品数量归零、被摧毁或永久丢失"
+    },
+    "content": [
+      [
+        null,
+        "物品ID",
+        "物品名称",
+        "类别",
+        "数量",
+        "已装备",
+        "所属人",
+        "伤害",
+        "特性",
+        "稀有度",
+        "描述",
+        "重量",
+        "价值"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "背包物品"
+    },
+    "orderNo": 2
+  },
+  "sheet_QUEST_Active": {
+    "uid": "sheet_QUEST_Active",
+    "name": "📜 任务",
+    "sourceData": {
+      "note": "【任务追踪表】当前活跃的任务。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| 任务ID | pk | 主键，格式：QUEST_XXX |\n| 任务名称 | string | 任务标题 |\n| 类型 | enum | [主线/支线/个人] |\n| 发布者 | string | NPC姓名或势力名 |\n| 目标描述 | text | 任务目标和要求 |\n| 当前进度 | text | 进度描述 |\n| 状态 | enum | [进行中/已完成/已失败] |\n| 时限 | string | 剩余时间或\"无限制\" |\n| 奖励 | text | 预期奖励 |",
+      "initNode": "【初始化】根据剧情设定添加初始任务",
+      "updateNode": "【触发条件】\n- 任务进展时更新进度\n- 完成/失败时更新状态",
+      "insertNode": "【触发条件】接受新任务或触发新事件线",
+      "deleteNode": "【触发条件】任务完成或失败后可选择删除以保持简洁"
+    },
+    "content": [
+      [
+        null,
+        "任务ID",
+        "任务名称",
+        "类型",
+        "发布者",
+        "目标描述",
+        "当前进度",
+        "状态",
+        "时限",
+        "奖励"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "任务列表"
+    },
+    "orderNo": 3
+  },
+  "sheet_FACTION_Standing": {
+    "uid": "sheet_FACTION_Standing",
+    "name": "🏛️ 势力声望",
+    "sourceData": {
+      "note": "【势力关系表】与各组织的关系状态。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| 势力ID | pk | 主键，格式：FACTION_XXX |\n| 势力名称 | string | 组织/城邦/公会名 |\n| 关系等级 | enum | [-2敌对/-1不友善/0中立/+1友善/+2盟友] |\n| 声望值 | int | 数值化声望，用于精细判定 |\n| 主角头衔 | string | 在该势力中的地位（如：学徒、特工）|\n| 关键事件 | text | 影响关系的重大事件记录 |\n| 特权/通缉 | text | 获得的特权或被通缉状态 |",
+      "initNode": "【初始化】根据角色背景设置初始势力关系",
+      "updateNode": "【触发条件】\n- 完成任务/冲突后调整关系和声望\n- 获得头衔时更新\n- 添加关键事件记录",
+      "insertNode": "【触发条件】首次与新势力产生实质性互动",
+      "deleteNode": "【触发条件】势力被毁灭或彻底离开该地区"
+    },
+    "content": [
+      [
+        null,
+        "势力ID",
+        "势力名称",
+        "关系等级",
+        "声望值",
+        "主角头衔",
+        "关键事件",
+        "特权/通缉"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "势力关系"
+    },
+    "orderNo": 4
+  },
+  "sheet_COMBAT_Encounter": {
+    "uid": "sheet_COMBAT_Encounter",
+    "name": "⚔️ 战斗遭遇表",
+    "sourceData": {
+      "note": "【战斗核心表】仅在战斗模式下激活，用于回合制战斗追踪。\n\n⚠️ 前端兼容说明：此表数据会被战术地图UI读取显示。\n\n| 列名 | 类型 | 前端读取 | 说明 |\n|------|------|----------|------|\n| 单位名称 | pk | ✅ | 唯一标识，必须与战斗地图表一致 |\n| 阵营 | enum | ✅ | [友方/敌方/中立]，用于颜色标记 |\n| 先攻/位置 | string | ✅ | 格式：先攻值/相对位置，如：18/近战 |\n| HP状态 | string | ✅ | 格式：当前/最大 [状态]，如：25/30 [健康] |\n| 防御/抗性 | string | ✅ | AC及特殊抗性，如：AC16 抗火 |\n| 附着状态 | string | ✅ | Buff/Debuff列表，用分号分隔 |\n| 是否为当前行动者 | enum | ✅ | [是/否]，高亮当前行动单位 |\n| 回合资源 | string | ✅ | 如：动作1/1;附赠0/1;移动30/30尺 |",
+      "initNode": "【战斗开始时】\n1. 全局状态表的战斗模式改为\"战斗中\"\n2. 为所有参战单位投掷先攻\n3. 按先攻降序排列所有行\n4. 将先攻最高者的\"是否为当前行动者\"设为\"是\"\n5. 填入每个单位的初始HP、AC",
+      "updateNode": "【每轮更新】\n1. 攻击命中时扣除目标HP，更新状态标签\n2. 单位行动后将其\"是否为当前行动者\"改为\"否\"\n3. 下一个单位改为\"是\"\n4. 移动时更新位置描述\n5. 施加/移除状态效果",
+      "insertNode": "【触发条件】增援或召唤物加入战斗",
+      "deleteNode": "【战斗结束时】清空全表，全局状态的战斗模式改为\"非战斗\""
+    },
+    "content": [
+      [
+        null,
+        "单位名称",
+        "阵营",
+        "先攻/位置",
+        "HP状态",
+        "防御/抗性",
+        "附着状态",
+        "是否为当前行动者",
+        "回合资源"
+      ]
+    ],
+    "updateConfig": {
+      "contextDepth": 3,
+      "updateFrequency": 1,
+      "batchSize": 3,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "战斗遭遇"
+    },
+    "orderNo": 5
+  },
+  "sheet_COMBAT_BattleMap": {
+    "uid": "sheet_COMBAT_BattleMap",
+    "name": "🗺️ 战斗地图",
+    "sourceData": {
+      "note": "【战术地图数据表】存储战场的几何空间数据，供前端可视化渲染。\n\n⚠️ 前端兼容说明：严格遵守数据格式，否则地图无法渲染。\n\n| 列名 | 类型 | 格式要求 |\n|------|------|----------|\n| 单位名称 | pk | 必须与战斗遭遇表的单位名称完全一致 |\n| 类型 | enum | [Config/Token/Wall/Terrain/Zone] |\n| 坐标 | string | Config行：{\"w\":宽,\"h\":高}；其他行：{\"x\":列,\"y\":行} |\n| 大小 | string | {\"w\":占格宽,\"h\":占格高}，默认{\"w\":1,\"h\":1} |\n| Token | string | DiceBear图标，格式：风格:种子，如 adventurer:Hero |\n\n【类型说明】\n- Config: 地图配置，必须有且仅有一行，坐标存地图尺寸\n- Token: 可移动单位（PC、NPC、怪物）\n- Wall: 不可穿越的障碍物\n- Terrain: 困难地形、水域等\n- Zone: 法术效果区域",
+      "initNode": "【战斗开始时】\n1. 清空旧数据\n2. 创建Map_Config行设定地图大小（默认20x20）\n3. 根据场景描述创建Wall/Terrain\n4. 为所有参战单位创建Token行\n5. 分配不重叠的初始坐标",
+      "updateNode": "【移动时】更新对应单位的坐标\n【环境变化时】添加/修改/删除Wall/Terrain/Zone",
+      "insertNode": "【触发条件】新单位加入战场或施放区域法术",
+      "deleteNode": "【战斗结束时】清空全表，删除所有记录，包括Map_Config行"
+    },
+    "content": [
+      [
+        null,
+        "单位名称",
+        "类型",
+        "坐标",
+        "大小",
+        "Token"
+      ]
+    ],
+    "updateConfig": {
+      "contextDepth": 3,
+      "updateFrequency": 1,
+      "batchSize": 3,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "战斗地图"
+    },
+    "orderNo": 6
+  },
+  "sheet_LOG_Summary": {
+    "uid": "sheet_LOG_Summary",
+    "name": "总结表",
+    "sourceData": {
+      "note": "轮次日志，每轮交互后必须立即插入一条新记录。\n- 列0: 时间跨度 - 本轮事件发生的精确时间范围。\n- 列1: 地点 - 本轮事件发生的地点，从大到小描述（例如：国家-城市-具体地点）。\n- 列2: 纪要 - 对本轮交互进行**高保真、零解读**的物理与行为记录。1.**绝对客观的监控视角**：仅记录视觉可见的动作（移动、接触、物品操作）和听觉可闻的信息。2.**去心理化**：绝对禁止描写内心想法、情绪状态（如\"依恋\"、\"不舍\"）、动机分析（如\"基于...考量\"）及意义升华（如\"标志着...\"）。3.**保留物理细节**：详尽记录动作过程。4.**篇幅**：追求事实点的完整罗列，总字数不得少于300字。\n- 列3: 重要对话 - 只摘录原文中造成事实重点的重要对白本身(需标明由谁说的)，总token不得超过80token。\n- 列4: 编码索引 - 为本轮总结表生成一个唯一的编码索引，格式为 AMXX，XX从01开始递增。\n【检查】检查本轮总结表及总体大纲表插入的条目中是否均带有一个相同的编码索引，且格式为`AM`+数字（如`AM01`），若任一方缺失或二者不一致，则需修正。",
+      "initNode": "故事初始化时，插入一条新记录用作记录正文剧情，如果提供的正文包含多轮交互，将其总结为一条记录后插入。",
+      "deleteNode": "禁止删除。",
+      "updateNode": "禁止操作。",
+      "insertNode": "每轮交互结束后，插入一条新记录，如果提供的正文包含多轮交互，将其总结为一条记录后插入。"
+    },
+    "content": [
+      [
+        null,
+        "时间跨度",
+        "地点",
+        "纪要",
+        "重要对话",
+        "编码索引"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "总结表",
+      "entryType": "keyword"
+    },
+    "orderNo": 7
+  },
+  "sheet_LOG_Outline": {
+    "uid": "sheet_LOG_Outline",
+    "name": "总体大纲",
+    "sourceData": {
+      "note": "对每轮的'总结表'进行精炼，形成故事主干。\n- 列0: 时间跨度 - 总结表所记录的时间范围。\n- 列1: 大纲 - 对本轮'总结表'核心事件的精炼概括。\n- 列2: 编码索引 - 必须与当前轮次'总结表'表中的编码索引完全一致。\n【检查】检查本轮总结表及总体大纲表插入的条目中是否均带有一个相同的编码索引，且格式为`AM`+数字（如`AM01`），若任一方缺失或二者不一致，则需修正。\n",
+      "initNode": "故事初始化时，插入一条新记录用作记录初始化剧情。",
+      "deleteNode": "禁止删除。",
+      "updateNode": "禁止操作。",
+      "insertNode": "每轮交互结束后，插入一条新记录。"
+    },
+    "content": [
+      [
+        null,
+        "时间跨度",
+        "大纲",
+        "编码索引"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "总体大纲",
+      "entryType": "keyword"
+    },
+    "orderNo": 8
+  },
+  "sheet_UI_ActionOptions": {
+    "uid": "sheet_UI_ActionOptions",
+    "name": "🎮 行动选项",
+    "sourceData": {
+      "note": "【前端UI表】每轮为玩家生成可选的行动选项，此表有且仅有一行。\n\n⚠️ 前端兼容说明：前端会读取此表渲染为可点击按钮。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| 选项A | action | 符合逻辑的常规行动 |\n| 选项B | action | 谨慎/防御性的行动 |\n| 选项C | action | 大胆/冒险性的行动 |\n| 选项D | action | 社交/非战斗行动 |",
+      "initNode": "【初始化】根据开局情境生成4个初始选项",
+      "updateNode": "【每轮必须更新】根据当前剧情和环境重新生成4个选项",
+      "insertNode": "【禁止】",
+      "deleteNode": "【禁止】"
+    },
+    "content": [
+      [
+        null,
+        "选项A",
+        "选项B",
+        "选项C",
+        "选项D"
+      ]
+    ],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": -1,
+      "batchSize": -1,
+      "skipFloors": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "行动选项",
+      "injectIntoWorldbook": false
+    },
+    "orderNo": 9
+  },
+  "sheet_DICE_Pool": {
+    "uid": "sheet_DICE_Pool",
+    "name": "🎲 骰子池",
+    "sourceData": {
+      "note": "【预生成骰子池】存储真随机生成的骰子数值。前端会自动补充。使用时取第一行数据，使用对应列的数值，然后删除该行。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| ID | int | 骰子序号 |\n| D4 | int | D4骰值 |\n| D6 | int | D6骰值 |\n| D8 | int | D8骰值 |\n| D10 | int | D10骰值 |\n| D12 | int | D12骰值 |\n| D20 | int | D20骰值 |\n| D100 | int | D100骰值 |",
+      "initNode": "【禁止】请勿手动初始化，由前端脚本自动管理。",
+      "updateNode": "【禁止】不可修改已生成的随机数",
+      "insertNode": "【禁止】由前端脚本自动管理补充",
+      "deleteNode": "【使用后删除】当一次检定需要随机数时，读取第一行对应骰面数值，然后删除该行。"
+    },
+    "content": [
+      [
+        null,
+        "ID",
+        "D4",
+        "D6",
+        "D8",
+        "D10",
+        "D12",
+        "D20",
+        "D100"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": -1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "骰子池"
+    },
+    "orderNo": 10
+  },
+  "sheet_EXPLORATION_Map_Data": {
+    "uid": "sheet_EXPLORATION_Map_Data",
+    "name": "🗺️ 探索地图数据",
+    "sourceData": {
+      "note": "【探索地图结构表】存储每个场景的地图结构数据（JSON格式）。\n你是一个资深DND地牢架构师。请根据主题设计一个紧凑、真实的地牢平面图结构。\n关键设计原则：\n1. **紧凑连接**：房间之间不应该用长长的线连接，而应该物理上紧挨着。\n2. **走廊即房间**：走廊(corridor)本身就是一个长条形的房间，角色可以站在里面。不要用抽象的线代表路径。\n3. **无缝拼接**：房间和走廊的坐标(x,y,width,height)应该设计得让它们边缘贴合，形成一个连通的整体区域。\n4. **门与通道**：房间之间的连接通过共享墙壁上的“门”或“开口”实现。\n5. **不规则布局**：整个地图中地点的布局不用规则分布，即使是人造建筑，也可以有不对称和不规则的形状。\n请生成一个至少包含4-12个区域（房间+走廊）的复杂结构，确保有一个入口和一个Boss区域。走廊应该连接多个房间。\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| LocationName | pk | 场景名称（对应全局状态表的“当前场景”） |\n| MapStructureJSON | text | 只有结构数据的JSON字符串（房间/连接/特征） |\n| LastUpdated | datetime | 最后生成时间 |\n| 当前显示地图 | enum | [是/否]，强制显示该地图，忽略全局场景 |\n\n【JSON结构定义】MapStructureJSON 必须符合以下 Schema：\n{\n  \"mapName\": \"地图名称\",\n  \"mapSize\": { \"width\": 800, \"height\": 600 },\n  \"rooms\": [\n    {\n      \"id\": \"room_1\",\n      \"name\": \"入口大厅\",\n      \"type\": \"entrance/corridor/room/hall/secret_room\",\n      \"shape\": \"rectangular/circular/irregular/cave_blob (自然洞穴必须用 irregular/cave_blob)\",\n      \"x\": 100, \"y\": 100, \"width\": 200, \"height\": 150,\n      \"description\": \"描述...\",\n      \"color\": \"#hex\"\n    }\n  ],\n  \"doors\": [\n    {\n      \"x\": 300, \"y\": 175,\n      \"type\": \"open/door/secret_door/barred\",\n      \"orientation\": \"horizontal/vertical\",\n      \"connects\": [\"room_1\", \"room_2\"]\n    }\n  ],\n  \"features\": [\n    {\n      \"x\": 150, \"y\": 150,\n      \"type\": \"column/statue/chest/trap/fountain/table...\"\n    }\n  ]\n}",
+      "initNode": "【初始化】如果游戏开始时主角已处于某个地牢/探索区域，应用下方【insertNode】的逻辑生成该区域的初始地图。",
+      "updateNode": "【触发条件】通常不更新结构。除非剧情导致地形发生巨大改变（如塌方、魔法重塑、发现新房间），此时重新执行生成逻辑。",
+      "insertNode": "【触发条件】当主角进入一个新的探索区域时触发。作为资深DND地牢架构师，请根据LocationName（作为主题）设计一个紧凑、真实的地牢平面图结构。\n\n关键设计原则：\n1. **紧凑连接**：房间之间不应该用长长的线连接，而应该物理上紧挨着。\n2. **走廊即房间**：走廊(corridor)本身就是一个长条形的房间，角色可以站在里面。不要用抽象的线代表路径。\n3. **无缝拼接**：房间和走廊的坐标(x,y,width,height)应该设计得让它们边缘贴合，形成一个连通的整体区域。\n4. **门与通道**：房间之间的连接通过共享墙壁上的“门”或“开口”实现。\n5. **不规则布局**：整个地图中地点的布局不用规则分布，即使是人造建筑，也可以有不对称和不规则的形状。\n\n生成要求：\n- 生成一个至少包含8-12个区域（房间+走廊）的复杂结构。\n- 确保有一个入口和一个Boss区域/核心区域。\n- 走廊应该连接多个房间。\n- 输出符合Note中定义的JSON Schema的完整的JSON字符串到 MapStructureJSON 字段。\n- 记录当前时间到 LastUpdated。",
+      "deleteNode": "【触发条件】当主角彻底离开该区域且短期内不会返回时，可删除以节省空间。"
+    },
+    "content": [
+      [
+        null,
+        "LocationName",
+        "MapStructureJSON",
+        "LastUpdated",
+        "当前显示地图"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 3,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "探索地图数据"
+    },
+    "orderNo": 18
+  },
+  "sheet_CHARACTER_Registry": {
+    "uid": "sheet_CHARACTER_Registry",
+    "name": "👤 角色表",
+    "sourceData": {
+      "note": "【角色统一管理表】记录主角和队伍成员的基础信息。主角ID固定为PC_MAIN，队友ID格式为ALLY_XXX。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| CHAR_ID | pk | 主键，**主角固定为PC_MAIN**，队友为ALLY_XXX |\n| 成员类型 | enum | [主角/同伴/宠物/召唤物/魔宠/随从] |\n| 姓名 | string | 角色全名 |\n| 种族/性别/年龄 | string | 基础信息 |\n| 职业 | string | 职业及子职，如：圣武士(复仇誓言) Lv5 |\n| 外貌描述 | text | 详细的外貌特征描写 |\n| 性格特点 | text | 核心性格、理想、牵绊、缺陷 |\n| 背景故事 | text | 角色背景，主角最多500字，队友最多300字 |\n| 加入时间 | datetime | 主角为游戏开始时间，队友为加入队伍时间 |",
+      "initNode": "【初始化】\n1. 必须创建主角行，CHAR_ID=PC_MAIN，成员类型=主角\n2. 根据用户提供的角色信息填写主角数据\n3. 根据剧情设定填写初始队友信息",
+      "updateNode": "【触发条件】\n- 职业升级时更新职业列\n- 经历重大事件后追加背景故事（主角控制在500字内，队友300字内）\n- 外貌变化时更新描述",
+      "insertNode": "【严格限制】\n- 主角行：禁止插入，初始化时已创建\n- 队友：只有在NPC明确表达加入意愿，并且被玩家明确接受后，方可添加",
+      "deleteNode": "【触发条件】\n- 主角行：禁止删除\n- 队友：永久离队、死亡或背叛时删除"
+    },
+    "content": [
+      [
+        null,
+        "CHAR_ID",
+        "成员类型",
+        "姓名",
+        "种族/性别/年龄",
+        "职业",
+        "外貌描述",
+        "性格特点",
+        "背景故事",
+        "加入时间"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": true,
+      "entryName": "角色信息",
+      "splitByRow": true
+    },
+    "orderNo": 15
+  },
+  "sheet_CHARACTER_Attributes": {
+    "uid": "sheet_CHARACTER_Attributes",
+    "name": "📊 角色属性",
+    "sourceData": {
+      "note": "【角色属性表】记录所有角色的完整战斗数据。每个角色一行，通过CHAR_ID关联。\n\n| 列名 | 类型 | 格式示例 |\n|------|------|------|\n| CHAR_ID | fk | 外键，关联角色表(PC_MAIN或ALLY_XXX) |\n| 等级 | int | 总等级数字 |\n| HP | ratio | 当前/最大，如：45/52 |\n| AC | int | 护甲等级数值 |\n| 先攻加值 | int | 敏捷调整值+其他加值 |\n| 速度 | string | 如：30尺(6格) |\n| 属性值 | string | {\"STR\":16,\"DEX\":14,\"CON\":14,\"INT\":10,\"WIS\":12,\"CHA\":8} |\n| 豁免熟练 | string | 如：[\"力量\",\"体质\"] |\n| 技能熟练 | string | 如：[\"运动\",\"威吓\",\"宗教\"] |\n| 被动感知 | int | 10+感知调整值+熟练(若有) |\n| 经验值 | ratio | 当前/下级所需，如：6500/14000（仅主角填写）|",
+      "initNode": "【初始化】\n1. 必须创建主角属性行，CHAR_ID=PC_MAIN\n2. 根据职业和等级按DND 5E规则计算所有数值\n3. 队友加入时同步添加属性行",
+      "updateNode": "【触发条件】\n- 受伤/治疗时更新HP\n- 升级时重算所有数值\n- 装备变化时重算AC\n- 获得经验时更新经验值（仅主角）",
+      "insertNode": "【触发条件】新角色加入时，同步添加属性行",
+      "deleteNode": "【触发条件】\n- 主角行：禁止删除\n- 队友：离队时同步删除"
+    },
+    "content": [
+      [
+        null,
+        "CHAR_ID",
+        "等级",
+        "HP",
+        "AC",
+        "先攻加值",
+        "速度",
+        "属性值",
+        "豁免熟练",
+        "技能熟练",
+        "被动感知",
+        "经验值"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": true,
+      "entryName": "角色属性"
+    },
+    "orderNo": 16
+  },
+  "sheet_CHARACTER_Resources": {
+    "uid": "sheet_CHARACTER_Resources",
+    "name": "⚡ 角色资源",
+    "sourceData": {
+      "note": "【角色资源表】记录所有角色的可消耗资源。每个角色一行，通过CHAR_ID关联。\n\n| 列名 | 类型 | 格式示例 |\n|------|------|------|\n| CHAR_ID | fk | 外键，关联角色表(PC_MAIN或ALLY_XXX) |\n| 法术位 | string | {\"1级\":\"3/4\",\"2级\":\"2/3\",\"3级\":\"0/2\"} |\n| 职业资源 | string | 如战士：{\"动作如潮\":\"0/1\",\"再战\":\"1/1\"} |\n| 生命骰 | ratio | 短休可用，如：3/5 |\n| 特殊能力 | string | 种族/专长能力次数 |\n| 金币 | int | 当前持有金币数 |",
+      "initNode": "【初始化】\n1. 必须创建主角资源行，CHAR_ID=PC_MAIN\n2. 根据职业等级设置初始资源池\n3. 队友加入时同步添加资源行",
+      "updateNode": "【触发条件】\n- 使用法术/能力后扣除\n- 短休后恢复生命骰和部分职业资源\n- 长休后完全恢复\n- 金币变动时更新（仅主角）",
+      "insertNode": "【触发条件】新角色加入时，同步添加资源行",
+      "deleteNode": "【触发条件】\n- 主角行：禁止删除\n- 队友：离队时同步删除"
+    },
+    "content": [
+      [
+        null,
+        "CHAR_ID",
+        "法术位",
+        "职业资源",
+        "生命骰",
+        "特殊能力",
+        "金币"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "角色资源"
+    },
+    "orderNo": 17
+  },
+  "sheet_SKILL_Library": {
+    "uid": "sheet_SKILL_Library",
+    "name": "📚 技能/法术库",
+    "sourceData": {
+      "note": "【共享技能库】存储所有技能和法术的详细信息。角色通过关联表引用此库中的技能。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| SKILL_ID | pk | 主键，格式：SKL_XXX |\n| 技能名称 | string | 技能/法术名 |\n| 技能类型 | enum | [法术/武技/特技/天赋/种族能力/职业能力] |\n| 环阶 | string | 法术环阶(0=戏法)或技能等级 |\n| 学派 | string | 法术学派或武技流派 |\n| 施法时间 | string | 如：1动作、1附赠动作、1分钟 |\n| 射程 | string | 如：自身、接触、120尺 |\n| 成分 | string | V/S/M(材料)或能力消耗 |\n| 持续时间 | string | 如：立即、专注1分钟、8小时 |\n| 效果描述 | text | 技能效果的完整描述 |\n| 升阶效果 | text | 高环施放的额外效果(法术专用) |",
+      "initNode": "【初始化】根据角色职业预填常用技能/法术，必须包含以下所有类型：\n\n1. **基础攻击动作**（所有职业必填）：\n   - 为角色装备的每种武器创建攻击技能（如：长剑斩击、短弓射击）\n   - 徒手攻击（所有角色默认拥有）\n   - 技能类型=武技，环阶=基础\n   \n2. **通用战斗动作**（所有职业必填）：\n   - 攻击(Attack)、疾走(Dash)、撤离(Disengage)、躲藏(Hide)、\n   - 帮助(Help)、准备(Ready)、搜索(Search)、使用物品(Use Object)\n   - 技能类型=特技，环阶=基础\n   \n3. **职业战斗技能**（按职业添加）：\n   - 战士：二次攻击、动作如潮、再战\n   - 武僧：疾风连击、气弹投射、震山靠、百裂拳\n   - 野蛮人：狂暴攻击、鲁莽攻击\n   - 游荡者：偷袭、狡诈动作\n   \n4. **法术**（施法职业添加）：\n   - 戏法和已知/已准备法术",
+      "updateNode": "【禁止】技能库内容通常不修改，如需修改请谨慎",
+      "insertNode": "【触发条件】遇到新技能/法术时添加到库中",
+      "deleteNode": "【触发条件】确认技能不再使用且无角色关联时可删除"
+    },
+    "content": [
+      [
+        null,
+        "SKILL_ID",
+        "技能名称",
+        "技能类型",
+        "环阶",
+        "学派",
+        "施法时间",
+        "射程",
+        "成分",
+        "持续时间",
+        "效果描述",
+        "升阶效果"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "技能库"
+    },
+    "orderNo": 11
+  },
+  "sheet_CHARACTER_Skills": {
+    "uid": "sheet_CHARACTER_Skills",
+    "name": "🔗 角色技能关联",
+    "sourceData": {
+      "note": "【角色技能关联表】建立角色与技能的多对多关系。一个角色可拥有多个技能，一个技能可被多人拥有。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| LINK_ID | pk | 主键，格式：SLINK_XXX |\n| CHAR_ID | fk | 角色ID (PC_MAIN 或 ALLY_XXX) |\n| SKILL_ID | fk | 技能ID (关联技能库) |\n| 获取方式 | string | 职业/种族/专长/道具/卷轴 |\n| 已准备 | bool | 是否已准备(法术类)，戏法永远为是 |\n| 熟练度 | enum | [生疏/熟练/精通] |\n| 备注 | text | 特殊说明(如：限制条件) |",
+      "initNode": "【初始化】根据角色职业和等级建立初始技能关联",
+      "updateNode": "【触发条件】长休后更新已准备状态，熟练度提升时更新",
+      "insertNode": "【触发条件】角色学习新技能时添加关联",
+      "deleteNode": "【触发条件】永久失去技能时删除关联（极少见）"
+    },
+    "content": [
+      [
+        null,
+        "LINK_ID",
+        "CHAR_ID",
+        "SKILL_ID",
+        "获取方式",
+        "已准备",
+        "熟练度",
+        "备注"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "角色技能"
+    },
+    "orderNo": 12
+  },
+  "sheet_FEAT_Library": {
+    "uid": "sheet_FEAT_Library",
+    "name": "🏅 专长库",
+    "sourceData": {
+      "note": "【共享专长库】存储所有专长的详细信息。角色通过关联表引用此库中的专长。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| FEAT_ID | pk | 主键，格式：FEAT_XXX |\n| 专长名称 | string | 专长名 |\n| 类别 | enum | [通用/战斗/法术/技巧/种族] |\n| 前置条件 | string | 获取前置要求（如：力量13+，施法能力）|\n| 效果描述 | text | 专长的完整效果说明 |\n| 属性提升 | string | 是否含属性提升（如：+1力量）|\n| 附带能力ID | string | 专长附带的技能ID列表(关联技能库) |",
+      "initNode": "【初始化】根据角色专长预填常用专长",
+      "updateNode": "【禁止】专长库内容通常不修改",
+      "insertNode": "【触发条件】遇到新专长时添加到库中",
+      "deleteNode": "【触发条件】确认专长不再使用且无角色关联时可删除"
+    },
+    "content": [
+      [
+        null,
+        "FEAT_ID",
+        "专长名称",
+        "类别",
+        "前置条件",
+        "效果描述",
+        "属性提升",
+        "附带能力ID"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "专长库"
+    },
+    "orderNo": 13
+  },
+  "sheet_CHARACTER_Feats": {
+    "uid": "sheet_CHARACTER_Feats",
+    "name": "🔗 角色专长关联",
+    "sourceData": {
+      "note": "【角色专长关联表】建立角色与专长的多对多关系。\n\n| 列名 | 类型 | 说明 |\n|------|------|------|\n| LINK_ID | pk | 主键，格式：FLINK_XXX |\n| CHAR_ID | fk | 角色ID (PC_MAIN 或 ALLY_XXX) |\n| FEAT_ID | fk | 专长ID (关联专长库) |\n| 获取来源 | string | 等级/种族/职业/奖励/背景 |\n| 获取等级 | int | 获得此专长时的角色等级 |\n| 已选择项 | string | 专长需选择时的具体选项(如：选择的语言) |\n| 备注 | text | 特殊说明 |",
+      "initNode": "【初始化】根据角色背景和等级建立初始专长关联",
+      "updateNode": "【触发条件】专长效果变化时更新备注",
+      "insertNode": "【触发条件】角色获得新专长时添加关联(4/8/12/16/19级或人类变体)",
+      "deleteNode": "【禁止】已获得的专长通常不会失去"
+    },
+    "content": [
+      [
+        null,
+        "LINK_ID",
+        "CHAR_ID",
+        "FEAT_ID",
+        "获取来源",
+        "获取等级",
+        "已选择项",
+        "备注"
+      ]
+    ],
+    "updateConfig": {
+      "batchSize": 1,
+      "uiSentinel": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "entryName": "角色专长"
+    },
+    "orderNo": 14
+  }
+}
