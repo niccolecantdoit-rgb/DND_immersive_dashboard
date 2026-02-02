@@ -1167,13 +1167,13 @@ export default {
             if (state.currentStep !== 'init') return;
             state.characterType = 'pc';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent()); // re-render panel
+            this.renderCharacterCreationPanel($container); // re-render panel
         });
         $container.find('#dnd-creator-type-party').on('click', () => {
             if (state.currentStep !== 'init') return;
             state.characterType = 'party';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent());
+            this.renderCharacterCreationPanel($container);
         });
 
         // 属性生成器按钮
@@ -1226,7 +1226,7 @@ export default {
                     currentStep: 'init'
                 };
                 this.saveCreatorState(); // 保存（覆盖）旧状态
-                this.renderCharacterCreationPanel($container.parent());
+                this.renderCharacterCreationPanel($container);
             }
         });
         
@@ -1257,7 +1257,7 @@ export default {
         $container.find('#dnd-creator-modify-btn').on('click', () => {
             state.currentStep = 'chatting';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent());
+            this.renderCharacterCreationPanel($container);
         });
         
         // 滚动到底部
