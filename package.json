@@ -1,6 +1,6 @@
 {
   "name": "dnd-dashboard-immersive",
-  "version": "1.4.2",
+  "version": "1.5.1",
   "description": "DND Immersive Dashboard for SillyTavern",
   "main": "dist/DND_Dashboard_Immersive.user.js",
   "scripts": {
