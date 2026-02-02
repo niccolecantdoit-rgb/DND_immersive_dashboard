@@ -3106,6 +3106,7 @@ const DataManager = {
             return { success: false, message: '导入失败: ' + err.message };
         }
     },
+    
 
     // [新增] 导入 FVTT 角色数据
     importFVTTData: async (json) => {
@@ -6835,13 +6836,13 @@ const SettingsManager = {
             if (state.currentStep !== 'init') return;
             state.characterType = 'pc';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent()); // re-render panel
+            this.renderCharacterCreationPanel($container); // re-render panel
         });
         $container.find('#dnd-creator-type-party').on('click', () => {
             if (state.currentStep !== 'init') return;
             state.characterType = 'party';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent());
+            this.renderCharacterCreationPanel($container);
         });
 
         // 属性生成器按钮
@@ -6894,7 +6895,7 @@ const SettingsManager = {
                     currentStep: 'init'
                 };
                 this.saveCreatorState(); // 保存（覆盖）旧状态
-                this.renderCharacterCreationPanel($container.parent());
+                this.renderCharacterCreationPanel($container);
             }
         });
         
@@ -6925,7 +6926,7 @@ const SettingsManager = {
         $container.find('#dnd-creator-modify-btn').on('click', () => {
             state.currentStep = 'chatting';
             this.saveCreatorState();
-            this.renderCharacterCreationPanel($container.parent());
+            this.renderCharacterCreationPanel($container);
         });
         
         // 滚动到底部
@@ -7374,6 +7375,7 @@ const SettingsManager = {
 });
 
 ;// ./src/ui/modules/UIPanels.js
+
 
 
 
@@ -8016,6 +8018,98 @@ const SettingsManager = {
         });
         
         $c.append($selector).append($viewArea);
+    },
+
+    // [新增] 导出队伍数据到文件
+    exportPartyToFile() {
+        try {
+            const data = DataManager.exportPartyData();
+            if (!data) {
+                NotificationSystem.error('无数据可导出');
+                return;
+            }
+
+            // 使用浏览器 API 下载
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `DND_Party_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            NotificationSystem.success('已导出队伍数据');
+        } catch (e) {
+            Logger.error('Export failed:', e);
+            NotificationSystem.error('导出失败: ' + e.message);
+        }
+    },
+
+    // [新增] 从文件导入队伍数据
+    importPartyFromFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const json = JSON.parse(event.target.result);
+                    const result = await DataManager.importPartyData(json);
+                    if (result.success) {
+                        NotificationSystem.success(result.message);
+                        // 刷新界面
+                        this.renderPanel('party');
+                    } else {
+                        NotificationSystem.error(result.message);
+                    }
+                } catch (err) {
+                    Logger.error('Import parse error:', err);
+                    NotificationSystem.error('文件解析失败');
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
+    },
+
+    // [新增] 从 FVTT 文件导入
+    importFVTTFromFile() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const json = JSON.parse(event.target.result);
+                    const result = await DataManager.importFVTTData(json);
+                    if (result.success) {
+                        NotificationSystem.success(result.message);
+                        this.renderPanel('party');
+                    } else {
+                        NotificationSystem.error(result.message);
+                    }
+                } catch (err) {
+                    Logger.error('FVTT Import error:', err);
+                    NotificationSystem.error('FVTT 文件解析失败');
+                }
+            };
+            reader.readAsText(file);
+        };
+        
+        input.click();
     },
 
     // [优化] 渲染快捷物品栏 (只显示装备和消耗品)
