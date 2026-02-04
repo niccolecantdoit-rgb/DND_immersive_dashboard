@@ -568,6 +568,17 @@ export default {
             
             // [新增] 检查是否为当前操控角色
             const isControlled = (this._controlledCharId === charId);
+
+            // [新增] 检查是否可以升级
+            let canLevelUp = false;
+            if (char['经验值']) {
+                const parts = char['经验值'].toString().split('/');
+                if (parts.length === 2) {
+                    const curr = parseInt(parts[0]) || 0;
+                    const max = parseInt(parts[1]) || 1;
+                    if (curr >= max && max > 0) canLevelUp = true;
+                }
+            }
                 
             html += `
                 <div class="party-bar-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-idx="${idx}" style="animation-delay:${idx * 0.05}s;">
@@ -582,6 +593,13 @@ export default {
                                 title="切换操控此角色">
                             🎮
                         </div>
+                        <!-- [新增] 升级按钮 -->
+                        ${canLevelUp ? `
+                        <div class="party-levelup-btn"
+                                onclick="event.stopPropagation(); window.DND_Dashboard_UI.startLevelUp('${charId}')"
+                                title="经验值已满，点击升级！">
+                            ⬆️
+                        </div>` : ''}
                     </div>
                     
                     <!-- HP条 -->

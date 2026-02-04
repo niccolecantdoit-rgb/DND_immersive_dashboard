@@ -625,6 +625,80 @@ export default {
     _charCreatorState: null,
     _charCreatorLoading: false,
 
+    // [新增] 启动升级流程
+    async startLevelUp(charId) {
+        const { $ } = getCore();
+        
+        // 1. 获取角色数据
+        const party = DataManager.getPartyData();
+        const char = party.find(p => p.PC_ID === charId || p.CHAR_ID === charId || p.姓名 === charId);
+        
+        if (!char) {
+            NotificationSystem.error('未找到角色数据');
+            return;
+        }
+
+        // 2. 构建结构化数据供 AI 参考
+        const skills = DataManager.getCharacterSkills(charId);
+        const feats = DataManager.getCharacterFeats(charId);
+        const stats = DataManager.parseValue(char['属性值'], 'stats') || {};
+        
+        // 简化的数据重构
+        const currentData = {
+            name: char['姓名'],
+            race_gender_age: char['种族/性别/年龄'],
+            class: char['职业'],
+            level: parseInt(char['等级']) || 1,
+            stats: stats,
+            hp: char['HP'],
+            xp: char['经验值'],
+            spells: skills.filter(s => s['技能类型'] === '法术').map(s => ({
+                name: s['技能名称'],
+                level: s['环阶'] || 0,
+                desc: s['效果描述']
+            })),
+            features: feats.map(f => ({
+                name: f['专长名称'],
+                desc: f['效果描述']
+            })),
+            background: char['背景故事']
+        };
+        
+        // 3. 初始化状态
+        this._charCreatorState = {
+            mode: 'levelup', // 标记为升级模式
+            targetCharId: charId,
+            apiConfig: await SettingsManager.getAPIConfig(),
+            modelList: [],
+            conversationHistory: [],
+            characterData: currentData, // 初始数据为当前状态
+            isGenerating: false,
+            currentStep: 'chatting', // 直接进入对话
+            characterType: 'pc' // 默认为 PC，实际上会更新现有角色
+        };
+        
+        // 4. 切换面板并确保显示
+        const mainUI = (typeof this.renderPanel === 'function') ? this : window.DND_Dashboard_UI;
+        if (mainUI) {
+            // [Fix] 先更新侧边栏选中状态，防止 setState('full') 自动渲染回 party tab
+            const { $ } = getCore();
+            $('.dnd-nav-item').removeClass('active');
+            $('.dnd-nav-item[data-target="create"]').addClass('active');
+
+            // 确保切换到完整面板模式
+            if (typeof mainUI.setState === 'function') {
+                mainUI.setState('full');
+            }
+            // 再次强制渲染 create 面板 (双重保险)
+            if (typeof mainUI.renderPanel === 'function') {
+                mainUI.renderPanel('create');
+            }
+        }
+        
+        // 5. 发送初始系统消息
+        this.sendCreatorMessage(null, true);
+    },
+
     saveCreatorState() {
         if (this._charCreatorState) {
             safeSave('dnd_creator_state', JSON.stringify(this._charCreatorState));
@@ -776,12 +850,15 @@ export default {
                 break;
         }
         
+        const isLevelUp = state.mode === 'levelup';
+        const title = isLevelUp ? '🆙 角色升级向导' : '⚔️ AI 角色创建向导';
+        
         const html = `
             <div class="dnd-char-creator-panel" style="max-width:800px;margin:0 auto;">
                 <!-- 标题区 -->
                 <div style="text-align:center;margin-bottom:20px;">
                     <h2 style="color:var(--dnd-text-highlight);font-family:var(--dnd-font-serif);margin:0 0 10px 0;">
-                        ⚔️ AI 角色创建向导
+                        ${title}
                     </h2>
                     <p style="color:#888;font-size:13px;margin:0;">${stepHint}</p>
                 </div>
@@ -789,8 +866,8 @@ export default {
                 <!-- 设置区域 -->
                 <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;margin-bottom:15px;border:1px solid var(--dnd-border-inner);">
                     <div style="display:flex;align-items:center;gap:15px;flex-wrap:wrap;">
-                        <!-- 角色类型选择 -->
-                        <div style="min-width:150px;">
+                        <!-- 角色类型选择 (升级模式下隐藏) -->
+                        <div style="min-width:150px; ${isLevelUp ? 'display:none;' : ''}">
                             <label style="font-size:12px;color:#888;display:block;margin-bottom:5px;">角色类型</label>
                             <div style="display:flex;gap:5px;">
                                 <button id="dnd-creator-type-pc" class="dnd-clickable" style="
@@ -1248,7 +1325,8 @@ export default {
             }
         });
         
-        // 确认创建
+        // 确认创建/升级
+        $container.find('#dnd-creator-confirm-btn').text(state.mode === 'levelup' ? '✅ 确认升级' : '✅ 确认创建');
         $container.find('#dnd-creator-confirm-btn').on('click', async () => {
             await this.finalizeCharacterCreation();
         });
@@ -1274,7 +1352,20 @@ export default {
         const { question, options, type } = config;
         const isMulti = type === 'multiple';
         
-        const buttonsHtml = options.map(opt => `
+        const buttonsHtml = options.map(opt => {
+            const isString = typeof opt === 'string';
+            const optName = isString ? opt : (opt.text || opt.label || opt.name || '选项');
+            const optDesc = isString ? '' : (opt.desc || opt.description || '');
+            // 优先使用 ID 作为返回值，其次是 value，最后是显示名称
+            // 如果是对象且没有 id/value，则尝试将其 stringify 作为值 (虽然不推荐，但作为 fallback)
+            let optValue = isString ? opt : (opt.id || opt.value || opt.name || optName);
+            
+            // 如果 value 是对象，转化为字符串，避免 [object Object]
+            if (typeof optValue === 'object') {
+                optValue = JSON.stringify(optValue);
+            }
+
+            return `
             <button class="dnd-creator-option-btn" style="
                 background:rgba(255,255,255,0.05);
                 border:1px solid var(--dnd-border-gold);
@@ -1285,14 +1376,15 @@ export default {
                 text-align:left;
                 transition:all 0.2s;
                 font-size:13px;
-            " onclick="window.DND_Dashboard_UI.handleCreatorOption('${opt}', '${isMulti}')">
-                ${opt}
+            " onclick="window.DND_Dashboard_UI.handleCreatorOption('${String(optValue).replace(/'/g, "\\'")}', '${isMulti}')">
+                <div style="font-weight:bold;">${optName}</div>
+                ${optDesc ? `<div style="font-size:11px;color:#aaa;margin-top:2px;">${optDesc}</div>` : ''}
             </button>
-        `).join('');
+        `}).join('');
 
         const html = `
             <div class="dnd-chat-msg dnd-anim-entry" style="background:rgba(157, 139, 108, 0.1); border-left:3px solid var(--dnd-border-gold); padding:10px 12px; margin-bottom:8px; border-radius:4px;">
-                <div style="font-size:12px;color:var(--dnd-text-highlight);margin-bottom:8px;font-weight:bold;">❓ ${question}</div>
+                ${question ? `<div style="font-size:12px;color:var(--dnd-text-highlight);margin-bottom:8px;font-weight:bold;">❓ ${question}</div>` : ''}
                 <div style="display:flex;flex-direction:column;gap:5px;">
                     ${buttonsHtml}
                 </div>
@@ -1340,15 +1432,55 @@ export default {
                 state.conversationHistory.push({ role: 'user', content: userMessage });
                 this.saveCreatorState(); // 保存
             } else if (isInitial) {
-                const initMsg = '你好，我想创建一个 DND 5E 角色。请引导我开始。';
+                const isLevelUp = state.mode === 'levelup';
+                const nextLvl = (state.characterData.level || 1) + 1;
+                const initMsg = isLevelUp
+                    ? `你好，我是 ${state.characterData.name}，我想从 Lv.${state.characterData.level} 升级到 Lv.${nextLvl}。请引导我完成升级。`
+                    : '你好，我想创建一个 DND 5E 角色。请引导我开始。';
+                
                 state.conversationHistory.push({ role: 'user', content: initMsg });
                 this.saveCreatorState(); // 保存
             }
 
             // 构建发送给 API 的消息数组
             const messages = [];
-            const charTypeLabel = state.characterType === 'pc' ? '主角' : '队友';
-            const systemPrompt = `你是一个 DND 5E 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。
+            const isLevelUp = state.mode === 'levelup';
+            
+            let systemPrompt = '';
+            
+            if (isLevelUp) {
+                // 升级模式 Prompt
+                systemPrompt = `你是一个 DND 5E 角色升级向导。当前用户正在将角色 "${state.characterData.name}" 从等级 ${state.characterData.level} 提升到 ${(state.characterData.level || 1) + 1}。
+
+**当前角色数据:**
+\`\`\`json
+${JSON.stringify(state.characterData, null, 2)}
+\`\`\`
+
+请遵循以下流程引导用户升级：
+1. **生命值提升**: 根据职业生命骰（取平均或投掷），计算新的最大HP。
+2. **职业特性**: 告知用户新等级获得的职业特性（如动作如潮、子职特性等），并解释其效果。
+3. **法术/已知法术**: 如果是施法者，引导选择新法术或替换旧法术。
+4. **属性提升/专长**: 如果是 4/8/12/16/19 级，引导用户选择属性值提升 (ASI) 或专长。
+5. **熟练项加值**: 检查熟练加值是否因等级提升而增加（如 1-4级+2, 5-8级+3）。
+
+在对话中：
+- 每次专注于一个升级步骤。
+- 当有多个选择时（如选择新法术、专长），使用 \`CHARACTER_OPTIONS\` 块输出选项。
+- 解释规则依据。
+
+最后，当升级的所有选择都确定后，输出更新后的 \`CHARACTER_DATA\` 块。**必须包含角色的所有数据（旧数据+新变化），而不仅仅是变化部分。** 格式与创建角色时相同。
+
+\`\`\`CHARACTER_DATA
+{
+  ... (完整的角色JSON数据，更新了等级、HP、特性、法术等)
+}
+\`\`\`
+`;
+            } else {
+                // 创建模式 Prompt
+                const charTypeLabel = state.characterType === 'pc' ? '主角' : '队友';
+                systemPrompt = `你是一个 DND 5E 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。
 
 请遵循以下流程：
 1. 首先询问用户想要创建什么类型的角色（战士、法师、盗贼等），或者让他们描述一个角色概念
@@ -1410,6 +1542,7 @@ export default {
 \`\`\`
 
 现在开始与用户对话。`;
+            }
 
             messages.push({ role: 'system', content: systemPrompt });
             state.conversationHistory.forEach(msg => {
@@ -1514,6 +1647,9 @@ export default {
             // 确定是主角(PC) 还是 队友(Party)
             const isPC = state.characterType === 'pc';
             
+            // [新增] 兼容升级模式下的 ID 获取
+            const targetId = state.mode === 'levelup' ? state.targetCharId : null;
+
             // 统一使用 CHARACTER_* 表
             // 查找表对象 (增强查找逻辑，兼容不同前缀)
             const findTable = (frag) => Object.values(rawData).find(s =>
@@ -1535,9 +1671,10 @@ export default {
             
             let charId;
             
-            if (isPC) {
+            if (targetId) {
+                charId = targetId; // 升级模式使用现有ID
+            } else if (isPC) {
                 charId = 'PC_MAIN';
-                // 确保主角行存在 (通常初始化时已创建)
             } else {
                 charId = 'ALLY_' + Date.now();
             }
@@ -1615,6 +1752,10 @@ export default {
             // 处理技能和法术
             const spells = data.spells || [];
             if (spells.length > 0 && skillLibTable && skillLinkTable) {
+                const linkHeaders = skillLinkTable.content[0];
+                const charIdIdx = linkHeaders.indexOf('CHAR_ID');
+                const skillIdIdx = linkHeaders.indexOf('SKILL_ID');
+
                 spells.forEach(spell => {
                     // 1. 添加到技能库 (SKILL_Library)
                     let skillId = 'SKILL_' + Math.random().toString(36).substr(2, 8);
@@ -1641,9 +1782,14 @@ export default {
                         skillLibTable.content.push(newLibRow);
                     }
 
-                    // 2. 添加到关联表 (CHARACTER_Skills)
-                    // 这里简化：直接添加
-                    const linkHeaders = skillLinkTable.content[0];
+                    // 2. 添加到关联表 (CHARACTER_Skills) - 避免重复
+                    if (charIdIdx !== -1 && skillIdIdx !== -1) {
+                        const linkExists = skillLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && row[skillIdIdx] === skillId
+                        );
+                        if (linkExists) return;
+                    }
+
                     const newLinkRow = linkHeaders.map(h => {
                         if (h === 'LINK_ID') return 'LNK_' + Math.random().toString(36).substr(2, 8);
                         if (h === 'CHAR_ID') return charId;
@@ -1658,6 +1804,10 @@ export default {
             // 处理专长和特性
             const features = data.features || [];
             if (features.length > 0 && featLibTable && featLinkTable) {
+                const linkHeaders = featLinkTable.content[0];
+                const charIdIdx = linkHeaders.indexOf('CHAR_ID');
+                const featIdIdx = linkHeaders.indexOf('FEAT_ID');
+
                 features.forEach(feat => {
                     let featId = 'FEAT_' + Math.random().toString(36).substr(2, 8);
                     const existingFeat = featLibTable.content.find(row => row[1] === feat.name);
@@ -1676,7 +1826,14 @@ export default {
                         featLibTable.content.push(newLibRow);
                     }
 
-                    const linkHeaders = featLinkTable.content[0];
+                    // 检查重复
+                    if (charIdIdx !== -1 && featIdIdx !== -1) {
+                        const linkExists = featLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && row[featIdIdx] === featId
+                        );
+                        if (linkExists) return;
+                    }
+
                     const newLinkRow = linkHeaders.map(h => {
                         if (h === 'LINK_ID') return 'LNK_' + Math.random().toString(36).substr(2, 8);
                         if (h === 'CHAR_ID') return charId;
@@ -1696,7 +1853,11 @@ export default {
             this.renderCharacterCreationPanel($('#dnd-creator-chat-history').closest('#dnd-content'));
             
             // 显示成功通知
-            NotificationSystem.success(`🎉 ${isPC ? '主角' : '队友'} "${data.name}" 创建成功！`, '角色创建');
+            const successMsg = state.mode === 'levelup'
+                ? `🎉 角色 "${data.name}" 升级成功 (Lv.${data.level})！`
+                : `🎉 ${isPC ? '主角' : '队友'} "${data.name}" 创建成功！`;
+                
+            NotificationSystem.success(successMsg, state.mode === 'levelup' ? '角色升级' : '角色创建');
             
         } catch (error) {
             console.error('[CharCreator] 保存失败:', error);
