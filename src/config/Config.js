@@ -38,7 +38,8 @@ export const CONFIG = {
         THEME: 'dnd_theme',
         MAP_ZOOM: 'dnd_map_zoom',
         PRESET_CONFIG: 'dnd_preset_config',
-        QUICK_SLOTS: 'dnd_quick_slots'
+        QUICK_SLOTS: 'dnd_quick_slots',
+        SYNC_QUEUE: 'dnd_sync_queue'
     },
     // 地图缩放配置
     MAP_ZOOM: {

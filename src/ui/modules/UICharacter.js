@@ -7,12 +7,17 @@ import { SettingsManager } from '../../core/SettingsManager.js';
 import { CONFIG } from '../../config/Config.js';
 import { DiceManager } from '../../data/DiceManager.js';
 import { NotificationSystem } from './UIUtils.js';
+import { TavernSettingsSync } from '../../core/TavernSettingsSync.js';
 
 export default {
-    // 头像存储管理 (使用 IndexedDB)
+    // 头像存储管理 (使用 IndexedDB + Chat Metadata)
     avatarStorage: {
         get: async (charId) => {
-            // 优先尝试 IndexedDB
+            // 1. 优先尝试 Chat Metadata (跟随聊天文件)
+            const chatVal = TavernSettingsSync.getFromChat(`avatar_${charId}`);
+            if (chatVal) return chatVal;
+
+            // 2. 尝试 IndexedDB (本地缓存)
             let val = await DBAdapter.get(charId);
             // 兼容旧版 localStorage (迁移数据)
             if (!val) {
@@ -26,9 +31,15 @@ export default {
             return val;
         },
         set: async (charId, base64Data) => {
+            // 保存到 Chat Metadata
+            await TavernSettingsSync.saveToChat(`avatar_${charId}`, base64Data);
+            // 保存到 IndexedDB
             return await DBAdapter.put(charId, base64Data);
         },
         remove: async (charId) => {
+            // 从 Chat Metadata 移除
+            await TavernSettingsSync.deleteFromChat(`avatar_${charId}`);
+            // 从 IndexedDB 移除
             return await DBAdapter.delete(charId);
         }
     },
@@ -665,6 +676,9 @@ export default {
         };
         
         // 3. 初始化状态
+        // [新增] 获取启用的世界书内容，用于自定义世界观支持
+        const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
         this._charCreatorState = {
             mode: 'levelup', // 标记为升级模式
             targetCharId: charId,
@@ -674,7 +688,9 @@ export default {
             characterData: currentData, // 初始数据为当前状态
             isGenerating: false,
             currentStep: 'chatting', // 直接进入对话
-            characterType: 'pc' // 默认为 PC，实际上会更新现有角色
+            characterType: 'pc', // 默认为 PC，实际上会更新现有角色
+            worldInfo: worldInfo, // 保存世界书内容
+            useWorldInfo: true // 默认开启世界书参考
         };
         
         // 4. 切换面板并确保显示
@@ -757,7 +773,7 @@ export default {
             $container.html('<div style="padding:50px;text-align:center;color:#888;">⏳ 正在初始化...</div>');
 
             // 尝试从存储加载状态
-            DBAdapter.getSetting('dnd_creator_state').then(savedState => {
+            DBAdapter.getSetting('dnd_creator_state').then(async savedState => {
                 this._charCreatorLoading = false;
                 
                 if (savedState) {
@@ -771,6 +787,9 @@ export default {
                 if (!this._charCreatorState) {
                     let apiConfig = { url: '', key: '', model: '' };
                     
+                    // [新增] 获取世界书内容
+                    const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
                     this._charCreatorState = {
                         selectedPresetId: null,
                         apiConfig: apiConfig,
@@ -779,7 +798,9 @@ export default {
                         characterData: {},
                         isGenerating: false,
                         currentStep: 'init',
-                        characterType: 'pc'
+                        characterType: 'pc',
+                        worldInfo: worldInfo,
+                        useWorldInfo: true
                     };
                     
                     // 异步加载全局 API 配置 (仅在全新开始时加载)
@@ -905,6 +926,13 @@ export default {
                                 URL: ${state.apiConfig.url || '未设置'}<br>
                                 Model: ${state.apiConfig.model || '未设置'}
                             </div>
+                            
+                            <!-- 世界书开关 -->
+                            <div style="margin-bottom:8px; display:flex; align-items:center; gap:5px;">
+                                <input type="checkbox" id="dnd-creator-use-worldinfo" ${state.useWorldInfo !== false ? 'checked' : ''} style="cursor:pointer;">
+                                <label for="dnd-creator-use-worldinfo" style="font-size:12px; color:#ccc; cursor:pointer;" title="开启后，升级/创建时将参考当前启用的世界书内容">📚 参考启用世界书</label>
+                            </div>
+
                             <button type="button" onclick="window.DND_Dashboard_UI.renderPanel('settings')" class="dnd-clickable" style="width:100%;padding:6px;background:#2a2a2c;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">
                                 ⚙️ 前往设置配置 API
                             </button>
@@ -1239,6 +1267,19 @@ export default {
         const { $ } = getCore();
         const state = this._charCreatorState;
         
+        // 世界书开关
+        $container.find('#dnd-creator-use-worldinfo').on('change', async function() {
+            state.useWorldInfo = $(this).is(':checked');
+            // 如果开启，且之前没有获取过 worldInfo，尝试获取
+            if (state.useWorldInfo && !state.worldInfo) {
+                const info = await TavernAPI.getEnabledWorldInfo();
+                state.worldInfo = info;
+            }
+            if (typeof window.DND_Dashboard_UI.saveCreatorState === 'function') {
+                window.DND_Dashboard_UI.saveCreatorState();
+            }
+        });
+
         // 角色类型切换按钮
         $container.find('#dnd-creator-type-pc').on('click', () => {
             if (state.currentStep !== 'init') return;
@@ -1291,6 +1332,9 @@ export default {
                 type: 'warning'
             });
             if (confirmed) {
+                // [新增] 获取世界书内容
+                const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
                 // 重置为初始状态，但保留配置
                 this._charCreatorState = {
                     selectedPresetId: state.selectedPresetId,
@@ -1300,7 +1344,9 @@ export default {
                     conversationHistory: [],
                     characterData: {},
                     isGenerating: false,
-                    currentStep: 'init'
+                    currentStep: 'init',
+                    worldInfo: worldInfo,
+                    useWorldInfo: true
                 };
                 this.saveCreatorState(); // 保存（覆盖）旧状态
                 this.renderCharacterCreationPanel($container);
@@ -1449,8 +1495,12 @@ export default {
             let systemPrompt = '';
             
             if (isLevelUp) {
+                // [新增] 注入世界书内容
+                const useWI = state.useWorldInfo !== false;
+                const worldInfoStr = (useWI && state.worldInfo) ? `\n\n${state.worldInfo}\n\n注意：上述【当前世界观/规则参考】不仅是背景故事，更是**扩展的游戏规则**。如果世界书中描述了特殊的魔法体系、武术流派或生理特征，请将其转化为具体的**自定义职业、专长、技能或特性**。不要局限于 DND 5E 的标准选项。如果世界书内容与 DND 规则冲突，或提供了全新的机制，**请优先使用世界书内容创造新的游戏规则**。你可以设计全新的职业特性来反映世界书的设定，而不仅仅是重命名现有的 DND 特性。` : '';
+
                 // 升级模式 Prompt
-                systemPrompt = `你是一个 DND 5E 角色升级向导。当前用户正在将角色 "${state.characterData.name}" 从等级 ${state.characterData.level} 提升到 ${(state.characterData.level || 1) + 1}。
+                systemPrompt = `你是一个 DND 5E (及自定义世界观) 角色升级向导。当前用户正在将角色 "${state.characterData.name}" 从等级 ${state.characterData.level} 提升到 ${(state.characterData.level || 1) + 1}。${worldInfoStr}
 
 **当前角色数据:**
 \`\`\`json
@@ -1459,15 +1509,22 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 请遵循以下流程引导用户升级：
 1. **生命值提升**: 根据职业生命骰（取平均或投掷），计算新的最大HP。
-2. **职业特性**: 告知用户新等级获得的职业特性（如动作如潮、子职特性等），并解释其效果。
+2. **职业特性**: 告知用户新等级获得的职业特性。如果角色是自定义职业或处于自定义世界观下，请**根据世界书推断、设计或询问用户其特性**。不要害怕创造 DND 规则书中没有的能力。
 3. **法术/已知法术**: 如果是施法者，引导选择新法术或替换旧法术。
 4. **属性提升/专长**: 如果是 4/8/12/16/19 级，引导用户选择属性值提升 (ASI) 或专长。
 5. **熟练项加值**: 检查熟练加值是否因等级提升而增加（如 1-4级+2, 5-8级+3）。
 
 在对话中：
 - 每次专注于一个升级步骤。
-- 当有多个选择时（如选择新法术、专长），使用 \`CHARACTER_OPTIONS\` 块输出选项。
-- 解释规则依据。
+- 当有多个选择时（如选择新法术、专长），**必须**使用 \`CHARACTER_OPTIONS\` 块输出选项，格式如下：
+\`\`\`CHARACTER_OPTIONS
+{
+"question": "请选择...",
+"type": "single",
+"options": ["选项A", "选项B"]
+}
+\`\`\`
+- 解释规则依据 (DND 5E 规则或世界书自定义规则)。如果使用了自定义规则，请明确指出这是根据世界书设定的。
 
 最后，当升级的所有选择都确定后，输出更新后的 \`CHARACTER_DATA\` 块。**必须包含角色的所有数据（旧数据+新变化），而不仅仅是变化部分。** 格式与创建角色时相同。
 
@@ -1480,11 +1537,16 @@ ${JSON.stringify(state.characterData, null, 2)}
             } else {
                 // 创建模式 Prompt
                 const charTypeLabel = state.characterType === 'pc' ? '主角' : '队友';
-                systemPrompt = `你是一个 DND 5E 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。
+                
+                // [新增] 注入世界书内容
+                const useWI = state.useWorldInfo !== false;
+                const worldInfoStr = (useWI && state.worldInfo) ? `\n\n${state.worldInfo}\n\n注意：上述【当前世界观/规则参考】不仅是背景故事，更是**扩展的游戏规则**。请积极从世界书中提取并**创造**新的种族、职业、背景和专长。不要局限于 DND 5E 的标准选项。例如，如果世界书提到了一种特殊的“星能使用者”，你可以为此创建一个全新的职业，并设计其特有的核心能力，而不是强行让用户使用“术士”卡。如果世界书内容提供了全新的机制，**请优先使用世界书内容创造新的游戏规则**。` : '';
+
+                systemPrompt = `你是一个 DND 5E (及自定义世界观) 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。${worldInfoStr}
 
 请遵循以下流程：
 1. 首先询问用户想要创建什么类型的角色（战士、法师、盗贼等），或者让他们描述一个角色概念
-2. 根据用户的回答，建议合适的种族和职业组合
+2. 根据用户的回答，建议合适的种族和职业组合 (优先参考世界书设定，其次参考 DND 规则)
 3. 帮助用户确定属性值分配（使用标准点数购买或让用户自选）
 4. 询问角色的背景、性格特点（理想、牵绊、缺陷）
 5. 询问角色的外貌特征（发色、眼睛、身高、特征）
@@ -1492,11 +1554,11 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 在对话过程中，请：
 - 每次只问1-2个问题，不要一次问太多
-- 提供具体的选项供用户选择（通过 CHARACTER_OPTIONS 输出）
+- 提供具体的选项供用户选择（**必须**通过 CHARACTER_OPTIONS 输出）
 - 解释你的建议理由
 - 保持友好和鼓励的语气
 
-当需要用户做选择时（如选择种族、职业、属性分配方式），请输出一个选项块：
+当需要用户做选择时（如选择种族、职业、属性分配方式），请务必输出一个选项块：
 \`\`\`CHARACTER_OPTIONS
 {
 "question": "请选择你的种族...",
@@ -1702,28 +1764,56 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const newRow = headers.map((h, i) => {
                     if (h === 'CHAR_ID') return idVal;
                     
-                    // 映射字段
+                    const oldVal = (rowIndex !== -1 && table.content[rowIndex] && table.content[rowIndex][i] !== undefined)
+                        ? table.content[rowIndex][i]
+                        : undefined;
+
+                    // 辅助函数：优先使用新数据，如果没有则使用旧数据
+                    const val = (v) => (v !== undefined && v !== null && v !== '') ? v : oldVal;
+
                     // Registry
-                    if (h === '成员类型') return isPC ? '主角' : (data.member_type || '同伴');
-                    if (h === '姓名') return data.name;
-                    if (h === '种族/性别/年龄') return data.race_gender_age || `${data.race}/-/1`;
-                    if (h === '职业') return data.class;
-                    if (h === '外貌描述') return data.appearance;
-                    if (h === '性格特点') return data.personality;
-                    if (h === '背景故事') return data.backstory;
-                    if (h === '加入时间' && !isPC) return '第1天'; // 简化处理
+                    if (h === '成员类型') return isPC ? '主角' : (data.member_type || oldVal || '同伴');
+                    if (h === '姓名') return val(data.name);
+                    if (h === '种族/性别/年龄') return val(data.race_gender_age) || `${data.race}/-/1`;
+                    if (h === '职业') return val(data.class);
+                    if (h === '外貌描述') return val(data.appearance);
+                    if (h === '性格特点') return val(data.personality);
+                    if (h === '背景故事') return val(data.backstory);
+                    if (h === '加入时间') return !isPC ? '第1天' : (oldVal || null);
                     
                     // Attributes
-                    if (h === '等级') return data.level || 1;
-                    if (h === 'HP') return data.hp || '10/10';
-                    if (h === 'AC') return data.ac || 10;
-                    if (h === '先攻加值') return data.initiative || 0;
-                    if (h === '速度') return data.speed || '30尺';
-                    if (h === '属性值') return JSON.stringify(data.stats || {});
-                    if (h === '豁免熟练') return JSON.stringify(data.saving_throws || []);
-                    if (h === '技能熟练') return JSON.stringify(data.skill_proficiencies || []);
-                    if (h === '被动感知') return data.passive_perception || 10;
-                    if (h === '经验值' && isPC) return '0/300';
+                    if (h === '等级') return val(data.level) || 1;
+                    if (h === 'HP') return val(data.hp) || '10/10';
+                    if (h === 'AC') return val(data.ac) || 10;
+                    if (h === '先攻加值') return (data.initiative !== undefined ? data.initiative : oldVal) || 0;
+                    if (h === '速度') return val(data.speed) || '30尺';
+                    if (h === '属性值') return data.stats ? JSON.stringify(data.stats) : (oldVal || '{}');
+                    if (h === '豁免熟练') return data.saving_throws ? JSON.stringify(data.saving_throws) : (oldVal || '[]');
+                    if (h === '技能熟练') return data.skill_proficiencies ? JSON.stringify(data.skill_proficiencies) : (oldVal || '[]');
+                    if (h === '被动感知') return (data.passive_perception !== undefined ? data.passive_perception : oldVal) || 10;
+                    if (h === '经验值' && isPC) {
+                        // 如果是升级模式，尝试保留当前经验值并更新上限
+                        if (state.mode === 'levelup' && rowIndex !== -1) {
+                            const oldVal = table.content[rowIndex][i] || '0/300';
+                            const currExp = parseInt(oldVal.split('/')[0]) || 0;
+                            
+                            // DND 5E 经验值表 (下标对应等级，值为下一级所需经验)
+                            // Lv1->Lv2: 300, Lv2->Lv3: 900 ...
+                            const xpTable = [
+                                0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
+                                85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000
+                            ];
+                            
+                            const nextLevel = parseInt(data.level) || 1;
+                            // 获取下一级所需经验值 (作为分母)
+                            // 如果当前是Lv1(nextLevel=1), 目标是300 (xpTable[1])
+                            // 如果当前是Lv2(nextLevel=2), 目标是900 (xpTable[2])
+                            const nextExp = xpTable[nextLevel] || 355000;
+                            
+                            return `${currExp}/${nextExp}`;
+                        }
+                        return '0/300';
+                    }
                     
                     // Resources
                     if (h === '法术位') return data.resources?.spell_slots ? JSON.stringify(data.resources.spell_slots) : null;
@@ -1756,19 +1846,72 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
                 const skillIdIdx = linkHeaders.indexOf('SKILL_ID');
 
+                // [Fix] 清理现有的重复技能 (保留一个，删除多余的)
+                if (charIdIdx !== -1 && skillIdIdx !== -1) {
+                    const charLinks = skillLinkTable.content.filter(row => row[charIdIdx] === charId);
+                    const nameMap = new Map(); // name -> [linkRow...]
+                    const rowsToDelete = new Set();
+
+                    charLinks.forEach(linkRow => {
+                        const skillId = linkRow[skillIdIdx];
+                        const libRow = skillLibTable.content.find(r => r[0] === skillId);
+                        if (libRow) {
+                            const name = (libRow[1] || '').trim();
+                            if (name) {
+                                if (!nameMap.has(name)) nameMap.set(name, []);
+                                nameMap.get(name).push(linkRow);
+                            }
+                        }
+                    });
+
+                    nameMap.forEach((rows, name) => {
+                        if (rows.length > 1) {
+                            console.log(`[CharCreator] 清理重复技能: ${name} (删除 ${rows.length - 1} 个)`);
+                            // 保留第一个，标记其余为删除
+                            for (let i = 1; i < rows.length; i++) {
+                                rowsToDelete.add(rows[i]);
+                            }
+                        }
+                    });
+
+                    if (rowsToDelete.size > 0) {
+                        skillLinkTable.content = skillLinkTable.content.filter(row => !rowsToDelete.has(row));
+                    }
+                }
+
                 spells.forEach(spell => {
+                    const spellName = (spell.name || '').trim();
+                    if (!spellName) return;
+
+                    // [Fix] 预先检查是否已存在同名技能的关联 (防止重复)
+                    const matchingSkillIds = skillLibTable.content
+                        .filter(row => (row[1] || '').trim() === spellName)
+                        .map(row => row[0]);
+
+                    if (charIdIdx !== -1 && skillIdIdx !== -1 && matchingSkillIds.length > 0) {
+                        const isAlreadyLinked = skillLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && matchingSkillIds.includes(row[skillIdIdx])
+                        );
+                        if (isAlreadyLinked) return;
+                    }
+
                     // 1. 添加到技能库 (SKILL_Library)
                     let skillId = 'SKILL_' + Math.random().toString(36).substr(2, 8);
                     // 检查是否存在
-                    const existingSkill = skillLibTable.content.find(row => row[1] === spell.name); // 假设第二列是名称
+                    const existingSkill = skillLibTable.content.find(row => (row[1] || '').trim() === spellName);
                     
                     if (existingSkill) {
                         skillId = existingSkill[0]; // 假设第一列是ID
+                        // [Fix] 更新描述 (如果 AI 提供了新描述)
+                        if (spell.desc) {
+                            const descIdx = skillLibTable.content[0].indexOf('效果描述');
+                            if (descIdx !== -1) existingSkill[descIdx] = spell.desc;
+                        }
                     } else {
                         const libHeaders = skillLibTable.content[0];
                         const newLibRow = libHeaders.map(h => {
                             if (h === 'SKILL_ID') return skillId;
-                            if (h === '技能名称') return spell.name;
+                            if (h === '技能名称') return spellName;
                             if (h === '技能类型') return '法术';
                             if (h === '环阶') return spell.level !== undefined ? spell.level : '0';
                             if (h === '学派') return spell.school || '-';
@@ -1808,17 +1951,73 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
                 const featIdIdx = linkHeaders.indexOf('FEAT_ID');
 
+                // [Fix] 清理现有的重复专长/特性
+                if (charIdIdx !== -1 && featIdIdx !== -1) {
+                    const charLinks = featLinkTable.content.filter(row => row[charIdIdx] === charId);
+                    const nameMap = new Map(); // name -> [linkRow...]
+                    const rowsToDelete = new Set();
+
+                    charLinks.forEach(linkRow => {
+                        const featId = linkRow[featIdIdx];
+                        const libRow = featLibTable.content.find(r => r[0] === featId);
+                        if (libRow) {
+                            const name = (libRow[1] || '').trim();
+                            if (name) {
+                                if (!nameMap.has(name)) nameMap.set(name, []);
+                                nameMap.get(name).push(linkRow);
+                            }
+                        }
+                    });
+
+                    nameMap.forEach((rows, name) => {
+                        if (rows.length > 1) {
+                            console.log(`[CharCreator] 清理重复特性: ${name} (删除 ${rows.length - 1} 个)`);
+                            for (let i = 1; i < rows.length; i++) {
+                                rowsToDelete.add(rows[i]);
+                            }
+                        }
+                    });
+
+                    if (rowsToDelete.size > 0) {
+                        featLinkTable.content = featLinkTable.content.filter(row => !rowsToDelete.has(row));
+                    }
+                }
+
                 features.forEach(feat => {
+                    const featName = (feat.name || '').trim();
+                    if (!featName) return;
+
+                    // 1. 查找所有名称匹配的 featId (包括可能重复的库条目)
+                    const matchingFeatIds = featLibTable.content
+                        .filter(row => (row[1] || '').trim() === featName)
+                        .map(row => row[0]);
+
+                    // 2. 检查该角色是否已经链接了其中任何一个 featId
+                    if (charIdIdx !== -1 && featIdIdx !== -1 && matchingFeatIds.length > 0) {
+                        const isAlreadyLinked = featLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && matchingFeatIds.includes(row[featIdIdx])
+                        );
+                        if (isAlreadyLinked) {
+                            console.log(`[CharCreator] 跳过重复专长/特性: ${featName}`);
+                            return;
+                        }
+                    }
+
                     let featId = 'FEAT_' + Math.random().toString(36).substr(2, 8);
-                    const existingFeat = featLibTable.content.find(row => row[1] === feat.name);
+                    const existingFeat = featLibTable.content.find(row => (row[1] || '').trim() === featName);
                     
                     if (existingFeat) {
                         featId = existingFeat[0];
+                        // [Fix] 更新描述 (如果 AI 提供了新描述)
+                        if (feat.desc) {
+                            const descIdx = featLibTable.content[0].indexOf('效果描述');
+                            if (descIdx !== -1) existingFeat[descIdx] = feat.desc;
+                        }
                     } else {
                         const libHeaders = featLibTable.content[0];
                         const newLibRow = libHeaders.map(h => {
                             if (h === 'FEAT_ID') return featId;
-                            if (h === '专长名称') return feat.name;
+                            if (h === '专长名称') return featName;
                             if (h === '类别') return feat.type || '职业特性';
                             if (h === '效果描述') return feat.desc;
                             return null;

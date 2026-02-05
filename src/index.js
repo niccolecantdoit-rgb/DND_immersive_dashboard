@@ -10,6 +10,8 @@ import { DiceManager } from './data/DiceManager.js';
 import { UpdateController } from './features/UpdateController.js';
 import { PresetSwitcher } from './features/PresetSwitcher.js';
 import { DataManager } from './data/DataManager.js';
+import { TavernSettingsSync } from './core/TavernSettingsSync.js';
+import { NotificationSystem } from './ui/modules/UIUtils.js';
 
 (function () {
     'use strict';
@@ -74,6 +76,15 @@ import { DataManager } from './data/DataManager.js';
                     }
                 });
 
+                // 初始化设置同步 (优先酒馆原生)
+                TavernSettingsSync.setNotifyCallback((type, message, title) => {
+                    // 映射 type 到 NotificationSystem 支持的类型
+                    const method = NotificationSystem[type] ? type : 'info';
+                    NotificationSystem[method](message, title);
+                });
+                // 延迟初始化以确保酒馆环境加载完成
+                setTimeout(() => TavernSettingsSync.init(), 1000);
+                
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
                     

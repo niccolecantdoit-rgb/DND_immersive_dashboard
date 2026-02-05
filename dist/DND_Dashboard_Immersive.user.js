@@ -247,6 +247,20 @@ const DBAdapter = {
         return DBAdapter._op(DBAdapter.storeName, 'readwrite', store => store.delete(key));
     },
 
+    // [新增] 清空指定存储库
+    clearStore: async (storeName) => {
+        return DBAdapter._op(storeName, 'readwrite', store => store.clear());
+    },
+
+    // [新增] 便捷清理方法
+    clearAvatars: async () => {
+        return DBAdapter.clearStore(DBAdapter.storeName);
+    },
+
+    clearMaps: async () => {
+        return DBAdapter.clearStore(DBAdapter.svgStore);
+    },
+
     migrateFromLocalStorage: async () => {
         const keys = Object.keys(localStorage);
         let count = 0;
@@ -304,8 +318,459 @@ const DBAdapter = {
     }
 };
 
+;// ./src/core/TavernSettingsSync.js
+// src/core/TavernSettingsSync.js
+
+
+
+const TavernSettingsSync = {
+    EXTENSION_NAME: 'dnd_dashboard',
+    SYNC_QUEUE_KEY: 'dnd_sync_queue',
+    
+    _tavernAvailable: null,
+    _previousState: null, // Used to detect state changes
+    _syncInterval: null,
+    _notifyCallback: null, // Notification callback
+    
+    /**
+     * Set notification callback function
+     * @param {Function} callback - (type, message, title) => void
+     */
+    setNotifyCallback: function(callback) {
+        this._notifyCallback = callback;
+    },
+    
+    /**
+     * Internal notification method
+     */
+    _notify: function(type, message, title = '') {
+        // 抑制频繁的连接通知，仅错误和重要状态变更时通知
+        if (type === 'info' && (title.includes('云同步') || title.includes('同步中'))) {
+            Logger.info(`[TavernSettingsSync] (Silent) ${type}: ${title} - ${message}`);
+            return;
+        }
+
+        if (this._notifyCallback) {
+            this._notifyCallback(type, message, title);
+        }
+        Logger.info(`[TavernSettingsSync] ${type}: ${title} - ${message}`);
+    },
+    
+    /**
+     * Initialize - Check Tavern environment, start sync
+     */
+    init: async function() {
+        // Prevent re-initialization
+        if (this._syncInterval) clearInterval(this._syncInterval);
+
+        this._tavernAvailable = this._checkTavernAvailable();
+        this._previousState = this._tavernAvailable;
+        
+        // Initial notification
+        if (this._tavernAvailable) {
+            // Silently sync on init to avoid popup spam
+            Logger.info('[TavernSettingsSync] ☁️ 云同步已启用');
+            
+            // Process pending sync queue
+            try {
+                const queue = await this._getSyncQueue();
+                const pendingCount = Object.keys(queue).length;
+                if (pendingCount > 0) {
+                    // Only notify if there is actual work to do
+                    this._notify('info', `正在同步 ${pendingCount} 项本地更改...`, '🔄 同步中');
+                    await this._processSyncQueue();
+                }
+            } catch (e) {
+                Logger.error('[TavernSettingsSync] Initial sync failed:', e);
+            }
+        } else {
+            this._notify('warning', '数据仅保存在本地，连接酒馆后将自动同步', '📴 离线模式');
+        }
+        
+        // Start background check
+        this._syncInterval = setInterval(() => this._backgroundCheck(), 30000);
+        
+        return this._tavernAvailable;
+    },
+    
+    /**
+     * Background check - Detect connection state changes
+     */
+    _backgroundCheck: async function() {
+        const currentState = this._checkTavernAvailable();
+        
+        // State change detection
+        if (currentState !== this._previousState) {
+            if (currentState && !this._previousState) {
+                // Recovered from offline to online
+                this._notify('success', '正在同步本地更改...', '🔗 已重新连接酒馆');
+                await this._processSyncQueue();
+            } else if (!currentState && this._previousState) {
+                // Changed from online to offline
+                this._notify('warning', '数据将暂存本地，恢复连接后自动同步', '📴 酒馆连接已断开');
+            }
+            this._previousState = currentState;
+        }
+        
+        this._tavernAvailable = currentState;
+        
+        // If online, try to process queue (in case previous attempts failed)
+        if (currentState) {
+            await this._processSyncQueue();
+        }
+    },
+    
+    /**
+     * Check if Tavern extension_settings is available
+     */
+    _checkTavernAvailable: function() {
+        try {
+            const win = window.parent || window;
+            // Check for SillyTavern object and getContext method
+            if (win.SillyTavern && typeof win.SillyTavern.getContext === 'function') {
+                const ctx = win.SillyTavern.getContext();
+                return !!(ctx && ctx.extensionSettings);
+            }
+            // Fallback check for global extension_settings (older versions might expose it differently)
+            // But relying on getContext is safer for modern ST
+            return false;
+        } catch(e) {
+            return false;
+        }
+    },
+    
+    /**
+     * Get reference to Tavern's extension_settings
+     */
+    _getExtensionSettings: function() {
+        try {
+            const win = window.parent || window;
+            if (!win.SillyTavern?.getContext) return null;
+            
+            const ctx = win.SillyTavern.getContext();
+            if (!ctx?.extensionSettings) return null;
+            
+            // Ensure our namespace exists
+            if (!ctx.extensionSettings[this.EXTENSION_NAME]) {
+                ctx.extensionSettings[this.EXTENSION_NAME] = {};
+            }
+            return ctx.extensionSettings[this.EXTENSION_NAME];
+        } catch (e) {
+            Logger.warn('[TavernSettingsSync] Failed to get extension settings:', e);
+            return null;
+        }
+    },
+
+    // ========== Chat Metadata Support ==========
+
+    /**
+     * Get chat metadata
+     */
+    _getChatMetadata: function() {
+        try {
+            const win = window.parent || window;
+            // Try global variable first (common in ST)
+            if (win.chat_metadata) return win.chat_metadata;
+            
+            // Try context
+            if (win.SillyTavern?.getContext) {
+                const ctx = win.SillyTavern.getContext();
+                if (ctx.chatMetadata) return ctx.chatMetadata;
+            }
+            return null;
+        } catch (e) { return null; }
+    },
+
+    /**
+     * Save chat metadata
+     */
+    _saveChatMetadata: async function() {
+        try {
+            const win = window.parent || window;
+            if (typeof win.saveChatDebounced === 'function') {
+                win.saveChatDebounced();
+                return true;
+            }
+            // Try context
+            if (win.SillyTavern?.getContext) {
+                const ctx = win.SillyTavern.getContext();
+                if (typeof ctx.saveChatDebounced === 'function') {
+                    ctx.saveChatDebounced();
+                    return true;
+                }
+            }
+            return false;
+        } catch (e) { return false; }
+    },
+
+    /**
+     * Save to chat metadata (Public)
+     */
+    saveToChat: async function(key, value) {
+        try {
+            const meta = this._getChatMetadata();
+            if (meta) {
+                if (!meta.extensions) meta.extensions = {};
+                if (!meta.extensions[this.EXTENSION_NAME]) meta.extensions[this.EXTENSION_NAME] = {};
+                
+                meta.extensions[this.EXTENSION_NAME][key] = value;
+                return await this._saveChatMetadata();
+            }
+        } catch (e) {
+            Logger.warn('[TavernSettingsSync] Save to chat failed:', e);
+        }
+        return false;
+    },
+
+    /**
+     * Get from chat metadata (Public)
+     */
+    getFromChat: function(key) {
+        try {
+            const meta = this._getChatMetadata();
+            if (meta?.extensions?.[this.EXTENSION_NAME]) {
+                return meta.extensions[this.EXTENSION_NAME][key];
+            }
+        } catch (e) {}
+        return undefined;
+    },
+
+    /**
+     * Delete from chat metadata (Public)
+     */
+    deleteFromChat: async function(key) {
+        try {
+            const meta = this._getChatMetadata();
+            if (meta?.extensions?.[this.EXTENSION_NAME]) {
+                delete meta.extensions[this.EXTENSION_NAME][key];
+                return await this._saveChatMetadata();
+            }
+        } catch (e) {}
+        return false;
+    },
+    
+    /**
+     * Public API to sync arbitrary data to Tavern extension_settings
+     * (Used for avatars and maps from DBAdapter)
+     */
+    syncToTavern: async function(key, value) {
+        // If offline, queue it
+        if (!this._tavernAvailable) {
+            await this._addToSyncQueue(key, value);
+            return false;
+        }
+
+        try {
+            const settings = this._getExtensionSettings();
+            if (settings) {
+                settings[key] = value;
+                const saved = await this._saveTavernSettings();
+                if (saved) {
+                    await this._removeFromSyncQueue(key);
+                    return true;
+                }
+            }
+        } catch(e) {
+            Logger.warn('[TavernSettingsSync] Sync to tavern failed:', e);
+        }
+        
+        // If failed, queue it
+        await this._addToSyncQueue(key, value);
+        return false;
+    },
+
+    /**
+     * Trigger Tavern save
+     */
+    _saveTavernSettings: async function() {
+        try {
+            const win = window.parent || window;
+            if (!win.SillyTavern?.getContext) return false;
+            
+            const ctx = win.SillyTavern.getContext();
+            const saveDebounced = ctx.saveSettingsDebounced;
+            
+            if (typeof saveDebounced === 'function') {
+                saveDebounced();
+                return true;
+            }
+            return false;
+        } catch (e) {
+            Logger.warn('[TavernSettingsSync] Failed to save Tavern settings:', e);
+            return false;
+        }
+    },
+    
+    // ========== Core API ==========
+    
+    /**
+     * Read setting - Prefer Tavern, fallback to IndexedDB
+     */
+    getSetting: async function(key, defaultValue = null) {
+        // 1. Try reading from Tavern
+        if (this._tavernAvailable) {
+            const settings = this._getExtensionSettings();
+            if (settings && settings[key] !== undefined) {
+                // Sync to IndexedDB as backup
+                try {
+                    const localVal = await DBAdapter.getSetting(key);
+                    if (JSON.stringify(localVal) !== JSON.stringify(settings[key])) {
+                        await DBAdapter.setSetting(key, settings[key]);
+                    }
+                } catch (e) {
+                    // Ignore compare errors, just write
+                    await DBAdapter.setSetting(key, settings[key]);
+                }
+                return settings[key];
+            }
+        }
+        
+        // 2. Read from IndexedDB
+        const localValue = await DBAdapter.getSetting(key);
+        if (localValue !== null && localValue !== undefined) {
+            return localValue;
+        }
+        
+        return defaultValue;
+    },
+    
+    /**
+     * Save setting - Write to both Tavern and IndexedDB
+     */
+    setSetting: async function(key, value) {
+        // 1. Immediately save to IndexedDB (Ensure no data loss)
+        await DBAdapter.setSetting(key, value);
+        
+        // 2. Try saving to Tavern
+        if (this._tavernAvailable) {
+            try {
+                const settings = this._getExtensionSettings();
+                if (settings) {
+                    settings[key] = value;
+                    const saved = await this._saveTavernSettings();
+                    if (saved) {
+                        // Success, remove from sync queue if it was there
+                        await this._removeFromSyncQueue(key);
+                        return true;
+                    }
+                }
+            } catch(e) {
+                Logger.warn('[TavernSettingsSync] Tavern save failed:', e);
+            }
+            
+            // Tavern save failed or threw error, add to sync queue
+            await this._addToSyncQueue(key, value);
+        } else {
+             // Offline, add to sync queue
+             await this._addToSyncQueue(key, value);
+        }
+        
+        return false; // Return false means only saved locally or queued
+    },
+    
+    // ========== Sync Queue Management ==========
+    
+    _addToSyncQueue: async function(key, value) {
+        try {
+            let queue = await this._getSyncQueue();
+            queue[key] = { value, timestamp: Date.now() };
+            await DBAdapter.setSetting(this.SYNC_QUEUE_KEY, JSON.stringify(queue));
+        } catch (e) {
+            Logger.error('[TavernSettingsSync] Failed to add to sync queue:', e);
+        }
+    },
+    
+    _removeFromSyncQueue: async function(key) {
+        try {
+            let queue = await this._getSyncQueue();
+            if (queue[key]) {
+                delete queue[key];
+                await DBAdapter.setSetting(this.SYNC_QUEUE_KEY, JSON.stringify(queue));
+            }
+        } catch (e) {
+            Logger.error('[TavernSettingsSync] Failed to remove from sync queue:', e);
+        }
+    },
+    
+    _getSyncQueue: async function() {
+        try {
+            const raw = await DBAdapter.getSetting(this.SYNC_QUEUE_KEY);
+            if (!raw) return {};
+            return typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch(e) { 
+            return {}; 
+        }
+    },
+    
+    _processSyncQueue: async function() {
+        if (!this._tavernAvailable) return;
+        
+        const queue = await this._getSyncQueue();
+        const keys = Object.keys(queue);
+        if (keys.length === 0) return;
+        
+        Logger.info(`[TavernSettingsSync] Processing ${keys.length} pending items...`);
+        
+        let successCount = 0;
+        
+        try {
+            const settings = this._getExtensionSettings();
+            if (!settings) throw new Error('Extension settings not accessible');
+
+            for (const key of keys) {
+                const { value } = queue[key];
+                settings[key] = value;
+                successCount++;
+            }
+            
+            const saved = await this._saveTavernSettings();
+            if (saved) {
+                await DBAdapter.setSetting(this.SYNC_QUEUE_KEY, '{}');
+                this._notify('success', `${successCount} 项设置已同步到酒馆`, '✅ 同步完成');
+            } else {
+                 Logger.warn('[TavernSettingsSync] Save triggered but returned false');
+            }
+        } catch(e) {
+            Logger.error('[TavernSettingsSync] Sync processing failed:', e);
+            this._notify('error', '请检查网络连接', '❌ 同步失败');
+        }
+    },
+    
+    /**
+     * Manual sync trigger
+     */
+    forceSync: async function() {
+        this._tavernAvailable = this._checkTavernAvailable();
+        if (this._tavernAvailable) {
+            await this._processSyncQueue();
+            return true;
+        }
+        return false;
+    },
+    
+    /**
+     * Get current status (for UI)
+     */
+    getStatus: async function() {
+        const queue = await this._getSyncQueue();
+        const pendingCount = Object.keys(queue).length;
+        
+        return {
+            connected: this._tavernAvailable,
+            pendingSync: pendingCount,
+            statusText: this._tavernAvailable 
+                ? (pendingCount > 0 ? `☁️ 在线 (${pendingCount} 待同步)` : '☁️ 在线同步')
+                : '📴 离线模式',
+            statusClass: this._tavernAvailable 
+                ? (pendingCount > 0 ? 'warning' : 'success')
+                : 'warning'
+        };
+    }
+};
+
 ;// ./src/core/Utils.js
 // src/core/Utils.js
+
 
 
 const getCore = () => {
@@ -327,22 +792,8 @@ const getCore = () => {
 };
 
 const safeSave = async (key, val) => {
-    try {
-        await DBAdapter.setSetting(key, val);
-    } catch(e) {
-        console.warn('[DND Storage] DB Save failed:', e);
-    }
-    
-    try {
-        const valStr = typeof val === 'object' ? JSON.stringify(val) : val;
-        localStorage.setItem(key, valStr);
-    } catch(e) {
-        if (e.name === 'QuotaExceededError' || e.code === 22) {
-            console.warn('[DND Storage] LocalStorage is full! Backup failed for:', key);
-        } else {
-            console.warn('[DND Storage] LS Save failed:', e);
-        }
-    }
+    // 优先使用同步模块
+    await TavernSettingsSync.setSetting(key, val);
 };
 
 ;// ./src/config/Config.js
@@ -386,7 +837,8 @@ const CONFIG = {
         THEME: 'dnd_theme',
         MAP_ZOOM: 'dnd_map_zoom',
         PRESET_CONFIG: 'dnd_preset_config',
-        QUICK_SLOTS: 'dnd_quick_slots'
+        QUICK_SLOTS: 'dnd_quick_slots',
+        SYNC_QUEUE: 'dnd_sync_queue'
     },
     // 地图缩放配置
     MAP_ZOOM: {
@@ -5578,6 +6030,79 @@ const TavernAPI = {
             
             return response.trim();
         }
+    },
+
+    /**
+     * 获取当前启用的世界书内容
+     * @returns {Promise<string>} 世界书内容摘要
+     */
+    getEnabledWorldInfo: async function() {
+        const { TavernHelper } = this.getCore();
+        if (!TavernHelper) return '';
+
+        try {
+            const worldbooks = new Set();
+            
+            // 1. 全局世界书
+            if (TavernHelper.getGlobalWorldbookNames) {
+                const globals = TavernHelper.getGlobalWorldbookNames();
+                if (Array.isArray(globals)) globals.forEach(n => worldbooks.add(n));
+            }
+
+            // 2. 聊天世界书
+            if (TavernHelper.getChatWorldbookName) {
+                const chatBook = TavernHelper.getChatWorldbookName('current');
+                if (chatBook) worldbooks.add(chatBook);
+            }
+
+            // 3. 角色世界书
+            if (TavernHelper.getCharWorldbookNames) {
+                const charBooks = TavernHelper.getCharWorldbookNames('current');
+                if (charBooks) {
+                    if (charBooks.primary) worldbooks.add(charBooks.primary);
+                    if (Array.isArray(charBooks.additional)) charBooks.additional.forEach(n => worldbooks.add(n));
+                }
+            }
+
+            if (worldbooks.size === 0) return '';
+
+            let context = "【当前世界观/规则参考 (World Info)】\n";
+            
+            // 获取条目内容
+            for (const bookName of worldbooks) {
+                if (TavernHelper.getWorldbook) {
+                    const entries = await TavernHelper.getWorldbook(bookName);
+                    if (entries && entries.length > 0) {
+                        context += `\n--- 世界书: ${bookName} ---\n`;
+                        // 筛选启用的条目
+                        const activeEntries = entries.filter(e => e.enabled);
+                        
+                        // 简单摘要: 仅提取关键字和部分内容，避免 Token 过多
+                        // 优先提取: 职业, 种族, 等级, 魔法, 规则
+                        const relevantEntries = activeEntries.filter(e => {
+                            const keys = (Array.isArray(e.keys) ? e.keys : []).join(',').toLowerCase();
+                            const content = (e.content || '').toLowerCase();
+                            return keys.includes('class') || keys.includes('race') || keys.includes('level') || keys.includes('magic') || keys.includes('rule') ||
+                                   content.includes('职业') || content.includes('种族') || content.includes('等级') || content.includes('规则');
+                        });
+
+                        // 如果没有特别相关的，取前 20 个 enabled 的条目作为上下文 (防止漏掉)
+                        const targetEntries = relevantEntries.length > 0 ? relevantEntries : activeEntries.slice(0, 20);
+
+                        targetEntries.forEach(e => {
+                            const keysStr = Array.isArray(e.keys) ? e.keys.join(', ') : '无关键字';
+                            context += `[${keysStr}]: ${e.content}\n`;
+                        });
+                    }
+                }
+            }
+            
+            return context;
+
+        } catch (e) {
+            console.error('[TavernAPI] 获取世界书失败:', e);
+            return '';
+        }
     }
 };
 
@@ -5586,39 +6111,28 @@ const TavernAPI = {
 
 
 
-
 const SettingsManager = {
+    // 初始化（在插件启动时调用）
+    init: async () => {
+        await TavernSettingsSync.init();
+    },
+    
     getAPIConfig: async () => {
-        // 1. 优先尝试从 LocalStorage 读取 (最可靠，避免 DB 写入失败导致的旧数据回滚)
-        let saved = null;
-        try {
-            saved = localStorage.getItem('dnd_global_api_config');
-        } catch(e) {}
+        // 使用新的混合存储
+        // 注意：TavernSettingsSync 不再自动添加前缀，需传入完整 Key
+        let saved = await TavernSettingsSync.getSetting('dnd_global_api_config', null);
 
-        // 2. 如果 LS 为空，尝试读取 DB (Global)
+        // [兼容性] 如果新存储为空，尝试读取旧 Key (Legacy)
         if (!saved) {
-            saved = await DBAdapter.getSetting('dnd_global_api_config');
-        }
-        
-        // 3. 如果仍为空，尝试读取旧 Key (Creator/Legacy) - 支持从 DB 或 LS 读取
-        if (!saved) {
-            Logger.debug('[SettingsManager] Global config missing, checking legacy key...');
             try {
-                saved = localStorage.getItem('dnd_creator_api_config');
+                const legacy = localStorage.getItem('dnd_creator_api_config');
+                if (legacy) saved = legacy;
             } catch(e) {}
-            
-            if (!saved) {
-                saved = await DBAdapter.getSetting('dnd_creator_api_config');
-            }
-            
-            if (saved) Logger.info('[SettingsManager] Recovered config from legacy key (dnd_creator_api_config)');
         }
-
-        Logger.debug('[SettingsManager] Loaded API Config (Raw):', saved, typeof saved);
 
         let parsed = saved;
         
-        // 3. 如果是字符串，尝试解析
+        // 解析字符串
         if (typeof saved === 'string') {
             try {
                 parsed = JSON.parse(saved);
@@ -5627,34 +6141,18 @@ const SettingsManager = {
             }
         }
 
-        // 4. 防御性检查：防止双重序列化 (Double Stringify)
+        // 防御性检查：防止双重序列化
         if (typeof parsed === 'string') {
             try {
                 const doubleParsed = JSON.parse(parsed);
                 if (doubleParsed && typeof doubleParsed === 'object') {
                     parsed = doubleParsed;
-                    Logger.debug('[SettingsManager] Detected and fixed double-serialized config');
                 }
             } catch(e) {}
         }
 
-        // 5. 确保是对象
         if (!parsed || typeof parsed !== 'object') {
             parsed = {};
-        }
-
-        // [新增] 6. 如果解析出的配置为空（没有URL），再次尝试从 dnd_creator_api_config 读取 (防止 dnd_global_api_config 存在但为空的情况)
-        if (!parsed.url) {
-            try {
-                const legacy = localStorage.getItem('dnd_creator_api_config');
-                if (legacy) {
-                    const legacyParsed = JSON.parse(legacy);
-                    if (legacyParsed && legacyParsed.url) {
-                        Logger.info('[SettingsManager] Recovered config from legacy key');
-                        parsed = legacyParsed;
-                    }
-                }
-            } catch(e) {}
         }
 
         return {
@@ -5663,19 +6161,20 @@ const SettingsManager = {
             model: parsed.model || ''
         };
     },
+
     setAPIConfig: async (config) => {
         Logger.info('[SettingsManager] Saving API Config:', config);
-        // 使用 safeSave 同时保存到 DB 和 LocalStorage
-        await safeSave('dnd_global_api_config', config);
-        
-        // [双重保险] 强制写入 LocalStorage，防止 safeSave 中的逻辑被跳过
-        try {
-            localStorage.setItem('dnd_global_api_config', JSON.stringify(config));
-            // 同时更新旧 key 以保持兼容（可选，但为了保险起见）
-            localStorage.setItem('dnd_creator_api_config', JSON.stringify(config));
-        } catch(e) {
-            Logger.error('[SettingsManager] Force LS Save failed:', e);
-        }
+        await TavernSettingsSync.setSetting('dnd_global_api_config', config);
+    },
+    
+    // 获取同步状态（用于设置面板显示）
+    getSyncStatus: async () => {
+        return await TavernSettingsSync.getStatus();
+    },
+    
+    // 手动触发同步
+    forceSync: async () => {
+        return await TavernSettingsSync.forceSync();
     }
 };
 
@@ -5690,11 +6189,16 @@ const SettingsManager = {
 
 
 
+
 /* harmony default export */ const UICharacter = ({
-    // 头像存储管理 (使用 IndexedDB)
+    // 头像存储管理 (使用 IndexedDB + Chat Metadata)
     avatarStorage: {
         get: async (charId) => {
-            // 优先尝试 IndexedDB
+            // 1. 优先尝试 Chat Metadata (跟随聊天文件)
+            const chatVal = TavernSettingsSync.getFromChat(`avatar_${charId}`);
+            if (chatVal) return chatVal;
+
+            // 2. 尝试 IndexedDB (本地缓存)
             let val = await DBAdapter.get(charId);
             // 兼容旧版 localStorage (迁移数据)
             if (!val) {
@@ -5708,9 +6212,15 @@ const SettingsManager = {
             return val;
         },
         set: async (charId, base64Data) => {
+            // 保存到 Chat Metadata
+            await TavernSettingsSync.saveToChat(`avatar_${charId}`, base64Data);
+            // 保存到 IndexedDB
             return await DBAdapter.put(charId, base64Data);
         },
         remove: async (charId) => {
+            // 从 Chat Metadata 移除
+            await TavernSettingsSync.deleteFromChat(`avatar_${charId}`);
+            // 从 IndexedDB 移除
             return await DBAdapter.delete(charId);
         }
     },
@@ -6347,6 +6857,9 @@ const SettingsManager = {
         };
         
         // 3. 初始化状态
+        // [新增] 获取启用的世界书内容，用于自定义世界观支持
+        const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
         this._charCreatorState = {
             mode: 'levelup', // 标记为升级模式
             targetCharId: charId,
@@ -6356,7 +6869,9 @@ const SettingsManager = {
             characterData: currentData, // 初始数据为当前状态
             isGenerating: false,
             currentStep: 'chatting', // 直接进入对话
-            characterType: 'pc' // 默认为 PC，实际上会更新现有角色
+            characterType: 'pc', // 默认为 PC，实际上会更新现有角色
+            worldInfo: worldInfo, // 保存世界书内容
+            useWorldInfo: true // 默认开启世界书参考
         };
         
         // 4. 切换面板并确保显示
@@ -6439,7 +6954,7 @@ const SettingsManager = {
             $container.html('<div style="padding:50px;text-align:center;color:#888;">⏳ 正在初始化...</div>');
 
             // 尝试从存储加载状态
-            DBAdapter.getSetting('dnd_creator_state').then(savedState => {
+            DBAdapter.getSetting('dnd_creator_state').then(async savedState => {
                 this._charCreatorLoading = false;
                 
                 if (savedState) {
@@ -6453,6 +6968,9 @@ const SettingsManager = {
                 if (!this._charCreatorState) {
                     let apiConfig = { url: '', key: '', model: '' };
                     
+                    // [新增] 获取世界书内容
+                    const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
                     this._charCreatorState = {
                         selectedPresetId: null,
                         apiConfig: apiConfig,
@@ -6461,7 +6979,9 @@ const SettingsManager = {
                         characterData: {},
                         isGenerating: false,
                         currentStep: 'init',
-                        characterType: 'pc'
+                        characterType: 'pc',
+                        worldInfo: worldInfo,
+                        useWorldInfo: true
                     };
                     
                     // 异步加载全局 API 配置 (仅在全新开始时加载)
@@ -6587,6 +7107,13 @@ const SettingsManager = {
                                 URL: ${state.apiConfig.url || '未设置'}<br>
                                 Model: ${state.apiConfig.model || '未设置'}
                             </div>
+                            
+                            <!-- 世界书开关 -->
+                            <div style="margin-bottom:8px; display:flex; align-items:center; gap:5px;">
+                                <input type="checkbox" id="dnd-creator-use-worldinfo" ${state.useWorldInfo !== false ? 'checked' : ''} style="cursor:pointer;">
+                                <label for="dnd-creator-use-worldinfo" style="font-size:12px; color:#ccc; cursor:pointer;" title="开启后，升级/创建时将参考当前启用的世界书内容">📚 参考启用世界书</label>
+                            </div>
+
                             <button type="button" onclick="window.DND_Dashboard_UI.renderPanel('settings')" class="dnd-clickable" style="width:100%;padding:6px;background:#2a2a2c;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">
                                 ⚙️ 前往设置配置 API
                             </button>
@@ -6921,6 +7448,19 @@ const SettingsManager = {
         const { $ } = getCore();
         const state = this._charCreatorState;
         
+        // 世界书开关
+        $container.find('#dnd-creator-use-worldinfo').on('change', async function() {
+            state.useWorldInfo = $(this).is(':checked');
+            // 如果开启，且之前没有获取过 worldInfo，尝试获取
+            if (state.useWorldInfo && !state.worldInfo) {
+                const info = await TavernAPI.getEnabledWorldInfo();
+                state.worldInfo = info;
+            }
+            if (typeof window.DND_Dashboard_UI.saveCreatorState === 'function') {
+                window.DND_Dashboard_UI.saveCreatorState();
+            }
+        });
+
         // 角色类型切换按钮
         $container.find('#dnd-creator-type-pc').on('click', () => {
             if (state.currentStep !== 'init') return;
@@ -6973,6 +7513,9 @@ const SettingsManager = {
                 type: 'warning'
             });
             if (confirmed) {
+                // [新增] 获取世界书内容
+                const worldInfo = await TavernAPI.getEnabledWorldInfo();
+
                 // 重置为初始状态，但保留配置
                 this._charCreatorState = {
                     selectedPresetId: state.selectedPresetId,
@@ -6982,7 +7525,9 @@ const SettingsManager = {
                     conversationHistory: [],
                     characterData: {},
                     isGenerating: false,
-                    currentStep: 'init'
+                    currentStep: 'init',
+                    worldInfo: worldInfo,
+                    useWorldInfo: true
                 };
                 this.saveCreatorState(); // 保存（覆盖）旧状态
                 this.renderCharacterCreationPanel($container);
@@ -7131,8 +7676,12 @@ const SettingsManager = {
             let systemPrompt = '';
             
             if (isLevelUp) {
+                // [新增] 注入世界书内容
+                const useWI = state.useWorldInfo !== false;
+                const worldInfoStr = (useWI && state.worldInfo) ? `\n\n${state.worldInfo}\n\n注意：上述【当前世界观/规则参考】不仅是背景故事，更是**扩展的游戏规则**。如果世界书中描述了特殊的魔法体系、武术流派或生理特征，请将其转化为具体的**自定义职业、专长、技能或特性**。不要局限于 DND 5E 的标准选项。如果世界书内容与 DND 规则冲突，或提供了全新的机制，**请优先使用世界书内容创造新的游戏规则**。你可以设计全新的职业特性来反映世界书的设定，而不仅仅是重命名现有的 DND 特性。` : '';
+
                 // 升级模式 Prompt
-                systemPrompt = `你是一个 DND 5E 角色升级向导。当前用户正在将角色 "${state.characterData.name}" 从等级 ${state.characterData.level} 提升到 ${(state.characterData.level || 1) + 1}。
+                systemPrompt = `你是一个 DND 5E (及自定义世界观) 角色升级向导。当前用户正在将角色 "${state.characterData.name}" 从等级 ${state.characterData.level} 提升到 ${(state.characterData.level || 1) + 1}。${worldInfoStr}
 
 **当前角色数据:**
 \`\`\`json
@@ -7141,15 +7690,22 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 请遵循以下流程引导用户升级：
 1. **生命值提升**: 根据职业生命骰（取平均或投掷），计算新的最大HP。
-2. **职业特性**: 告知用户新等级获得的职业特性（如动作如潮、子职特性等），并解释其效果。
+2. **职业特性**: 告知用户新等级获得的职业特性。如果角色是自定义职业或处于自定义世界观下，请**根据世界书推断、设计或询问用户其特性**。不要害怕创造 DND 规则书中没有的能力。
 3. **法术/已知法术**: 如果是施法者，引导选择新法术或替换旧法术。
 4. **属性提升/专长**: 如果是 4/8/12/16/19 级，引导用户选择属性值提升 (ASI) 或专长。
 5. **熟练项加值**: 检查熟练加值是否因等级提升而增加（如 1-4级+2, 5-8级+3）。
 
 在对话中：
 - 每次专注于一个升级步骤。
-- 当有多个选择时（如选择新法术、专长），使用 \`CHARACTER_OPTIONS\` 块输出选项。
-- 解释规则依据。
+- 当有多个选择时（如选择新法术、专长），**必须**使用 \`CHARACTER_OPTIONS\` 块输出选项，格式如下：
+\`\`\`CHARACTER_OPTIONS
+{
+"question": "请选择...",
+"type": "single",
+"options": ["选项A", "选项B"]
+}
+\`\`\`
+- 解释规则依据 (DND 5E 规则或世界书自定义规则)。如果使用了自定义规则，请明确指出这是根据世界书设定的。
 
 最后，当升级的所有选择都确定后，输出更新后的 \`CHARACTER_DATA\` 块。**必须包含角色的所有数据（旧数据+新变化），而不仅仅是变化部分。** 格式与创建角色时相同。
 
@@ -7162,11 +7718,16 @@ ${JSON.stringify(state.characterData, null, 2)}
             } else {
                 // 创建模式 Prompt
                 const charTypeLabel = state.characterType === 'pc' ? '主角' : '队友';
-                systemPrompt = `你是一个 DND 5E 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。
+                
+                // [新增] 注入世界书内容
+                const useWI = state.useWorldInfo !== false;
+                const worldInfoStr = (useWI && state.worldInfo) ? `\n\n${state.worldInfo}\n\n注意：上述【当前世界观/规则参考】不仅是背景故事，更是**扩展的游戏规则**。请积极从世界书中提取并**创造**新的种族、职业、背景和专长。不要局限于 DND 5E 的标准选项。例如，如果世界书提到了一种特殊的“星能使用者”，你可以为此创建一个全新的职业，并设计其特有的核心能力，而不是强行让用户使用“术士”卡。如果世界书内容提供了全新的机制，**请优先使用世界书内容创造新的游戏规则**。` : '';
+
+                systemPrompt = `你是一个 DND 5E (及自定义世界观) 角色创建向导。你的任务是通过对话引导用户创建一个完整的${charTypeLabel}角色。${worldInfoStr}
 
 请遵循以下流程：
 1. 首先询问用户想要创建什么类型的角色（战士、法师、盗贼等），或者让他们描述一个角色概念
-2. 根据用户的回答，建议合适的种族和职业组合
+2. 根据用户的回答，建议合适的种族和职业组合 (优先参考世界书设定，其次参考 DND 规则)
 3. 帮助用户确定属性值分配（使用标准点数购买或让用户自选）
 4. 询问角色的背景、性格特点（理想、牵绊、缺陷）
 5. 询问角色的外貌特征（发色、眼睛、身高、特征）
@@ -7174,11 +7735,11 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 在对话过程中，请：
 - 每次只问1-2个问题，不要一次问太多
-- 提供具体的选项供用户选择（通过 CHARACTER_OPTIONS 输出）
+- 提供具体的选项供用户选择（**必须**通过 CHARACTER_OPTIONS 输出）
 - 解释你的建议理由
 - 保持友好和鼓励的语气
 
-当需要用户做选择时（如选择种族、职业、属性分配方式），请输出一个选项块：
+当需要用户做选择时（如选择种族、职业、属性分配方式），请务必输出一个选项块：
 \`\`\`CHARACTER_OPTIONS
 {
 "question": "请选择你的种族...",
@@ -7384,28 +7945,56 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const newRow = headers.map((h, i) => {
                     if (h === 'CHAR_ID') return idVal;
                     
-                    // 映射字段
+                    const oldVal = (rowIndex !== -1 && table.content[rowIndex] && table.content[rowIndex][i] !== undefined)
+                        ? table.content[rowIndex][i]
+                        : undefined;
+
+                    // 辅助函数：优先使用新数据，如果没有则使用旧数据
+                    const val = (v) => (v !== undefined && v !== null && v !== '') ? v : oldVal;
+
                     // Registry
-                    if (h === '成员类型') return isPC ? '主角' : (data.member_type || '同伴');
-                    if (h === '姓名') return data.name;
-                    if (h === '种族/性别/年龄') return data.race_gender_age || `${data.race}/-/1`;
-                    if (h === '职业') return data.class;
-                    if (h === '外貌描述') return data.appearance;
-                    if (h === '性格特点') return data.personality;
-                    if (h === '背景故事') return data.backstory;
-                    if (h === '加入时间' && !isPC) return '第1天'; // 简化处理
+                    if (h === '成员类型') return isPC ? '主角' : (data.member_type || oldVal || '同伴');
+                    if (h === '姓名') return val(data.name);
+                    if (h === '种族/性别/年龄') return val(data.race_gender_age) || `${data.race}/-/1`;
+                    if (h === '职业') return val(data.class);
+                    if (h === '外貌描述') return val(data.appearance);
+                    if (h === '性格特点') return val(data.personality);
+                    if (h === '背景故事') return val(data.backstory);
+                    if (h === '加入时间') return !isPC ? '第1天' : (oldVal || null);
                     
                     // Attributes
-                    if (h === '等级') return data.level || 1;
-                    if (h === 'HP') return data.hp || '10/10';
-                    if (h === 'AC') return data.ac || 10;
-                    if (h === '先攻加值') return data.initiative || 0;
-                    if (h === '速度') return data.speed || '30尺';
-                    if (h === '属性值') return JSON.stringify(data.stats || {});
-                    if (h === '豁免熟练') return JSON.stringify(data.saving_throws || []);
-                    if (h === '技能熟练') return JSON.stringify(data.skill_proficiencies || []);
-                    if (h === '被动感知') return data.passive_perception || 10;
-                    if (h === '经验值' && isPC) return '0/300';
+                    if (h === '等级') return val(data.level) || 1;
+                    if (h === 'HP') return val(data.hp) || '10/10';
+                    if (h === 'AC') return val(data.ac) || 10;
+                    if (h === '先攻加值') return (data.initiative !== undefined ? data.initiative : oldVal) || 0;
+                    if (h === '速度') return val(data.speed) || '30尺';
+                    if (h === '属性值') return data.stats ? JSON.stringify(data.stats) : (oldVal || '{}');
+                    if (h === '豁免熟练') return data.saving_throws ? JSON.stringify(data.saving_throws) : (oldVal || '[]');
+                    if (h === '技能熟练') return data.skill_proficiencies ? JSON.stringify(data.skill_proficiencies) : (oldVal || '[]');
+                    if (h === '被动感知') return (data.passive_perception !== undefined ? data.passive_perception : oldVal) || 10;
+                    if (h === '经验值' && isPC) {
+                        // 如果是升级模式，尝试保留当前经验值并更新上限
+                        if (state.mode === 'levelup' && rowIndex !== -1) {
+                            const oldVal = table.content[rowIndex][i] || '0/300';
+                            const currExp = parseInt(oldVal.split('/')[0]) || 0;
+                            
+                            // DND 5E 经验值表 (下标对应等级，值为下一级所需经验)
+                            // Lv1->Lv2: 300, Lv2->Lv3: 900 ...
+                            const xpTable = [
+                                0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
+                                85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000
+                            ];
+                            
+                            const nextLevel = parseInt(data.level) || 1;
+                            // 获取下一级所需经验值 (作为分母)
+                            // 如果当前是Lv1(nextLevel=1), 目标是300 (xpTable[1])
+                            // 如果当前是Lv2(nextLevel=2), 目标是900 (xpTable[2])
+                            const nextExp = xpTable[nextLevel] || 355000;
+                            
+                            return `${currExp}/${nextExp}`;
+                        }
+                        return '0/300';
+                    }
                     
                     // Resources
                     if (h === '法术位') return data.resources?.spell_slots ? JSON.stringify(data.resources.spell_slots) : null;
@@ -7438,19 +8027,72 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
                 const skillIdIdx = linkHeaders.indexOf('SKILL_ID');
 
+                // [Fix] 清理现有的重复技能 (保留一个，删除多余的)
+                if (charIdIdx !== -1 && skillIdIdx !== -1) {
+                    const charLinks = skillLinkTable.content.filter(row => row[charIdIdx] === charId);
+                    const nameMap = new Map(); // name -> [linkRow...]
+                    const rowsToDelete = new Set();
+
+                    charLinks.forEach(linkRow => {
+                        const skillId = linkRow[skillIdIdx];
+                        const libRow = skillLibTable.content.find(r => r[0] === skillId);
+                        if (libRow) {
+                            const name = (libRow[1] || '').trim();
+                            if (name) {
+                                if (!nameMap.has(name)) nameMap.set(name, []);
+                                nameMap.get(name).push(linkRow);
+                            }
+                        }
+                    });
+
+                    nameMap.forEach((rows, name) => {
+                        if (rows.length > 1) {
+                            console.log(`[CharCreator] 清理重复技能: ${name} (删除 ${rows.length - 1} 个)`);
+                            // 保留第一个，标记其余为删除
+                            for (let i = 1; i < rows.length; i++) {
+                                rowsToDelete.add(rows[i]);
+                            }
+                        }
+                    });
+
+                    if (rowsToDelete.size > 0) {
+                        skillLinkTable.content = skillLinkTable.content.filter(row => !rowsToDelete.has(row));
+                    }
+                }
+
                 spells.forEach(spell => {
+                    const spellName = (spell.name || '').trim();
+                    if (!spellName) return;
+
+                    // [Fix] 预先检查是否已存在同名技能的关联 (防止重复)
+                    const matchingSkillIds = skillLibTable.content
+                        .filter(row => (row[1] || '').trim() === spellName)
+                        .map(row => row[0]);
+
+                    if (charIdIdx !== -1 && skillIdIdx !== -1 && matchingSkillIds.length > 0) {
+                        const isAlreadyLinked = skillLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && matchingSkillIds.includes(row[skillIdIdx])
+                        );
+                        if (isAlreadyLinked) return;
+                    }
+
                     // 1. 添加到技能库 (SKILL_Library)
                     let skillId = 'SKILL_' + Math.random().toString(36).substr(2, 8);
                     // 检查是否存在
-                    const existingSkill = skillLibTable.content.find(row => row[1] === spell.name); // 假设第二列是名称
+                    const existingSkill = skillLibTable.content.find(row => (row[1] || '').trim() === spellName);
                     
                     if (existingSkill) {
                         skillId = existingSkill[0]; // 假设第一列是ID
+                        // [Fix] 更新描述 (如果 AI 提供了新描述)
+                        if (spell.desc) {
+                            const descIdx = skillLibTable.content[0].indexOf('效果描述');
+                            if (descIdx !== -1) existingSkill[descIdx] = spell.desc;
+                        }
                     } else {
                         const libHeaders = skillLibTable.content[0];
                         const newLibRow = libHeaders.map(h => {
                             if (h === 'SKILL_ID') return skillId;
-                            if (h === '技能名称') return spell.name;
+                            if (h === '技能名称') return spellName;
                             if (h === '技能类型') return '法术';
                             if (h === '环阶') return spell.level !== undefined ? spell.level : '0';
                             if (h === '学派') return spell.school || '-';
@@ -7490,17 +8132,73 @@ ${JSON.stringify(state.characterData, null, 2)}
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
                 const featIdIdx = linkHeaders.indexOf('FEAT_ID');
 
+                // [Fix] 清理现有的重复专长/特性
+                if (charIdIdx !== -1 && featIdIdx !== -1) {
+                    const charLinks = featLinkTable.content.filter(row => row[charIdIdx] === charId);
+                    const nameMap = new Map(); // name -> [linkRow...]
+                    const rowsToDelete = new Set();
+
+                    charLinks.forEach(linkRow => {
+                        const featId = linkRow[featIdIdx];
+                        const libRow = featLibTable.content.find(r => r[0] === featId);
+                        if (libRow) {
+                            const name = (libRow[1] || '').trim();
+                            if (name) {
+                                if (!nameMap.has(name)) nameMap.set(name, []);
+                                nameMap.get(name).push(linkRow);
+                            }
+                        }
+                    });
+
+                    nameMap.forEach((rows, name) => {
+                        if (rows.length > 1) {
+                            console.log(`[CharCreator] 清理重复特性: ${name} (删除 ${rows.length - 1} 个)`);
+                            for (let i = 1; i < rows.length; i++) {
+                                rowsToDelete.add(rows[i]);
+                            }
+                        }
+                    });
+
+                    if (rowsToDelete.size > 0) {
+                        featLinkTable.content = featLinkTable.content.filter(row => !rowsToDelete.has(row));
+                    }
+                }
+
                 features.forEach(feat => {
+                    const featName = (feat.name || '').trim();
+                    if (!featName) return;
+
+                    // 1. 查找所有名称匹配的 featId (包括可能重复的库条目)
+                    const matchingFeatIds = featLibTable.content
+                        .filter(row => (row[1] || '').trim() === featName)
+                        .map(row => row[0]);
+
+                    // 2. 检查该角色是否已经链接了其中任何一个 featId
+                    if (charIdIdx !== -1 && featIdIdx !== -1 && matchingFeatIds.length > 0) {
+                        const isAlreadyLinked = featLinkTable.content.some(row =>
+                            row[charIdIdx] === charId && matchingFeatIds.includes(row[featIdIdx])
+                        );
+                        if (isAlreadyLinked) {
+                            console.log(`[CharCreator] 跳过重复专长/特性: ${featName}`);
+                            return;
+                        }
+                    }
+
                     let featId = 'FEAT_' + Math.random().toString(36).substr(2, 8);
-                    const existingFeat = featLibTable.content.find(row => row[1] === feat.name);
+                    const existingFeat = featLibTable.content.find(row => (row[1] || '').trim() === featName);
                     
                     if (existingFeat) {
                         featId = existingFeat[0];
+                        // [Fix] 更新描述 (如果 AI 提供了新描述)
+                        if (feat.desc) {
+                            const descIdx = featLibTable.content[0].indexOf('效果描述');
+                            if (descIdx !== -1) existingFeat[descIdx] = feat.desc;
+                        }
                     } else {
                         const libHeaders = featLibTable.content[0];
                         const newLibRow = libHeaders.map(h => {
                             if (h === 'FEAT_ID') return featId;
-                            if (h === '专长名称') return feat.name;
+                            if (h === '专长名称') return featName;
                             if (h === '类别') return feat.type || '职业特性';
                             if (h === '效果描述') return feat.desc;
                             return null;
@@ -8358,6 +9056,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const config = CONFIG.PRESET_SWITCHING;
         const presets = PresetSwitcher.getAvailablePresets();
         const apiConfig = await SettingsManager.getAPIConfig();
+        const syncStatus = await SettingsManager.getSyncStatus();
         
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
@@ -8374,6 +9073,18 @@ ${JSON.stringify(state.characterData, null, 2)}
                 <h2 style="color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:10px;margin-top:0;">
                     ⚙️ 仪表盘设置
                 </h2>
+
+                <!-- 同步状态 -->
+                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">☁️ 云同步状态</div>
+                        <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">🔄</button>
+                    </div>
+                </div>
 
                 <!-- API 配置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
@@ -8468,20 +9179,43 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                 <!-- 存储诊断工具 -->
                 <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间诊断</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
-                        检查 LocalStorage 使用情况。如果提示“存储已满”，请尝试清理旧数据。
+                        检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
                     </p>
                     <div id="dnd-storage-stats" style="margin-bottom:15px;font-size:12px;color:#ccc;"></div>
-                    <button type="button" id="dnd-check-storage" class="dnd-clickable" style="
-                        background:rgba(52, 152, 219, 0.2);
-                        border:1px solid #3498db;
-                        color:#3498db;
-                        padding:8px 15px;
-                        border-radius:4px;
-                        cursor:pointer;
-                        font-size:13px;
-                    ">🔍 检查存储使用量</button>
+                    
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button type="button" id="dnd-check-storage" class="dnd-clickable" style="
+                            background:rgba(52, 152, 219, 0.2);
+                            border:1px solid #3498db;
+                            color:#3498db;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🔍 检查存储使用量</button>
+                        
+                        <button type="button" id="dnd-clear-avatars" class="dnd-clickable" style="
+                            background:rgba(231, 76, 60, 0.2);
+                            border:1px solid #e74c3c;
+                            color:#e74c3c;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🗑️ 清理头像缓存</button>
+                        
+                        <button type="button" id="dnd-clear-maps" class="dnd-clickable" style="
+                            background:rgba(231, 76, 60, 0.2);
+                            border:1px solid #e74c3c;
+                            color:#e74c3c;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🗺️ 清理地图缓存</button>
+                    </div>
                 </div>
                 
                 <div style="margin-top:20px;padding:15px;background:rgba(197, 160, 89, 0.1);border-left:3px solid var(--dnd-border-gold);border-radius:4px;">
@@ -8524,6 +9258,48 @@ ${JSON.stringify(state.characterData, null, 2)}
                 ${breakdownHtml}
                 ${topKeysHtml}
             `);
+        });
+
+        // 绑定清理头像缓存按钮
+        $c.find('#dnd-clear-avatars').on('click', async function() {
+            if (confirm('确定要清理所有缓存的角色头像吗？这将释放存储空间，但下次查看角色时需要重新生成头像。')) {
+                try {
+                    await DBAdapter.clearAvatars();
+                    NotificationSystem.success('头像缓存已清理');
+                } catch (e) {
+                    NotificationSystem.error('清理失败: ' + e.message);
+                }
+            }
+        });
+
+        // 绑定清理地图缓存按钮
+        $c.find('#dnd-clear-maps').on('click', async function() {
+            if (confirm('确定要清理所有缓存的地图吗？这将释放存储空间，但下次查看地图时需要重新生成。')) {
+                try {
+                    await DBAdapter.clearMaps();
+                    NotificationSystem.success('地图缓存已清理');
+                } catch (e) {
+                    NotificationSystem.error('清理失败: ' + e.message);
+                }
+            }
+        });
+
+        // 绑定强制同步按钮
+        $c.find('#dnd-sync-force').on('click', async function() {
+            const $btn = $(this);
+            $btn.prop('disabled', true).css('opacity', 0.5);
+            $c.find('#dnd-sync-badge').text('🔄 同步中...');
+            
+            await SettingsManager.forceSync();
+            
+            // 刷新状态
+            const newStatus = await SettingsManager.getSyncStatus();
+            $c.find('#dnd-sync-badge')
+                .removeClass('dnd-badge-success dnd-badge-warning dnd-badge-error')
+                .addClass(`dnd-badge-${newStatus.statusClass}`)
+                .text(newStatus.statusText);
+                
+            $btn.prop('disabled', false).css('opacity', 1);
         });
 
         // 绑定刷新按钮 (API)
@@ -9856,6 +10632,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 
 
+
 const ExplorationMapManager = {
     // Prompts
     prompts: {
@@ -10124,18 +10901,29 @@ ${structureJSON}
 
         // Save to Cache
         await DBAdapter.setSVG(locationName, svgContent);
+        // Save to Chat Metadata (Priority)
+        await TavernSettingsSync.saveToChat(`map_${locationName}`, svgContent);
+        
         return svgContent;
     },
 
     // Main Flow: Get or Generate Map
     getMap: async (locationName, description, forceRegen = false) => {
-        // 1. Check SVG Cache (if not forced)
+        const mapKey = `map_${locationName}`;
+
+        // 1. Check Chat Metadata (Priority 1)
+        if (!forceRegen) {
+            const chatSVG = TavernSettingsSync.getFromChat(mapKey);
+            if (chatSVG) return { type: 'svg', content: chatSVG };
+        }
+
+        // 2. Check SVG Cache (Priority 2)
         if (!forceRegen) {
             const cachedSVG = await DBAdapter.getSVG(locationName);
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
         }
 
-        // 2. Check Structure
+        // 3. Check Structure
         let structure = ExplorationMapManager.checkStructure(locationName);
         
         // If no structure, fail (User requested to remove structure generation)
@@ -10210,8 +10998,15 @@ ${structureJSON}
     // [New] Generate Battle Map
     getBattleMap: async (locationName, description, width, height, forceRegen = false) => {
         const cacheKey = `BATTLE_MAP_${locationName}_${width}x${height}`;
+        const mapKey = `map_${cacheKey}`;
         
-        // 1. Check Cache (SVG)
+        // 1. Check Chat Metadata (Priority 1)
+        if (!forceRegen) {
+            const chatSVG = TavernSettingsSync.getFromChat(mapKey);
+            if (chatSVG) return { type: 'svg', content: chatSVG };
+        }
+
+        // 2. Check Cache (SVG) (Priority 2)
         if (!forceRegen) {
             const cachedSVG = await DBAdapter.getSVG(cacheKey);
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
@@ -10278,6 +11073,9 @@ ${structureJSON}
 
             // Cache it
             await DBAdapter.setSVG(cacheKey, svgContent);
+            // Save to Chat Metadata (Priority)
+            await TavernSettingsSync.saveToChat(`map_${cacheKey}`, svgContent);
+            
             return { type: 'svg', content: svgContent };
 
         } catch (e) {
@@ -11990,6 +12788,8 @@ try {
 
 
 
+
+
 (function () {
     'use strict';
 
@@ -12053,6 +12853,15 @@ try {
                     }
                 });
 
+                // 初始化设置同步 (优先酒馆原生)
+                TavernSettingsSync.setNotifyCallback((type, message, title) => {
+                    // 映射 type 到 NotificationSystem 支持的类型
+                    const method = NotificationSystem[type] ? type : 'info';
+                    NotificationSystem[method](message, title);
+                });
+                // 延迟初始化以确保酒馆环境加载完成
+                setTimeout(() => TavernSettingsSync.init(), 1000);
+                
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
                     

@@ -14,6 +14,7 @@ export default {
         const config = CONFIG.PRESET_SWITCHING;
         const presets = PresetSwitcher.getAvailablePresets();
         const apiConfig = await SettingsManager.getAPIConfig();
+        const syncStatus = await SettingsManager.getSyncStatus();
         
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
@@ -30,6 +31,18 @@ export default {
                 <h2 style="color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:10px;margin-top:0;">
                     ⚙️ 仪表盘设置
                 </h2>
+
+                <!-- 同步状态 -->
+                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">☁️ 云同步状态</div>
+                        <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">🔄</button>
+                    </div>
+                </div>
 
                 <!-- API 配置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
@@ -124,20 +137,43 @@ export default {
 
                 <!-- 存储诊断工具 -->
                 <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间诊断</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
-                        检查 LocalStorage 使用情况。如果提示“存储已满”，请尝试清理旧数据。
+                        检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
                     </p>
                     <div id="dnd-storage-stats" style="margin-bottom:15px;font-size:12px;color:#ccc;"></div>
-                    <button type="button" id="dnd-check-storage" class="dnd-clickable" style="
-                        background:rgba(52, 152, 219, 0.2);
-                        border:1px solid #3498db;
-                        color:#3498db;
-                        padding:8px 15px;
-                        border-radius:4px;
-                        cursor:pointer;
-                        font-size:13px;
-                    ">🔍 检查存储使用量</button>
+                    
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button type="button" id="dnd-check-storage" class="dnd-clickable" style="
+                            background:rgba(52, 152, 219, 0.2);
+                            border:1px solid #3498db;
+                            color:#3498db;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🔍 检查存储使用量</button>
+                        
+                        <button type="button" id="dnd-clear-avatars" class="dnd-clickable" style="
+                            background:rgba(231, 76, 60, 0.2);
+                            border:1px solid #e74c3c;
+                            color:#e74c3c;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🗑️ 清理头像缓存</button>
+                        
+                        <button type="button" id="dnd-clear-maps" class="dnd-clickable" style="
+                            background:rgba(231, 76, 60, 0.2);
+                            border:1px solid #e74c3c;
+                            color:#e74c3c;
+                            padding:8px 15px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:13px;
+                        ">🗺️ 清理地图缓存</button>
+                    </div>
                 </div>
                 
                 <div style="margin-top:20px;padding:15px;background:rgba(197, 160, 89, 0.1);border-left:3px solid var(--dnd-border-gold);border-radius:4px;">
@@ -180,6 +216,48 @@ export default {
                 ${breakdownHtml}
                 ${topKeysHtml}
             `);
+        });
+
+        // 绑定清理头像缓存按钮
+        $c.find('#dnd-clear-avatars').on('click', async function() {
+            if (confirm('确定要清理所有缓存的角色头像吗？这将释放存储空间，但下次查看角色时需要重新生成头像。')) {
+                try {
+                    await DBAdapter.clearAvatars();
+                    NotificationSystem.success('头像缓存已清理');
+                } catch (e) {
+                    NotificationSystem.error('清理失败: ' + e.message);
+                }
+            }
+        });
+
+        // 绑定清理地图缓存按钮
+        $c.find('#dnd-clear-maps').on('click', async function() {
+            if (confirm('确定要清理所有缓存的地图吗？这将释放存储空间，但下次查看地图时需要重新生成。')) {
+                try {
+                    await DBAdapter.clearMaps();
+                    NotificationSystem.success('地图缓存已清理');
+                } catch (e) {
+                    NotificationSystem.error('清理失败: ' + e.message);
+                }
+            }
+        });
+
+        // 绑定强制同步按钮
+        $c.find('#dnd-sync-force').on('click', async function() {
+            const $btn = $(this);
+            $btn.prop('disabled', true).css('opacity', 0.5);
+            $c.find('#dnd-sync-badge').text('🔄 同步中...');
+            
+            await SettingsManager.forceSync();
+            
+            // 刷新状态
+            const newStatus = await SettingsManager.getSyncStatus();
+            $c.find('#dnd-sync-badge')
+                .removeClass('dnd-badge-success dnd-badge-warning dnd-badge-error')
+                .addClass(`dnd-badge-${newStatus.statusClass}`)
+                .text(newStatus.statusText);
+                
+            $btn.prop('disabled', false).css('opacity', 1);
         });
 
         // 绑定刷新按钮 (API)

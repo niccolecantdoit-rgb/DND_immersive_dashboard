@@ -280,5 +280,78 @@ export const TavernAPI = {
             
             return response.trim();
         }
+    },
+
+    /**
+     * 获取当前启用的世界书内容
+     * @returns {Promise<string>} 世界书内容摘要
+     */
+    getEnabledWorldInfo: async function() {
+        const { TavernHelper } = this.getCore();
+        if (!TavernHelper) return '';
+
+        try {
+            const worldbooks = new Set();
+            
+            // 1. 全局世界书
+            if (TavernHelper.getGlobalWorldbookNames) {
+                const globals = TavernHelper.getGlobalWorldbookNames();
+                if (Array.isArray(globals)) globals.forEach(n => worldbooks.add(n));
+            }
+
+            // 2. 聊天世界书
+            if (TavernHelper.getChatWorldbookName) {
+                const chatBook = TavernHelper.getChatWorldbookName('current');
+                if (chatBook) worldbooks.add(chatBook);
+            }
+
+            // 3. 角色世界书
+            if (TavernHelper.getCharWorldbookNames) {
+                const charBooks = TavernHelper.getCharWorldbookNames('current');
+                if (charBooks) {
+                    if (charBooks.primary) worldbooks.add(charBooks.primary);
+                    if (Array.isArray(charBooks.additional)) charBooks.additional.forEach(n => worldbooks.add(n));
+                }
+            }
+
+            if (worldbooks.size === 0) return '';
+
+            let context = "【当前世界观/规则参考 (World Info)】\n";
+            
+            // 获取条目内容
+            for (const bookName of worldbooks) {
+                if (TavernHelper.getWorldbook) {
+                    const entries = await TavernHelper.getWorldbook(bookName);
+                    if (entries && entries.length > 0) {
+                        context += `\n--- 世界书: ${bookName} ---\n`;
+                        // 筛选启用的条目
+                        const activeEntries = entries.filter(e => e.enabled);
+                        
+                        // 简单摘要: 仅提取关键字和部分内容，避免 Token 过多
+                        // 优先提取: 职业, 种族, 等级, 魔法, 规则
+                        const relevantEntries = activeEntries.filter(e => {
+                            const keys = (Array.isArray(e.keys) ? e.keys : []).join(',').toLowerCase();
+                            const content = (e.content || '').toLowerCase();
+                            return keys.includes('class') || keys.includes('race') || keys.includes('level') || keys.includes('magic') || keys.includes('rule') ||
+                                   content.includes('职业') || content.includes('种族') || content.includes('等级') || content.includes('规则');
+                        });
+
+                        // 如果没有特别相关的，取前 20 个 enabled 的条目作为上下文 (防止漏掉)
+                        const targetEntries = relevantEntries.length > 0 ? relevantEntries : activeEntries.slice(0, 20);
+
+                        targetEntries.forEach(e => {
+                            const keysStr = Array.isArray(e.keys) ? e.keys.join(', ') : '无关键字';
+                            context += `[${keysStr}]: ${e.content}\n`;
+                        });
+                    }
+                }
+            }
+            
+            return context;
+
+        } catch (e) {
+            console.error('[TavernAPI] 获取世界书失败:', e);
+            return '';
+        }
     }
 };

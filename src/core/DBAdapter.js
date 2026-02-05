@@ -175,6 +175,20 @@ export const DBAdapter = {
         return DBAdapter._op(DBAdapter.storeName, 'readwrite', store => store.delete(key));
     },
 
+    // [新增] 清空指定存储库
+    clearStore: async (storeName) => {
+        return DBAdapter._op(storeName, 'readwrite', store => store.clear());
+    },
+
+    // [新增] 便捷清理方法
+    clearAvatars: async () => {
+        return DBAdapter.clearStore(DBAdapter.storeName);
+    },
+
+    clearMaps: async () => {
+        return DBAdapter.clearStore(DBAdapter.svgStore);
+    },
+
     migrateFromLocalStorage: async () => {
         const keys = Object.keys(localStorage);
         let count = 0;

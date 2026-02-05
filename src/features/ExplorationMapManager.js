@@ -5,6 +5,7 @@ import { Logger } from '../core/Logger.js';
 import { DataManager } from '../data/DataManager.js';
 import { DiceManager } from '../data/DiceManager.js';
 import { DBAdapter } from '../core/DBAdapter.js';
+import { TavernSettingsSync } from '../core/TavernSettingsSync.js';
 
 export const ExplorationMapManager = {
     // Prompts
@@ -274,18 +275,29 @@ ${structureJSON}
 
         // Save to Cache
         await DBAdapter.setSVG(locationName, svgContent);
+        // Save to Chat Metadata (Priority)
+        await TavernSettingsSync.saveToChat(`map_${locationName}`, svgContent);
+        
         return svgContent;
     },
 
     // Main Flow: Get or Generate Map
     getMap: async (locationName, description, forceRegen = false) => {
-        // 1. Check SVG Cache (if not forced)
+        const mapKey = `map_${locationName}`;
+
+        // 1. Check Chat Metadata (Priority 1)
+        if (!forceRegen) {
+            const chatSVG = TavernSettingsSync.getFromChat(mapKey);
+            if (chatSVG) return { type: 'svg', content: chatSVG };
+        }
+
+        // 2. Check SVG Cache (Priority 2)
         if (!forceRegen) {
             const cachedSVG = await DBAdapter.getSVG(locationName);
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
         }
 
-        // 2. Check Structure
+        // 3. Check Structure
         let structure = ExplorationMapManager.checkStructure(locationName);
         
         // If no structure, fail (User requested to remove structure generation)
@@ -360,8 +372,15 @@ ${structureJSON}
     // [New] Generate Battle Map
     getBattleMap: async (locationName, description, width, height, forceRegen = false) => {
         const cacheKey = `BATTLE_MAP_${locationName}_${width}x${height}`;
+        const mapKey = `map_${cacheKey}`;
         
-        // 1. Check Cache (SVG)
+        // 1. Check Chat Metadata (Priority 1)
+        if (!forceRegen) {
+            const chatSVG = TavernSettingsSync.getFromChat(mapKey);
+            if (chatSVG) return { type: 'svg', content: chatSVG };
+        }
+
+        // 2. Check Cache (SVG) (Priority 2)
         if (!forceRegen) {
             const cachedSVG = await DBAdapter.getSVG(cacheKey);
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
@@ -428,6 +447,9 @@ ${structureJSON}
 
             // Cache it
             await DBAdapter.setSVG(cacheKey, svgContent);
+            // Save to Chat Metadata (Priority)
+            await TavernSettingsSync.saveToChat(`map_${cacheKey}`, svgContent);
+            
             return { type: 'svg', content: svgContent };
 
         } catch (e) {
