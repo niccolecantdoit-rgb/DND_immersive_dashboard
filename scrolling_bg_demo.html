@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game UI Scrolling Background Patterns</title>
+    <style>
+        :root {
+            --bg-dark: #0f0b0a;
+            --accent-gold: #9d8b6c;
+            --accent-blue: #2c4c8a;
+            --accent-red: #8a2c2c;
+            --accent-green: #3a6b4a;
+            --text-main: #dcd0c0;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            color: var(--text-main);
+            font-family: 'Segoe UI', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            border-bottom: 1px solid var(--accent-gold);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+        }
+
+        .toggle-btn {
+            padding: 8px 16px;
+            background: var(--accent-blue);
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .toggle-btn:hover { opacity: 0.9; }
+        .toggle-btn.active { background: var(--accent-green); }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2px;
+            margin-top: 80px;
+            padding-bottom: 50px;
+        }
+
+        .preview-box {
+            position: relative;
+            height: 300px;
+            overflow: hidden;
+            border: 1px solid #333;
+            background: var(--bg-dark);
+        }
+
+        .preview-label {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            border-left: 3px solid var(--accent-gold);
+            z-index: 10;
+        }
+
+        /* Effect 1: Diagonal Stripes (Nier/Arknights style) */
+        .bg-stripes {
+            background: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 20px,
+                rgba(157, 139, 108, 0.05) 20px,
+                rgba(157, 139, 108, 0.05) 40px
+            );
+            width: 200%;
+            height: 200%;
+            animation: scroll-stripes 20s linear infinite;
+        }
+        @keyframes scroll-stripes {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(-10%, -10%); }
+        }
+
+        /* Effect 2: Dot Matrix Parallax (MGS style) */
+        .bg-dots {
+            background-image: radial-gradient(rgba(157, 139, 108, 0.15) 1.5px, transparent 1.5px);
+            background-size: 20px 20px;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            transition: transform 0.1s ease-out;
+        }
+        .bg-dots-layer2 {
+            background-image: radial-gradient(rgba(157, 139, 108, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            width: 110%;
+            height: 110%;
+            position: absolute;
+            top: -5%; left: -5%;
+        }
+
+        /* Effect 3: Hexagonal Grid (Deus Ex style) */
+        .bg-hex {
+            width: 100%;
+            height: 100%;
+            background-color: #0f0b0a;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49' viewBox='0 0 28 49'%3E%3Cg fill-rule='evenodd'%3E%3Cg id='hexagons' fill='%239d8b6c' fill-opacity='0.05' fill-rule='nonzero'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            animation: scroll-hex 30s linear infinite;
+        }
+        @keyframes scroll-hex {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 -100px; }
+        }
+
+        /* Effect 4: Topographic Lines (Death Stranding style) */
+        .bg-topo {
+            width: 100%;
+            height: 100%;
+            background: #0f0b0a;
+            position: relative;
+        }
+        .topo-canvas {
+            position: absolute;
+            top: 0; left: 0;
+        }
+
+        /* Effect 5: Isometric Grid (Strategy UI) */
+        .bg-iso {
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(30deg, transparent 49%, rgba(44, 76, 138, 0.1) 49%, rgba(44, 76, 138, 0.1) 51%, transparent 51%),
+                linear-gradient(-30deg, transparent 49%, rgba(44, 76, 138, 0.1) 49%, rgba(44, 76, 138, 0.1) 51%, transparent 51%);
+            background-size: 60px 34.6px;
+            animation: scroll-iso 10s linear infinite;
+        }
+        @keyframes scroll-iso {
+            0% { background-position: 0 0; }
+            100% { background-position: 60px 0; }
+        }
+
+        /* Effect 6: Digital Rain (Matrix/Hacking) */
+        .bg-rain {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            position: relative;
+        }
+
+        /* Effect 7: Radar Sweep (Sonar) */
+        .bg-radar {
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle, transparent 20%, rgba(58, 107, 74, 0.1) 20%, rgba(58, 107, 74, 0.1) 21%, transparent 21%),
+                radial-gradient(circle, transparent 40%, rgba(58, 107, 74, 0.1) 40%, rgba(58, 107, 74, 0.1) 41%, transparent 41%),
+                radial-gradient(circle, transparent 60%, rgba(58, 107, 74, 0.1) 60%, rgba(58, 107, 74, 0.1) 61%, transparent 61%),
+                linear-gradient(0deg, transparent 49%, rgba(58, 107, 74, 0.1) 49%, rgba(58, 107, 74, 0.1) 51%, transparent 51%),
+                linear-gradient(90deg, transparent 49%, rgba(58, 107, 74, 0.1) 49%, rgba(58, 107, 74, 0.1) 51%, transparent 51%);
+            background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .radar-sweep {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 150%; height: 150%;
+            transform: translate(-50%, -50%);
+            background: conic-gradient(from 0deg, transparent 0deg, rgba(58, 107, 74, 0.3) 20deg, transparent 60deg);
+            border-radius: 50%;
+            animation: radar-spin 4s linear infinite;
+        }
+        @keyframes radar-spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* Effect 8: Blueprint Grid */
+        .bg-blueprint {
+            width: 100%;
+            height: 100%;
+            background-color: #0f0b0a;
+            background-image: 
+                linear-gradient(rgba(44, 76, 138, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(44, 76, 138, 0.1) 1px, transparent 1px),
+                linear-gradient(rgba(44, 76, 138, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(44, 76, 138, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+            background-position: -2px -2px, -2px -2px, -1px -1px, -1px -1px;
+            animation: scroll-blueprint 20s linear infinite;
+        }
+        @keyframes scroll-blueprint {
+            0% { background-position: 0 0, 0 0, 0 0, 0 0; }
+            100% { background-position: 100px 100px, 100px 100px, 20px 20px, 20px 20px; }
+        }
+
+        /* Effect 9: Abstract Geometric Float (Control/Destiny style) */
+        .bg-geo {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #1a1a1c, #000);
+        }
+        .geo-shape {
+            position: absolute;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform-style: preserve-3d;
+        }
+
+        /* Effect 10: CRT/Scanline Noise */
+        .bg-crt {
+            width: 100%;
+            height: 100%;
+            background: #111;
+            position: relative;
+        }
+        .scanlines {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            position: absolute;
+            z-index: 2;
+        }
+        .flicker {
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0.1;
+            position: absolute;
+            animation: flicker 0.15s infinite;
+        }
+        @keyframes flicker {
+            0% { opacity: 0.1; }
+            50% { opacity: 0.2; }
+            100% { opacity: 0.1; }
+        }
+
+        /* Global CRT Overlay */
+        .global-crt::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 style="margin:0;font-size:20px;color:var(--accent-gold);">🎮 Game UI Scrolling Background Patterns</h1>
+        <div class="controls">
+            <button class="toggle-btn" id="crtToggle">CRT Overlay: OFF</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 1. Diagonal Stripes -->
+        <div class="preview-box">
+            <div class="bg-stripes"></div>
+            <div class="preview-label">1. Kinetic Stripes (Nier/Arknights)</div>
+        </div>
+
+        <!-- 2. Dot Matrix Parallax -->
+        <div class="preview-box" id="dotsContainer">
+            <div class="bg-dots-layer2" id="dots2"></div>
+            <div class="bg-dots" id="dots1"></div>
+            <div class="preview-label">2. Dot Matrix Parallax (MGS) - Move Mouse</div>
+        </div>
+
+        <!-- 3. Hexagonal Grid -->
+        <div class="preview-box">
+            <div class="bg-hex"></div>
+            <div class="preview-label">3. Hex Grid (Deus Ex)</div>
+        </div>
+
+        <!-- 4. Topographic Lines -->
+        <div class="preview-box" id="topoContainer">
+            <div class="bg-topo">
+                <canvas id="topoCanvas" class="topo-canvas"></canvas>
+            </div>
+            <div class="preview-label">4. Topographic (Death Stranding)</div>
+        </div>
+
+        <!-- 5. Isometric Grid -->
+        <div class="preview-box">
+            <div class="bg-iso"></div>
+            <div class="preview-label">5. Isometric Grid (Strategy UI)</div>
+        </div>
+
+        <!-- 6. Digital Rain -->
+        <div class="preview-box" id="rainContainer">
+            <div class="bg-rain">
+                <canvas id="rainCanvas"></canvas>
+            </div>
+            <div class="preview-label">6. Data Stream (Hacking UI)</div>
+        </div>
+
+        <!-- 7. Radar Sweep -->
+        <div class="preview-box">
+            <div class="bg-radar">
+                <div class="radar-sweep"></div>
+            </div>
+            <div class="preview-label">7. Radar/Sonar</div>
+        </div>
+
+        <!-- 8. Blueprint Grid -->
+        <div class="preview-box">
+            <div class="bg-blueprint"></div>
+            <div class="preview-label">8. Blueprint/Tech Grid</div>
+        </div>
+
+        <!-- 9. Geometric Float -->
+        <div class="preview-box" id="geoContainer">
+            <div class="bg-geo" id="geoScene"></div>
+            <div class="preview-label">9. Geometric Float (Control/Destiny)</div>
+        </div>
+
+        <!-- 10. CRT Noise -->
+        <div class="preview-box">
+            <div class="bg-crt">
+                <div class="scanlines"></div>
+                <div class="flicker"></div>
+                <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:monospace;color:#333;font-size:24px;">NO SIGNAL</div>
+            </div>
+            <div class="preview-label">10. Retro CRT / Noise</div>
+        </div>
+    </div>
+
+    <script>
+        // Global CRT Toggle
+        const crtToggle = document.getElementById('crtToggle');
+        const previewBoxes = document.querySelectorAll('.preview-box');
+        
+        crtToggle.addEventListener('click', () => {
+            crtToggle.classList.toggle('active');
+            const isActive = crtToggle.classList.contains('active');
+            crtToggle.textContent = `CRT Overlay: ${isActive ? 'ON' : 'OFF'}`;
+            
+            previewBoxes.forEach(box => {
+                if (isActive) box.classList.add('global-crt');
+                else box.classList.remove('global-crt');
+            });
+        });
+
+        // Effect 2: Dot Matrix Parallax
+        const dotsContainer = document.getElementById('dotsContainer');
+        const dots1 = document.getElementById('dots1');
+        const dots2 = document.getElementById('dots2');
+        
+        dotsContainer.addEventListener('mousemove', (e) => {
+            const rect = dotsContainer.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            
+            dots1.style.transform = `translate(${x * 0.05}px, ${y * 0.05}px)`;
+            dots2.style.transform = `translate(${x * 0.02}px, ${y * 0.02}px)`;
+        });
+
+        // Effect 4: Topographic Lines Canvas
+        const topoCanvas = document.getElementById('topoCanvas');
+        const topoCtx = topoCanvas.getContext('2d');
+        let topoOffset = 0;
+
+        function resizeTopo() {
+            const rect = document.getElementById('topoContainer').getBoundingClientRect();
+            topoCanvas.width = rect.width;
+            topoCanvas.height = rect.height;
+        }
+        resizeTopo();
+        window.addEventListener('resize', resizeTopo);
+
+        function drawTopo() {
+            topoCtx.clearRect(0, 0, topoCanvas.width, topoCanvas.height);
+            topoCtx.strokeStyle = 'rgba(157, 139, 108, 0.3)';
+            topoCtx.lineWidth = 1;
+
+            topoOffset += 0.2;
+
+            for (let i = 0; i < 10; i++) {
+                topoCtx.beginPath();
+                for (let x = 0; x <= topoCanvas.width; x += 10) {
+                    const y = 100 + i * 20 + Math.sin((x + topoOffset * 20) * 0.01) * 20 + Math.cos((x - topoOffset * 10) * 0.02) * 10;
+                    if (x === 0) topoCtx.moveTo(x, y);
+                    else topoCtx.lineTo(x, y);
+                }
+                topoCtx.stroke();
+            }
+            requestAnimationFrame(drawTopo);
+        }
+        drawTopo();
+
+        // Effect 6: Digital Rain
+        const rainCanvas = document.getElementById('rainCanvas');
+        const rainCtx = rainCanvas.getContext('2d');
+        const chars = '01';
+        const drops = [];
+
+        function resizeRain() {
+            const rect = document.getElementById('rainContainer').getBoundingClientRect();
+            rainCanvas.width = rect.width;
+            rainCanvas.height = rect.height;
+            const columns = rainCanvas.width / 14;
+            drops.length = 0;
+            for(let i=0; i<columns; i++) drops[i] = 1;
+        }
+        resizeRain();
+        window.addEventListener('resize', resizeRain);
+
+        function drawRain() {
+            rainCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            rainCtx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+            
+            rainCtx.fillStyle = '#0F0';
+            rainCtx.font = '12px monospace';
+
+            for(let i=0; i<drops.length; i++) {
+                const text = chars[Math.floor(Math.random()*chars.length)];
+                rainCtx.fillText(text, i*14, drops[i]*14);
+                
+                if(drops[i]*14 > rainCanvas.height && Math.random() > 0.975)
+                    drops[i] = 0;
+                
+                drops[i]++;
+            }
+            requestAnimationFrame(drawRain);
+        }
+        drawRain();
+
+        // Effect 9: Geometric Float
+        const geoScene = document.getElementById('geoScene');
+        for(let i=0; i<5; i++) {
+            const shape = document.createElement('div');
+            shape.className = 'geo-shape';
+            const size = 30 + Math.random() * 50;
+            shape.style.width = `${size}px`;
+            shape.style.height = `${size}px`;
+            
+            // Random start pos
+            shape.style.left = `${Math.random() * 100}%`;
+            shape.style.top = `${Math.random() * 100}%`;
+            shape.style.borderColor = Math.random() > 0.5 ? 'rgba(157, 139, 108, 0.2)' : 'rgba(255, 255, 255, 0.1)';
+            
+            if (Math.random() > 0.5) shape.style.borderRadius = '50%';
+            else shape.style.transform = `rotate(${Math.random()*360}deg)`;
+
+            geoScene.appendChild(shape);
+
+            // Simple animation loop
+            let x = parseFloat(shape.style.left);
+            let y = parseFloat(shape.style.top);
+            let dx = (Math.random() - 0.5) * 0.1;
+            let dy = (Math.random() - 0.5) * 0.1;
+
+            function animateShape() {
+                x += dx;
+                y += dy;
+                if(x < 0 || x > 100) dx *= -1;
+                if(y < 0 || y > 100) dy *= -1;
+                shape.style.left = `${x}%`;
+                shape.style.top = `${y}%`;
+                requestAnimationFrame(animateShape);
+            }
+            animateShape();
+        }
+
+    </script>
+</body>
+</html>

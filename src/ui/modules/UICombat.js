@@ -163,8 +163,8 @@ export default {
         
         let html = `<div class="dnd-resource-consumption" style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;border:1px dashed rgba(255,255,255,0.1);">
             <div style="font-size:11px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
-                <span>⚡ 本场战斗消耗</span>
-                <span class="dnd-clickable" style="cursor:pointer;color:var(--dnd-text-dim);font-size:14px;line-height:1;" title="重置统计" onclick="window.DND_Dashboard_UI.initResourceTracker(); window.DND_Dashboard_UI.renderHUD();">🔄</span>
+                <span><i class="fa-solid fa-bolt"></i> 本场战斗消耗</span>
+                <span class="dnd-clickable" style="cursor:pointer;color:var(--dnd-text-dim);font-size:14px;line-height:1;" title="重置统计" onclick="window.DND_Dashboard_UI.initResourceTracker(); window.DND_Dashboard_UI.renderHUD();"><i class="fa-solid fa-sync"></i></span>
             </div>`;
         
         if (hasSlots) {
@@ -529,7 +529,7 @@ export default {
         if (!skills || skills.length === 0) {
             // 尝试显示提示而不是直接退出
             const html = `<div style="padding:15px;text-align:center;">
-                <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;">✨ ${current['姓名']}</div>
+                <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']}</div>
                 <div style="color:#888;">该角色暂无已学习的技能或法术。</div>
             </div>`;
             this.showItemDetailPopup(html, event.clientX, event.clientY);
@@ -565,7 +565,7 @@ export default {
 
         if (skills) skills.forEach(s => processAbility(s));
         
-        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;">✨ ${current['姓名']} 的技能</div>`;
+        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']} 的技能</div>`;
         html += `<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">`;
         
         let hasSkills = false;
@@ -579,7 +579,7 @@ export default {
                 const safeName = rawName.replace(/'/g, "\\'").replace(/"/g, '"');
                 const safeRange = (s['射程'] || '接触').replace(/'/g, "\\'");
                 const isSpell = s._isSpell;
-                const icon = isSpell ? '📜' : '⚔️';
+                const icon = isSpell ? '<i class="fa-solid fa-scroll"></i>' : '<i class="fa-solid fa-gavel"></i>';
                 const costType = s._costType;
                 
                 const actionType = isSpell ? 'spell' : 'skill';

@@ -6,11 +6,13 @@ import { DataManager } from '../../data/DataManager.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { NotificationSystem } from './UIUtils.js';
+import { DynamicBackground } from '../DynamicBackground.js';
 
 export default {
     state: 'collapsed', // 'collapsed', 'mini', 'full'
     _lastToggleTime: 0, // 用于防止重复触发
     _controlledCharId: null, // [新增] 当前操控的角色ID，null表示默认PC
+    _dynamicBgIds: {}, // [新增] 动态背景效果实例ID存储
 
     setControlledCharacter(charId) {
         this._controlledCharId = charId;
@@ -53,6 +55,59 @@ export default {
         return party.find(p => p.type === 'PC' || p.isPC) || party[0];
     },
 
+    // [新增] 应用 UI 缩放
+    applyUIScale(scale) {
+        const { $ } = getCore();
+        const s = parseFloat(scale) || 1.0;
+        
+        // 设置 CSS 变量 (供 CSS 引用)
+        document.documentElement.style.setProperty('--dnd-ui-scale', s);
+
+        // 使用样式注入确保覆盖所有相关元素 (包括动态生成的)
+        if ($('#dnd-scale-style').length === 0) {
+            $('head').append(`<style id="dnd-scale-style"></style>`);
+        }
+        
+        // A. 悬浮元素：直接缩放
+        const floatingSelectors = [
+            '#dnd-mini-hud',
+            '#dnd-toggle-btn',
+            '#dnd-tooltip',
+            '#dnd-position-dialog',
+            '.dnd-generic-popup'
+        ];
+
+        // B. 全屏容器：缩放并补偿尺寸，确保始终填满屏幕
+        const fullscreenSelectors = [
+            '#dnd-dashboard-root'
+        ];
+
+        // 计算反向比例 (例如放大1.2倍，宽度需要设为 100/1.2 = 83.333% 才能在放大后刚好填满)
+        const reverseScale = (100 / s).toFixed(4);
+
+        $('#dnd-scale-style').html(`
+            ${floatingSelectors.join(', ')} {
+                zoom: ${s};
+            }
+            ${fullscreenSelectors.join(', ')} {
+                zoom: ${s};
+                width: ${reverseScale}vw !important;
+                height: ${reverseScale}vh !important;
+                top: 0 !important;
+                left: 0 !important;
+            }
+        `);
+        
+        // 记录当前缩放比例供其他模块使用
+        this.currentScale = s;
+        Logger.info('[UICore] Applied UI scale:', s, 'Compensated size:', reverseScale + '%');
+        
+        // 强制更新 HUD 位置，因为尺寸可能变了
+        if (window.DND_Dashboard_UI && window.DND_Dashboard_UI.updateHUDPosition) {
+            setTimeout(() => window.DND_Dashboard_UI.updateHUDPosition(), 100);
+        }
+    },
+
     // [新增] 切换仪表盘状态的辅助方法
     toggleDashboard() {
         Logger.info('toggleDashboard 被调用，当前状态:', this.state);
@@ -82,12 +137,16 @@ export default {
         switch (newState) {
             case 'collapsed':
                 $btn.removeClass('dnd-hidden');
+                // 销毁动态背景以节省性能
+                this._destroyDynamicBackgrounds();
                 break;
             case 'mini':
                 $btn.removeClass('dnd-hidden');
                 // 稍微延迟添加 visible 类以触发 transition (如果刚从 display:none 切换)
                 requestAnimationFrame(() => $mini.addClass('visible'));
                 this.renderHUD();
+                // [新增] 初始化 Mini HUD 动态背景
+                this._initDynamicBackground('mini');
                 break;
             case 'full':
                 $btn.addClass('dnd-hidden');
@@ -98,16 +157,144 @@ export default {
                 } else {
                     this.renderPanel('party');
                 }
+                // [新增] 初始化全屏界面动态背景
+                this._initDynamicBackground('full');
                 break;
         }
+    },
+
+    // [新增] 初始化动态背景
+    _initDynamicBackground(mode) {
+        const { $ } = getCore();
+        
+        // 从设置中获取背景效果类型 (默认 particles)
+        const effectType = CONFIG.DYNAMIC_BG?.type || 'particles';
+        const enabled = CONFIG.DYNAMIC_BG?.enabled !== false; // 默认启用
+        
+        if (!enabled) {
+            Logger.debug('[DynamicBackground] Disabled by config');
+            return;
+        }
+        
+        try {
+            if (mode === 'mini') {
+                const $mini = $('#dnd-mini-hud');
+                if ($mini.length && !this._dynamicBgIds.mini) {
+                    this._dynamicBgIds.mini = DynamicBackground.init($mini[0], effectType, {
+                        particleCount: 20, // Mini HUD 使用较少的粒子
+                        gearCount: 3
+                    });
+                    Logger.debug('[DynamicBackground] Initialized for Mini HUD');
+                }
+            } else if (mode === 'full') {
+                const $full = $('#dnd-dashboard-root');
+                if ($full.length && !this._dynamicBgIds.full) {
+                    this._dynamicBgIds.full = DynamicBackground.init($full[0], effectType, {
+                        particleCount: 40, // 全屏使用更多粒子
+                        gearCount: 6
+                    });
+                    Logger.debug('[DynamicBackground] Initialized for Full Dashboard');
+                }
+            }
+        } catch (e) {
+            Logger.warn('[DynamicBackground] Init error:', e);
+        }
+    },
+
+    // [新增] 销毁动态背景
+    _destroyDynamicBackgrounds() {
+        try {
+            if (this._dynamicBgIds.mini) {
+                DynamicBackground.destroy(this._dynamicBgIds.mini);
+                this._dynamicBgIds.mini = null;
+            }
+            if (this._dynamicBgIds.full) {
+                DynamicBackground.destroy(this._dynamicBgIds.full);
+                this._dynamicBgIds.full = null;
+            }
+        } catch (e) {
+            Logger.warn('[DynamicBackground] Destroy error:', e);
+        }
+    },
+
+    // [新增] 切换动态背景效果
+    switchDynamicBgEffect(effectType) {
+        try {
+            if (this._dynamicBgIds.mini) {
+                DynamicBackground.switchEffect(this._dynamicBgIds.mini, effectType);
+            }
+            if (this._dynamicBgIds.full) {
+                DynamicBackground.switchEffect(this._dynamicBgIds.full, effectType);
+            }
+            // 保存设置
+            if (!CONFIG.DYNAMIC_BG) CONFIG.DYNAMIC_BG = {};
+            CONFIG.DYNAMIC_BG.type = effectType;
+            Logger.info('[DynamicBackground] Switched to:', effectType);
+        } catch (e) {
+            Logger.warn('[DynamicBackground] Switch error:', e);
+        }
+    },
+
+    // [新增] 获取可用的背景效果列表
+    getAvailableBgEffects() {
+        return DynamicBackground.getAvailableEffects();
     },
 
     init() {
         Logger.info('[UIRenderer] init() called');
         const { $ } = getCore();
-        if ($('#dnd-dashboard-root').length) {
-            Logger.warn('[UIRenderer] Dashboard already exists, skipping init');
-            return;
+        
+        // [修复] 热更新支持：如果有旧的实例，先清除
+        // 始终尝试清除，不仅仅是检测到 ID 时，以防万一有残留的监听器或变量
+        Logger.info('[UIRenderer] Performing cleanup...');
+            
+        // 1. 清除定时器 (检查 window 对象上的引用)
+        if (window.DND_HUD_Interval) {
+            clearInterval(window.DND_HUD_Interval);
+            window.DND_HUD_Interval = null;
+        }
+
+        // 2. 清除全局事件 (使用命名空间)
+        try {
+            $(window).off('resize.dnd');
+            $(document).off('keydown.dndHotkeys');
+            $(document).off('dblclick.dndAvatar');
+            $(document).off('click.dndPos'); // 清除位置设置弹窗的监听器
+        } catch (e) { console.warn('Event cleanup error:', e); }
+
+        // 3. 清除 DOM 元素 (更彻底的清除)
+        const selectorsToRemove = [
+            '#dnd-dashboard-root',
+            '#dnd-mini-hud',
+            '#dnd-tooltip',
+            '#dnd-toggle-btn',
+            '#dnd-notification-container',
+            '#dnd-dialog-container',
+            '.dnd-generic-popup',
+            '#dnd-position-dialog',
+            '#dnd-scale-style',
+            '#dnd-shake-style',
+            '#dnd-quick-bar',
+            '#dnd-quick-trigger'
+        ];
+        
+        selectorsToRemove.forEach(sel => {
+            const $el = $(sel);
+            if ($el.length) {
+                // 尝试移除原生监听器 (如果是 toggle btn)
+                if (sel === '#dnd-toggle-btn' && $el[0]) {
+                    $el[0].onclick = null;
+                    // 指针事件通常绑定在 DOM 元素上，移除 DOM 元素即可自动清理，
+                    // 但如果绑定在 window 上的 pending 事件 (drag 中) 需要注意
+                }
+                $el.remove();
+            }
+        });
+
+        // 额外清除可能存在的重复 ID (防止 zombie 元素)
+        if ($('#dnd-toggle-btn').length > 0) {
+            console.warn('[UIRenderer] Duplicate toggle button detected, removing all...');
+            $('[id="dnd-toggle-btn"]').remove();
         }
 
         const html = `
@@ -374,10 +561,11 @@ export default {
         btnDom.onclick = null;
         
         // 监听窗口调整
-        $(window).on('resize.dnd', () => this.updateHUDPosition());
+        $(window).off('resize.dnd').on('resize.dnd', () => this.updateHUDPosition());
 
         // [新增] 定时器强制更新位置 (防止样式被覆盖或初始化失败)
-        setInterval(() => this.updateHUDPosition(), 1000);
+        if (window.DND_HUD_Interval) clearInterval(window.DND_HUD_Interval);
+        window.DND_HUD_Interval = setInterval(() => this.updateHUDPosition(), 1000);
 
         // [DEBUG] 检查是否有元素遮挡悬浮球
         setTimeout(() => {
@@ -457,6 +645,13 @@ export default {
         // 初始状态
         this.setState('collapsed');
         
+        // [新增] 读取并应用 UI 缩放设置
+        DBAdapter.getSetting(CONFIG.STORAGE_KEYS.UI_SCALE).then(savedScale => {
+            // 如果没有保存过，默认为 1.0
+            const scale = savedScale || CONFIG.UI_SCALE.DEFAULT;
+            this.applyUIScale(scale);
+        });
+
         // [新增] 全局快捷键支持
         $(document).on('keydown.dndHotkeys', (e) => {
             // 忽略输入框内的按键
@@ -516,7 +711,7 @@ export default {
         });
         
         // 全局事件委托：头像双击上传
-        $(document).on('dblclick', '.dnd-avatar-container', (e) => {
+        $(document).off('dblclick.dndAvatar').on('dblclick.dndAvatar', '.dnd-avatar-container', (e) => {
             e.stopPropagation();
             const $target = $(e.currentTarget);
             const charId = $target.data('char-id');

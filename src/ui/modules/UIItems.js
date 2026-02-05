@@ -32,8 +32,8 @@ export default {
                     ${isEquipped ? '<i class="fa-solid fa-shield-halved" style="float:right;font-size:12px;color:var(--dnd-text-highlight)"></i>' : ''}
                 </div>
                 
-                ${damage ? `<div class="dnd-item-damage">⚔️ ${damage}</div>` : ''}
-                
+                ${damage ? `<div class="dnd-item-damage"><i class="fa-solid fa-gavel"></i> ${damage}</div>` : ''}
+
                 <div style="font-size:12px;color:#888;display:flex;justify-content:space-between;margin-top:4px;">
                     <span>x${item['数量']}</span>
                     <span>${item['价值'] || '-'}</span>
@@ -44,7 +44,7 @@ export default {
                 <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px;">
                     <div class="dnd-item-rarity rarity-${rarity.toLowerCase()}">${rarity}</div>
                     <div style="display:flex;flex-direction:column;align-items:flex-end;">
-                        ${owner ? `<div style="font-size:10px;color:var(--dnd-accent-blue);background:rgba(44, 76, 138, 0.2);padding:1px 4px;border-radius:2px;margin-bottom:2px;">👤 ${owner}</div>` : ''}
+                        ${owner ? `<div style="font-size:10px;color:var(--dnd-accent-blue);background:rgba(44, 76, 138, 0.2);padding:1px 4px;border-radius:2px;margin-bottom:2px;"><i class="fa-solid fa-user"></i> ${owner}</div>` : ''}
                         ${item['重量'] ? `<div style="font-size:11px;color:#666;">${item['重量']} lb</div>` : ''}
                     </div>
                 </div>
@@ -65,16 +65,16 @@ export default {
         
         // [Feature 4] 详细属性
         const detailFields = [
-            { key: '所属人', icon: '👤', label: '持有者' },
-            { key: '伤害', icon: '⚔️', label: '伤害' },
-            { key: '护甲等级', icon: '🛡️', label: 'AC' },
-            { key: '特性', icon: '✨', label: '特性' },
-            { key: '稀有度', icon: '💎', label: '稀有度' },
-            { key: '重量', icon: '⚖️', label: '重量' },
-            { key: '价值', icon: '💰', label: '价值' },
-            { key: '需求', icon: '📋', label: '需求' },
-            { key: '类别', icon: '🏷️', label: '类别' },
-            { key: '数量', icon: '🔢', label: '数量' }
+            { key: '所属人', icon: '<i class="fa-solid fa-user"></i>', label: '持有者' },
+            { key: '伤害', icon: '<i class="fa-solid fa-gavel"></i>', label: '伤害' },
+            { key: '护甲等级', icon: '<i class="fa-solid fa-shield-halved"></i>', label: 'AC' },
+            { key: '特性', icon: '<i class="fa-solid fa-bolt"></i>', label: '特性' },
+            { key: '稀有度', icon: '<i class="fa-solid fa-gem"></i>', label: '稀有度' },
+            { key: '重量', icon: '<i class="fa-solid fa-weight-hanging"></i>', label: '重量' },
+            { key: '价值', icon: '<i class="fa-solid fa-coins"></i>', label: '价值' },
+            { key: '需求', icon: '<i class="fa-solid fa-list"></i>', label: '需求' },
+            { key: '类别', icon: '<i class="fa-solid fa-tag"></i>', label: '类别' },
+            { key: '数量', icon: '<i class="fa-solid fa-sort-numeric-down"></i>', label: '数量' }
         ];
 
         let detailHtml = '';
@@ -268,9 +268,9 @@ export default {
         const fullItem = items ? items.find(i => (i['物品ID'] === itemId) || (i['物品名称'] === itemId)) : item;
         
         const actions = [
-            { label: isEquipped ? '卸下' : '装备', icon: '🛡️', action: 'equip' },
-            { label: '使用/消耗', icon: '🧪', action: 'use' },
-            { label: '丢弃', icon: '🗑️', action: 'drop' }
+            { label: isEquipped ? '卸下' : '装备', icon: '<i class="fa-solid fa-shield-halved"></i>', action: 'equip' },
+            { label: '使用/消耗', icon: '<i class="fa-solid fa-flask"></i>', action: 'use' },
+            { label: '丢弃', icon: '<i class="fa-solid fa-trash"></i>', action: 'drop' }
         ];
         
         let html = `<div style="display:flex;flex-direction:column;gap:5px;">`;
@@ -464,8 +464,8 @@ export default {
                         onmouseout="this.style.background='rgba(197, 160, 89, 0.1)'"
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="display:flex;flex-direction:column;overflow:hidden;max-width:180px;">
-                            <span style="color:var(--dnd-text-highlight);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🛡️ ${item['物品名称']}</span>
-                            ${item['所属人'] ? `<span style="font-size:10px;color:var(--dnd-accent-blue);">👤 ${item['所属人']}</span>` : ''}
+                            <span style="color:var(--dnd-text-highlight);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><i class="fa-solid fa-shield-halved"></i> ${item['物品名称']}</span>
+                            ${item['所属人'] ? `<span style="font-size:10px;color:var(--dnd-accent-blue);"><i class="fa-solid fa-user"></i> ${item['所属人']}</span>` : ''}
                         </div>
                         <span style="color:#888;flex-shrink:0;">${item['类别'] || '-'}</span>
                     </div>
@@ -492,18 +492,18 @@ export default {
         
         factions.forEach(f => {
             const relation = parseInt(f['关系等级']) || 0;
-            let icon = '⚖️';
+            let icon = '<i class="fa-solid fa-scale-balanced"></i>';
             let color = '#ccc';
             let statusText = '中立';
             let percent = 50; // 中立默认 50%
             
             if (relation > 0) {
-                icon = '🤝';
+                icon = '<i class="fa-solid fa-handshake"></i>';
                 color = 'var(--dnd-accent-green)';
                 statusText = '友好';
                 percent = Math.min(100, 50 + (relation * 5));
             } else if (relation < 0) {
-                icon = '⚔️';
+                icon = '<i class="fa-solid fa-skull"></i>';
                 color = 'var(--dnd-accent-red)';
                 statusText = '敌对';
                 percent = Math.max(0, 50 + (relation * 5));

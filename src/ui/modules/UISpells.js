@@ -20,7 +20,7 @@ export default {
                         '${spell['射程']||'接触'}',
                         '${spell['环阶']}'
                     )">
-                    ✨ 施放
+                    <i class="fa-solid fa-bolt"></i> 施放
                 </button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:#aaa;margin-bottom:8px;">
@@ -170,7 +170,7 @@ export default {
             byLevel[level].push(s);
         });
         
-        let html = `<div style="font-weight:bold;color:#aab;border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;">📖 法术书</div>`;
+        let html = `<div style="font-weight:bold;color:#aab;border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-book"></i> 法术书</div>`;
         
         // 搜索和筛选
         html += `
@@ -189,7 +189,7 @@ export default {
             html += `<div class="dnd-spell-group-header" data-level="${lvl}" style="color:var(--dnd-text-highlight);font-size:12px;margin:8px 0 4px 0;border-bottom:1px dashed #444;">${lvl}</div>`;
             byLevel[lvl].forEach(s => {
                 const isPrep = s['已准备'] === '是' || s['已准备'] === true || lvl === '戏法';
-                const prepIcon = isPrep ? '✨' : '⚪';
+                const prepIcon = isPrep ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-regular fa-circle"></i>';
                 const safeName = (s['法术名称'] || '').replace(/'/g, "\\'");
                 html += `
                     <div class="dnd-spell-item" data-name="${s['法术名称']}" data-level="${lvl}" style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;cursor:pointer;"

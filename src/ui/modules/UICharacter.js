@@ -162,7 +162,7 @@ export default {
                                 font-size: 13px;
                                 transition: all 0.2s;
                             " onmouseover="this.style.background='rgba(157, 139, 108, 0.4)'" onmouseout="this.style.background='rgba(157, 139, 108, 0.2)'">
-                                📷 选择图片
+                                <i class="fa-solid fa-camera"></i> 选择图片
                                 <input type="file" id="dnd-avatar-file-input" accept="image/*" style="display:none;">
                             </label>
                             
@@ -177,7 +177,7 @@ export default {
                                     font-size: 13px;
                                     transition: all 0.2s;
                                 " onmouseover="this.style.background='rgba(138, 44, 44, 0.5)'" onmouseout="this.style.background='rgba(138, 44, 44, 0.3)'">
-                                    🗑️ 移除头像
+                                    <i class="fa-solid fa-trash"></i> 移除头像
                                 </button>
                             ` : ''}
                         </div>
@@ -844,7 +844,7 @@ export default {
                 const isUser = msg.role === 'user';
                 const bgColor = isUser ? 'rgba(52, 152, 219, 0.1)' : 'rgba(155, 89, 182, 0.1)';
                 const borderColor = isUser ? '#3498db' : '#9b59b6';
-                const icon = isUser ? '👤' : '🤖';
+                const icon = isUser ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
                 chatHistoryHtml += `
                     <div class="dnd-chat-msg dnd-anim-entry" style="animation-delay:${idx * 0.05}s; background:${bgColor}; border-left:3px solid ${borderColor}; padding:10px 12px; margin-bottom:8px; border-radius:4px;">
                         <div style="font-size:11px;color:#888;margin-bottom:4px;">${icon} ${isUser ? '你' : 'AI 向导'}</div>
@@ -900,7 +900,7 @@ export default {
                                     border-radius:4px;
                                     font-size:12px;
                                     cursor:pointer;
-                                " ${state.currentStep !== 'init' ? 'disabled' : ''}>👤 主角</button>
+                                " ${state.currentStep !== 'init' ? 'disabled' : ''}><i class="fa-solid fa-user"></i> 主角</button>
                                 <button id="dnd-creator-type-party" class="dnd-clickable" style="
                                     flex:1;
                                     padding:8px 12px;
@@ -910,7 +910,7 @@ export default {
                                     border-radius:4px;
                                     font-size:12px;
                                     cursor:pointer;
-                                " ${state.currentStep !== 'init' ? 'disabled' : ''}>👥 队友</button>
+                                " ${state.currentStep !== 'init' ? 'disabled' : ''}><i class="fa-solid fa-users"></i> 队友</button>
                             </div>
                         </div>
                         
@@ -919,7 +919,7 @@ export default {
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                                 <label style="font-size:12px;color:#888;">API 状态</label>
                                 <div style="font-size:11px;color:${state.apiConfig.key ? '#2ecc71' : '#e74c3c'}">
-                                    ${state.apiConfig.key ? '✅ 已配置' : '❌ 未配置'}
+                                    ${state.apiConfig.key ? '<i class="fa-solid fa-check-circle"></i> 已配置' : '<i class="fa-solid fa-times-circle"></i> 未配置'}
                                 </div>
                             </div>
                             <div style="font-size:11px;color:#aaa;margin-bottom:8px;">
@@ -934,7 +934,7 @@ export default {
                             </div>
 
                             <button type="button" onclick="window.DND_Dashboard_UI.renderPanel('settings')" class="dnd-clickable" style="width:100%;padding:6px;background:#2a2a2c;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">
-                                ⚙️ 前往设置配置 API
+                                <i class="fa-solid fa-cog"></i> 前往设置配置 API
                             </button>
                         </div>
                         <div style="display:flex;gap:10px;">
@@ -948,7 +948,7 @@ export default {
                                     cursor:pointer;
                                     font-weight:bold;
                                     font-size:13px;
-                                ">🚀 开始创建</button>
+                                "><i class="fa-solid fa-bolt"></i> 开始创建</button>
                             ` : ''}
                             ${state.currentStep !== 'init' ? `
                                 <button id="dnd-creator-reset-btn" class="dnd-clickable" style="
@@ -959,7 +959,7 @@ export default {
                                     border-radius:4px;
                                     cursor:pointer;
                                     font-size:12px;
-                                ">🔄 重新开始</button>
+                                "><i class="fa-solid fa-sync"></i> 重新开始</button>
                             ` : ''}
                         </div>
                     </div>
@@ -971,7 +971,7 @@ export default {
                     <div style="flex:2;min-width:300px;">
                         <div style="background:rgba(0,0,0,0.2);border:1px solid var(--dnd-border-inner);border-radius:6px;overflow:hidden;">
                             <div style="background:rgba(255,255,255,0.05);padding:10px 15px;border-bottom:1px solid var(--dnd-border-inner);">
-                                <span style="color:var(--dnd-text-header);font-weight:bold;">💬 对话记录</span>
+                                <span style="color:var(--dnd-text-header);font-weight:bold;"><i class="fa-solid fa-comments"></i> 对话记录</span>
                                 <span style="float:right;font-size:11px;color:#666;">${state.conversationHistory.length} 条消息</span>
                             </div>
                             <div id="dnd-creator-chat-history" style="height:350px;overflow-y:auto;padding:15px;">
@@ -989,7 +989,7 @@ export default {
                                 border-radius:4px;
                                 cursor:pointer;
                                 font-size:16px;
-                            " title="属性生成器">🔢</button>
+                            " title="属性生成器"><i class="fa-solid fa-sort-numeric-down"></i></button>
                             <input type="text" id="dnd-creator-user-input" placeholder="输入你的回答或想法..." style="
                                 flex:1;
                                 padding:10px 15px;
@@ -1008,7 +1008,7 @@ export default {
                                 cursor:pointer;
                                 font-weight:bold;
                             " ${state.currentStep === 'init' || state.isGenerating ? 'disabled' : ''}>
-                                ${state.isGenerating ? '⏳ 生成中...' : '📤 发送'}
+                                ${state.isGenerating ? '<i class="fa-solid fa-hourglass-half"></i> 生成中...' : '<i class="fa-solid fa-paper-plane"></i> 发送'}
                             </button>
                         </div>
                         
@@ -1022,7 +1022,7 @@ export default {
                     <div style="flex:1;min-width:250px;">
                         <div style="background:rgba(0,0,0,0.2);border:1px solid var(--dnd-border-gold);border-radius:6px;overflow:hidden;">
                             <div style="background:linear-gradient(135deg, rgba(157, 139, 108, 0.2), rgba(157, 139, 108, 0.1));padding:10px 15px;border-bottom:1px solid var(--dnd-border-gold);">
-                                <span style="color:var(--dnd-text-highlight);font-weight:bold;">📋 角色预览</span>
+                                <span style="color:var(--dnd-text-highlight);font-weight:bold;"><i class="fa-solid fa-clipboard-list"></i> 角色预览</span>
                             </div>
                             <div id="dnd-creator-preview" style="padding:15px;min-height:300px;">
                                 ${this.renderCharacterPreview(state.characterData)}
@@ -1040,7 +1040,7 @@ export default {
                                     border-radius:4px;
                                     cursor:pointer;
                                     font-weight:bold;
-                                ">✅ 确认创建</button>
+                                "><i class="fa-solid fa-check-circle"></i> 确认创建</button>
                                 <button id="dnd-creator-modify-btn" class="dnd-clickable" style="
                                     background:rgba(241, 196, 15, 0.2);
                                     border:1px solid #f1c40f;
@@ -1048,7 +1048,7 @@ export default {
                                     padding:12px 20px;
                                     border-radius:4px;
                                     cursor:pointer;
-                                ">✏️ 继续修改</button>
+                                "><i class="fa-solid fa-pen"></i> 继续修改</button>
                             </div>
                         ` : ''}
                     </div>
@@ -1154,7 +1154,7 @@ export default {
         if (!data || Object.keys(data).length === 0) {
             return `
                 <div style="color:#666;text-align:center;padding:30px 15px;">
-                    <div style="font-size:48px;margin-bottom:15px;opacity:0.3;">🧙</div>
+                    <div style="font-size:48px;margin-bottom:15px;opacity:0.3;"><i class="fa-solid fa-hat-wizard"></i></div>
                     <div>角色信息将随对话逐步生成...</div>
                 </div>
             `;
@@ -1237,7 +1237,7 @@ export default {
                 ${profHtml}
 
                 <!-- 特性 & 专长 -->
-                ${renderList('🌟 特性 & 专长', data.features, f => `
+                ${renderList('<i class="fa-solid fa-bolt"></i> 特性 & 专长', data.features, f => `
                     <div style="margin-bottom:4px;font-size:12px;">
                         <span style="color:#ccc;font-weight:bold;">${f.name}</span>
                         <div style="color:#888;font-size:10px;line-height:1.3;">${f.desc || ''}</div>
@@ -1245,7 +1245,7 @@ export default {
                 `)}
 
                 <!-- 法术 -->
-                ${renderList('✨ 法术', data.spells, s => `
+                ${renderList('<i class="fa-solid fa-bolt"></i> 法术', data.spells, s => `
                     <div style="margin-bottom:4px;font-size:12px;">
                         <span style="color:#b585ff;font-weight:bold;">${s.name}</span>
                         <span style="color:#666;font-size:10px;">(${s.level===0?'戏法':s.level+'环'})</span>
@@ -1372,7 +1372,7 @@ export default {
         });
         
         // 确认创建/升级
-        $container.find('#dnd-creator-confirm-btn').text(state.mode === 'levelup' ? '✅ 确认升级' : '✅ 确认创建');
+        $container.find('#dnd-creator-confirm-btn').html(state.mode === 'levelup' ? '<i class="fa-solid fa-check-circle"></i> 确认升级' : '<i class="fa-solid fa-check-circle"></i> 确认创建');
         $container.find('#dnd-creator-confirm-btn').on('click', async () => {
             await this.finalizeCharacterCreation();
         });
@@ -1430,7 +1430,7 @@ export default {
 
         const html = `
             <div class="dnd-chat-msg dnd-anim-entry" style="background:rgba(157, 139, 108, 0.1); border-left:3px solid var(--dnd-border-gold); padding:10px 12px; margin-bottom:8px; border-radius:4px;">
-                ${question ? `<div style="font-size:12px;color:var(--dnd-text-highlight);margin-bottom:8px;font-weight:bold;">❓ ${question}</div>` : ''}
+                ${question ? `<div style="font-size:12px;color:var(--dnd-text-highlight);margin-bottom:8px;font-weight:bold;"><i class="fa-solid fa-question-circle"></i> ${question}</div>` : ''}
                 <div style="display:flex;flex-direction:column;gap:5px;">
                     ${buttonsHtml}
                 </div>
@@ -1469,7 +1469,7 @@ export default {
                 const idx = state.conversationHistory.length;
                 const userMsgHtml = `
                     <div class="dnd-chat-msg dnd-anim-entry" style="background:rgba(52, 152, 219, 0.1); border-left:3px solid #3498db; padding:10px 12px; margin-bottom:8px; border-radius:4px;">
-                        <div style="font-size:11px;color:#888;margin-bottom:4px;">👤 你</div>
+                        <div style="font-size:11px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-user"></i> 你</div>
                         <div style="color:var(--dnd-text-main);line-height:1.5;white-space:pre-wrap;">${this.formatChatMessage(userMessage)}</div>
                     </div>`;
                 $chatHistory.append(userMsgHtml);
@@ -1624,7 +1624,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 // 追加到 DOM
                 const aiMsgHtml = `
                     <div class="dnd-chat-msg dnd-anim-entry" style="background:rgba(155, 89, 182, 0.1); border-left:3px solid #9b59b6; padding:10px 12px; margin-bottom:8px; border-radius:4px;">
-                        <div style="font-size:11px;color:#888;margin-bottom:4px;">🤖 AI 向导</div>
+                        <div style="font-size:11px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-robot"></i> AI 向导</div>
                         <div style="color:var(--dnd-text-main);line-height:1.5;white-space:pre-wrap;">${this.formatChatMessage(response)}</div>
                     </div>`;
                 $chatHistory.append(aiMsgHtml);
@@ -1662,8 +1662,8 @@ ${JSON.stringify(state.characterData, null, 2)}
             console.error('[CharCreator] API 调用失败:', error);
             const errMsgHtml = `
                 <div class="dnd-chat-msg dnd-anim-entry" style="background:rgba(192, 57, 43, 0.1); border-left:3px solid #e74c3c; padding:10px 12px; margin-bottom:8px; border-radius:4px;">
-                    <div style="font-size:11px;color:#888;margin-bottom:4px;">🤖 系统消息</div>
-                    <div style="color:var(--dnd-text-main);line-height:1.5;">❌ 抱歉，生成失败：${error.message}</div>
+                    <div style="font-size:11px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-robot"></i> 系统消息</div>
+                    <div style="color:var(--dnd-text-main);line-height:1.5;"><i class="fa-solid fa-times-circle"></i> 抱歉，生成失败：${error.message}</div>
                 </div>`;
             $chatHistory.append(errMsgHtml);
             $chatHistory.scrollTop($chatHistory[0].scrollHeight);

@@ -43,10 +43,10 @@ const NotificationSystem = {
         } = options;
 
         const icons = {
-            info: 'ℹ️',
-            success: '✅',
-            warning: '⚠️',
-            error: '❌'
+            info: '<i class="fa-solid fa-info-circle"></i>',
+            success: '<i class="fa-solid fa-check-circle"></i>',
+            warning: '<i class="fa-solid fa-exclamation"></i>',
+            error: '<i class="fa-solid fa-times-circle"></i>'
         };
 
         const $toast = $(`

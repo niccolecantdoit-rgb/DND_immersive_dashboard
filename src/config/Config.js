@@ -39,7 +39,22 @@ export const CONFIG = {
         MAP_ZOOM: 'dnd_map_zoom',
         PRESET_CONFIG: 'dnd_preset_config',
         QUICK_SLOTS: 'dnd_quick_slots',
-        SYNC_QUEUE: 'dnd_sync_queue'
+        SYNC_QUEUE: 'dnd_sync_queue',
+        UI_SCALE: 'dnd_ui_scale',
+        DYNAMIC_BG: 'dnd_dynamic_bg'
+    },
+    // 界面缩放配置
+    UI_SCALE: {
+        MIN: 0.5,
+        MAX: 2.0,
+        DEFAULT: 1.0,
+        STEP: 0.1
+    },
+    // 动态背景配置
+    DYNAMIC_BG: {
+        enabled: true,          // 是否启用动态背景
+        type: 'particles',      // 默认效果类型: particles, gears, ripples, runes, starfield, gradient, grid, dna
+        intensity: 1.0          // 效果强度 (0.5 - 2.0)
     },
     // 地图缩放配置
     MAP_ZOOM: {

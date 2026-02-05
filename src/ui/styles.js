@@ -1064,16 +1064,6 @@ export const addStyles = () => {
             animation: dnd-pulse-border 2s infinite !important;
         }
         
-        /* 悬停浮起效果 */
-        .dnd-hover-lift {
-            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, filter 0.2s !important;
-        }
-        .dnd-hover-lift:hover {
-            transform: translateY(-3px) scale(1.02) !important;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
-            filter: brightness(1.1) !important;
-            z-index: 10 !important;
-        }
 
         /* 状态条流光效果 */
         @keyframes dnd-shimmer {
@@ -1837,6 +1827,66 @@ export const addStyles = () => {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
             }
+        }
+
+        /* ============================================
+           SVG Icon Enhancements (FontAwesome)
+           ============================================ */
+        .svg-inline--fa {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+            display: inline-block !important;
+            vertical-align: -0.125em !important; /* Fix alignment */
+        }
+        
+        /* 悬停光晕效果 */
+        .dnd-clickable:hover .svg-inline--fa,
+        .dnd-btn:hover .svg-inline--fa,
+        .dnd-nav-item:hover .svg-inline--fa,
+        .dnd-footer-btn:hover .svg-inline--fa,
+        .dnd-icon-hover:hover {
+            filter: drop-shadow(0 0 5px currentColor) !important;
+            transform: scale(1.2) !important;
+        }
+        
+        /* 特定颜色的图标光晕增强 */
+        .dnd-text-highlight .svg-inline--fa {
+            filter: drop-shadow(0 0 2px rgba(255, 219, 133, 0.3));
+        }
+
+        /* 状态提示特效 */
+        @keyframes dnd-icon-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .dnd-icon-bounce {
+            animation: dnd-icon-bounce 1s infinite ease-in-out !important;
+            color: var(--dnd-text-highlight) !important;
+        }
+
+        @keyframes dnd-icon-pulse-gold {
+            0% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
+            50% { filter: drop-shadow(0 0 8px rgba(255, 219, 133, 0.8)); }
+            100% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
+        }
+        .dnd-icon-notify {
+            animation: dnd-icon-pulse-gold 2s infinite !important;
+            color: var(--dnd-text-highlight) !important;
+        }
+
+        /* 悬停浮起效果 (Moved to end for precedence) */
+        .dnd-hover-lift {
+            transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+                        box-shadow 0.4s,
+                        filter 0.4s,
+                        background 0.4s,
+                        border-color 0.4s,
+                        color 0.4s !important;
+        }
+        .dnd-hover-lift:hover {
+            transform: translateY(-3px) scale(1.02) !important;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+            filter: brightness(1.1) !important;
+            z-index: 10 !important;
         }
     `;
     $('head').append(`<style id="${SCRIPT_ID}-styles">${css}</style>`);

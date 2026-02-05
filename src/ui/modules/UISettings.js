@@ -7,6 +7,8 @@ import { SettingsManager } from '../../core/SettingsManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { TavernAPI } from '../../core/TavernAPI.js';
 import { NotificationSystem } from './UIUtils.js';
+import UICore from './UICore.js';
+import { DynamicBackground } from '../DynamicBackground.js';
 
 export default {
     async renderSettingsPanel($c) {
@@ -15,6 +17,12 @@ export default {
         const presets = PresetSwitcher.getAvailablePresets();
         const apiConfig = await SettingsManager.getAPIConfig();
         const syncStatus = await SettingsManager.getSyncStatus();
+        const currentScale = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.UI_SCALE) || CONFIG.UI_SCALE.DEFAULT;
+        
+        // 获取动态背景配置
+        const savedBgConfig = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.DYNAMIC_BG);
+        const bgConfig = savedBgConfig ? JSON.parse(savedBgConfig) : CONFIG.DYNAMIC_BG;
+        const bgEffects = DynamicBackground.getAvailableEffects();
         
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
@@ -41,6 +49,63 @@ export default {
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
                         <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">🔄</button>
+                    </div>
+                </div>
+
+                <!-- 界面显示设置 -->
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💻 界面显示</h3>
+                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                        调整仪表盘和悬浮球的大小比例，适配不同分辨率的屏幕。
+                    </p>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;justify-content:space-between;margin-bottom:5px;color:var(--dnd-text-main);">
+                            <span>缩放比例 (Scale)</span>
+                            <span id="dnd-scale-value" style="color:var(--dnd-text-highlight);">${currentScale}</span>
+                        </label>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <input type="range" id="dnd-set-ui-scale"
+                                min="${CONFIG.UI_SCALE.MIN}" max="${CONFIG.UI_SCALE.MAX}" step="${CONFIG.UI_SCALE.STEP}" value="${currentScale}"
+                                style="flex:1;cursor:pointer;">
+                            <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 动态背景设置 -->
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">✨ 动态背景</h3>
+                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                        为界面添加动态背景效果，类似游戏UI设计，让背景不再单调。
+                    </p>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-bg-enabled" ${bgConfig.enabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="font-weight:bold;">启用动态背景</span>
+                        </label>
+                    </div>
+                    
+                    <div class="dnd-bg-group" style="opacity:${bgConfig.enabled ? 1 : 0.5};pointer-events:${bgConfig.enabled ? 'auto' : 'none'};transition:all 0.3s;">
+                        <div style="margin-bottom:15px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">背景效果</label>
+                            <select id="dnd-bg-type" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                                ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || '✨'} ${e.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div style="margin-bottom:10px;">
+                            <label style="display:flex;justify-content:space-between;margin-bottom:5px;color:var(--dnd-text-main);">
+                                <span>效果强度</span>
+                                <span id="dnd-bg-intensity-value" style="color:var(--dnd-text-highlight);">${bgConfig.intensity || 1.0}</span>
+                            </label>
+                            <input type="range" id="dnd-bg-intensity" min="0.3" max="2.0" step="0.1" value="${bgConfig.intensity || 1.0}" style="width:100%;cursor:pointer;">
+                        </div>
+                        
+                        <div id="dnd-bg-preview" style="margin-top:15px;height:80px;border-radius:6px;border:1px solid var(--dnd-border-inner);overflow:hidden;position:relative;">
+                            <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#666;font-size:12px;">效果预览</div>
+                        </div>
                     </div>
                 </div>
 
@@ -348,10 +413,100 @@ export default {
             if(this.value) $c.find('#dnd-cfg-explore-input').val(this.value);
         });
         
+        // 缩放实时预览
+        $c.find('#dnd-set-ui-scale').on('input', function() {
+            const val = $(this).val();
+            $c.find('#dnd-scale-value').text(val);
+            // 实时应用 (预览) - 直接调用模块方法确保生效
+            UICore.applyUIScale(val);
+        });
+
+        // 重置缩放
+        $c.find('#dnd-reset-scale').on('click', function() {
+            const def = CONFIG.UI_SCALE.DEFAULT;
+            $c.find('#dnd-set-ui-scale').val(def).trigger('input');
+        });
+
+        // 动态背景设置
+        const $bgEnabled = $c.find('#dnd-bg-enabled');
+        const $bgGroup = $c.find('.dnd-bg-group');
+        const $bgPreview = $c.find('#dnd-bg-preview');
+        let previewBgId = null;
+
+        // 启用/禁用动态背景
+        $bgEnabled.on('change', function() {
+            const checked = $(this).prop('checked');
+            $bgGroup.css({ opacity: checked ? 1 : 0.5, pointerEvents: checked ? 'auto' : 'none' });
+            
+            // 更新运行时配置
+            CONFIG.DYNAMIC_BG.enabled = checked;
+            
+            // 实时应用: 销毁或重新初始化背景
+            if (checked) {
+                UICore._initDynamicBackground(UICore.state === 'full' ? 'full' : 'mini');
+            } else {
+                UICore._destroyDynamicBackgrounds();
+            }
+        });
+
+        // 背景效果类型切换
+        $c.find('#dnd-bg-type').on('change', function() {
+            const effectType = $(this).val();
+            CONFIG.DYNAMIC_BG.type = effectType;
+            
+            // 更新预览
+            if (previewBgId) {
+                DynamicBackground.destroy(previewBgId);
+            }
+            previewBgId = DynamicBackground.init($bgPreview[0], effectType, {
+                intensity: parseFloat($c.find('#dnd-bg-intensity').val())
+            });
+            
+            // 实时应用到主界面
+            if ($bgEnabled.prop('checked')) {
+                UICore.switchDynamicBgEffect(effectType);
+            }
+        });
+
+        // 效果强度调整
+        $c.find('#dnd-bg-intensity').on('input', function() {
+            const val = parseFloat($(this).val());
+            $c.find('#dnd-bg-intensity-value').text(val.toFixed(1));
+            CONFIG.DYNAMIC_BG.intensity = val;
+            
+            // 更新预览 (重新初始化以应用强度)
+            const effectType = $c.find('#dnd-bg-type').val();
+            if (previewBgId) {
+                DynamicBackground.destroy(previewBgId);
+            }
+            previewBgId = DynamicBackground.init($bgPreview[0], effectType, { intensity: val });
+        });
+
+        // 初始化预览
+        if ($bgEnabled.prop('checked')) {
+            previewBgId = DynamicBackground.init($bgPreview[0], $c.find('#dnd-bg-type').val(), {
+                intensity: parseFloat($c.find('#dnd-bg-intensity').val())
+            });
+        }
+
         // 保存
         $c.find('#dnd-cfg-save').on('click', async function(e) {
             if(e) e.preventDefault();
-            // 1. 保存预设配置
+            
+            // 0. 保存缩放设置
+            const scaleVal = $c.find('#dnd-set-ui-scale').val();
+            safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+
+            // 1. 保存动态背景配置
+            const newBgConfig = {
+                enabled: $bgEnabled.prop('checked'),
+                type: $c.find('#dnd-bg-type').val(),
+                intensity: parseFloat($c.find('#dnd-bg-intensity').val())
+            };
+            Object.assign(CONFIG.DYNAMIC_BG, newBgConfig);
+            safeSave(CONFIG.STORAGE_KEYS.DYNAMIC_BG, JSON.stringify(newBgConfig));
+
+            // 2. 保存预设配置
             const newConfig = {
                 ENABLED: $enabled.prop('checked'),
                 COMBAT_PRESET: $c.find('#dnd-cfg-combat-input').val().trim(),
@@ -361,7 +516,7 @@ export default {
             Object.assign(CONFIG.PRESET_SWITCHING, newConfig);
             safeSave(CONFIG.STORAGE_KEYS.PRESET_CONFIG, newConfig);
             
-            // 2. 保存 API 配置
+            // 3. 保存 API 配置
             const newApiConfig = {
                 url: $c.find('#dnd-set-api-url').val().trim(),
                 key: $c.find('#dnd-set-api-key').val().trim(),
@@ -377,7 +532,7 @@ export default {
                 $btn.html(originalText).prop('disabled', false);
             }, 1500);
             
-            Logger.info('设置已更新:', newConfig, newApiConfig);
+            Logger.info('设置已更新:', newConfig, newApiConfig, newBgConfig);
             
             // 立即触发一次状态检查以应用新设置
             PresetSwitcher._lastCombatState = null; // 重置状态以强制触发
@@ -386,5 +541,8 @@ export default {
                 PresetSwitcher.checkCombatStateChange(global[0]['战斗模式'] === '战斗中');
             }
         });
+
+        // 清理预览背景 (当设置面板关闭时)
+        // 注意: 这里假设面板关闭时会调用某种清理，否则可能需要额外机制
     }
 };

@@ -65,7 +65,7 @@ export default {
         const $toolbar = $(`
             <div class="dnd-party-toolbar" style="display:flex;gap:10px;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:6px;border:1px solid var(--dnd-border-inner);">
                 <div style="flex:1;display:flex;align-items:center;gap:10px;">
-                    <span style="font-weight:bold;color:var(--dnd-text-highlight);">👥 冒险队伍</span>
+                    <span style="font-weight:bold;color:var(--dnd-text-highlight);"><i class="fa-solid fa-users"></i> 冒险队伍</span>
                     <span style="font-size:12px;color:#888;">(${party.length} 名成员)</span>
                 </div>
                 <button class="dnd-btn dnd-clickable dnd-export-party-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-gold);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
@@ -315,7 +315,7 @@ export default {
     renderInventoryPanel($c) {
         const items = DataManager.getTable('ITEM_Inventory');
         if(!items || items.length === 0) {
-            $c.html('<div style="padding:20px;text-align:center;color:#888">🎒 背包空空如也</div>');
+            $c.html('<div style="padding:20px;text-align:center;color:#888"><i class="fa-solid fa-suitcase"></i> 背包空空如也</div>');
             return;
         }
 
@@ -351,7 +351,7 @@ export default {
         // 搜索和筛选区域 (Panel)
         const searchHtml = `
             <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid var(--dnd-border-inner);display:flex;gap:10px;align-items:center;">
-                <div style="font-weight:bold;color:var(--dnd-text-highlight);white-space:nowrap;">🔍 查找物品</div>
+                <div style="font-weight:bold;color:var(--dnd-text-highlight);white-space:nowrap;"><i class="fa-solid fa-search"></i> 查找物品</div>
                 <input type="text" id="dnd-panel-inv-search" placeholder="物品名称..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px 10px;border-radius:4px;" oninput="window.DND_Dashboard_UI.filterPanelInventory()">
                 <select id="dnd-panel-inv-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
                     <option value="">全部分类</option>
@@ -371,7 +371,7 @@ export default {
             const $equipSection = $(`
                 <div class="dnd-inv-section-equipped" style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-gold);">
                     <div style="font-size:16px;font-weight:bold;color:var(--dnd-text-header);margin-bottom:10px;display:flex;align-items:center;gap:10px;">
-                        <span>⚔️ 已装备</span>
+                        <span><i class="fa-solid fa-shield-halved"></i> 已装备</span>
                         <span style="font-size:12px;background:var(--dnd-accent-green);color:#fff;padding:2px 6px;border-radius:4px;">${equippedItems.length}</span>
                     </div>
                     <div class="dnd-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;"></div>
@@ -564,22 +564,7 @@ export default {
                 detail += `<div style="margin-bottom:10px"><strong>关键经历:</strong><br>${npc['关键经历'] || '无'}</div>`;
                 detail += `<div style="margin-bottom:10px"><strong>外貌:</strong><br>${npc['外貌描述'] || '无'}</div>`;
                 detail += `<div style="margin-top:20px;font-size:10px;color:#666">ID: ${npc['NPC_ID']}</div>`;
-                this.showModal(npc['姓名'], detail); // Assuming showModal exists? Wait, showModal is not in list.
-                // Original UIRenderer has showModal? No, it used UIRenderer.showItemDetailPopup in most places.
-                // Checking original code for showModal...
-                // renderNPCPanel calls UIRenderer.showModal(npc['姓名'], detail);
-                // But showModal is NOT defined in UIRenderer object in the file provided!
-                // Ah, check the very end of file or if I missed it.
-                // init() has:
-                // <div class="dnd-modal-overlay" id="dnd-modal-overlay">
-                //    <div class="dnd-modal" id="dnd-modal-content"></div>
-                // </div>
-                // But no showModal function in the large object.
-                // Wait, maybe I missed it in reading?
-                // Let's check lines around 2482.
-                // Line 2482: UIRenderer.showModal(npc['姓名'], detail);
-                // I need to implement showModal or use showItemDetailPopup.
-                // Given the HTML structure for modal exists in init(), I should implement it.
+                this.showModal(npc['姓名'], detail);
             });
             
             $grid.append($card);

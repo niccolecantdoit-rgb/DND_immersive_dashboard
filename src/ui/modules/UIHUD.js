@@ -35,14 +35,14 @@ export default {
         const weatherIcon = weather ? (weather.match(/[🌤️☀️☁️🌧️⛈️🌩️🌨️❄️🌫️🌪️]/)?.[0] || '🌤️') : '';
 
         // [修复] 恢复头部完整显示逻辑 - 优化布局和图标显示
-        const statusIcon = isCombat ? '⚔️' : '🧭';
+        const statusIcon = isCombat ? '<i class="fa-solid fa-skull"></i>' : '<i class="fa-solid fa-compass"></i>';
         const statusText = isCombat ? '战斗中' : '探索中';
         const statusColor = isCombat ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)';
         
         // 构建信息行 (时间 | 天气 | 状态)
         const infoParts = [];
-        if (timeStr) infoParts.push(`<span title="游戏时间">⏰ ${timeStr}</span>`);
-        if (weather || weatherIcon) infoParts.push(`<span title="${weather}">${weatherIcon} ${weather}</span>`);
+        if (timeStr) infoParts.push(`<span title="游戏时间"><i class="fa-solid fa-clock"></i> ${timeStr}</span>`);
+        if (weather || weatherIcon) infoParts.push(`<span title="${weather}"><i class="fa-solid fa-cloud-moon"></i> ${weather}</span>`);
         infoParts.push(`<span style="color:${statusColor}">${statusIcon} ${statusText}</span>`);
         
         $status.html(`
@@ -106,10 +106,10 @@ export default {
             const $queuePanel = $(`
                 <div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid var(--dnd-border-gold);border-radius:4px;overflow:hidden;">
                     <div style="background:rgba(197, 160, 89, 0.1);padding:5px 10px;font-weight:bold;color:var(--dnd-text-highlight);display:flex;justify-content:space-between;align-items:center;">
-                        <span>⏳ 待执行行动 (${this._actionQueue.length})</span>
+                        <span><i class="fa-solid fa-hourglass-half"></i> 待执行行动 (${this._actionQueue.length})</span>
                         <div style="display:flex;gap:5px;">
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;">✅ 执行</button>
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;">❌ 清空</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-check"></i> 执行</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-times"></i> 清空</button>
                         </div>
                     </div>
                     <div style="padding:5px 10px;font-size:12px;color:#ccc;">
@@ -123,7 +123,7 @@ export default {
         // [新增] 渲染快捷栏 (Quick Bar) - 附着在 HUD 右侧
         if ($('#dnd-quick-bar').length === 0) {
             const $bar = $(`<div id="dnd-quick-bar" class="dnd-quick-bar"></div>`);
-            const $trigger = $(`<div id="dnd-quick-trigger" class="dnd-quick-trigger" onclick="window.DND_Dashboard_UI.toggleQuickBar()">▶</div>`);
+            const $trigger = $(`<div id="dnd-quick-trigger" class="dnd-quick-trigger" onclick="window.DND_Dashboard_UI.toggleQuickBar()"><i class="fa-solid fa-chevron-right"></i></div>`);
             
             const $hud = $('#dnd-mini-hud');
             $hud.append($bar).append($trigger);
@@ -301,10 +301,10 @@ export default {
                 
                 <!-- 动作经济展示 -->
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;background:rgba(0,0,0,0.3);padding:4px;border-radius:4px;">
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'#2ecc71':'#555'}">🟢 动作: ${turnRes.action}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'#e67e22':'#555'}">🔺 附赠: ${turnRes.bonus}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'#f1c40f':'#555'}">🔁 反应: ${turnRes.reaction}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'#3498db':'#555'}">👣 移动: ${turnRes.movement}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'#2ecc71':'#555'}"><i class="fa-solid fa-bolt"></i> 动作: ${turnRes.action}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'#e67e22':'#555'}"><i class="fa-solid fa-plus-circle"></i> 附赠: ${turnRes.bonus}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'#f1c40f':'#555'}"><i class="fa-solid fa-rotate"></i> 反应: ${turnRes.reaction}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'#3498db':'#555'}"><i class="fa-solid fa-shoe-prints"></i> 移动: ${turnRes.movement}</div>
                 </div>
 
                 <div style="display:flex;gap:5px;">
@@ -323,7 +323,7 @@ export default {
                         rangeText: '30尺',
                         skillName: '移动',
                         callback: (res) => window.DND_Dashboard_UI.executeAction('move', res)
-                    })">👣 移动</button>
+                    })"><i class="fa-solid fa-person-walking"></i> 移动</button>
                     <button class="dnd-clickable" style="
                         flex: 1;
                         background: linear-gradient(135deg, #8e44ad, #9b59b6);
@@ -334,7 +334,7 @@ export default {
                         cursor: pointer;
                         font-weight: bold;
                         font-size: 12px;
-                    " onclick="window.DND_Dashboard_UI.showCombatSkillList(event)">⚔️ 技能</button>
+                    " onclick="window.DND_Dashboard_UI.showCombatSkillList(event)"><i class="fa-solid fa-gavel"></i> 技能</button>
                 </div>
             </div>
         `;
@@ -388,7 +388,7 @@ export default {
                         </div>
                         <div class="dnd-mini-char-info">
                             <div style="display:flex;justify-content:space-between">
-                                <div class="dnd-mini-name" style="color:${nameColor}">${unit['单位名称']} ${isActive ? '⚡' : ''}</div>
+                                <div class="dnd-mini-name" style="color:${nameColor}">${unit['单位名称']} ${isActive ? '<i class="fa-solid fa-bolt"></i>' : ''}</div>
                                 <div style="font-size:11px;color:#888">AC: ${acVal}</div>
                             </div>
                             <div class="dnd-mini-bars">
@@ -452,10 +452,10 @@ export default {
                 <div class="dnd-hud-quests dnd-hud-entry" style="animation-delay:0.2s; margin-top:5px;background:rgba(0,0,0,0.2);padding:6px;border-radius:4px;border-left:2px solid var(--dnd-border-gold);cursor:pointer;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
                         <div style="font-weight:bold;color:var(--dnd-text-header);font-size:12px;display:flex;align-items:center;gap:5px;">
-                            <span>📌 ${activeQ['任务名称']}</span>
+                            <span><i class="fa-solid fa-thumbtack dnd-icon-notify"></i> ${activeQ['任务名称']}</span>
                             ${type ? `<span style="font-size:10px;background:rgba(255,255,255,0.1);padding:0 4px;border-radius:2px;color:var(--dnd-text-dim);">${type}</span>` : ''}
                         </div>
-                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:#e67e22;">⏳ ${timeLimit}</div>` : ''}
+                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:#e67e22;"><i class="fa-solid fa-clock"></i> ${timeLimit}</div>` : ''}
                     </div>
                     <div style="font-size:11px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         ${activeQ['当前进度'] || activeQ['目标描述'] || '...'}
@@ -591,14 +591,14 @@ export default {
                         <div class="party-control-btn ${isControlled ? 'active' : ''}"
                                 onclick="event.stopPropagation(); window.DND_Dashboard_UI.setControlledCharacter('${charId}')"
                                 title="切换操控此角色">
-                            🎮
+                            <i class="fa-solid fa-gamepad"></i>
                         </div>
                         <!-- [新增] 升级按钮 -->
                         ${canLevelUp ? `
                         <div class="party-levelup-btn"
                                 onclick="event.stopPropagation(); window.DND_Dashboard_UI.startLevelUp('${charId}')"
                                 title="经验值已满，点击升级！">
-                            ⬆️
+                            <i class="fa-solid fa-arrow-up dnd-icon-bounce"></i>
                         </div>` : ''}
                     </div>
                     
@@ -654,10 +654,10 @@ export default {
         let html = `<div class="dnd-hud-footer">`;
         
         if (char) {
-            html += `<div class="dnd-res-item" title="金币"><span class="dnd-res-icon">💰</span> ${res['金币']||0} gp</div>`;
+            html += `<div class="dnd-res-item" title="金币"><span class="dnd-res-icon"><i class="fa-solid fa-coins"></i></span> ${res['金币']||0} gp</div>`;
             
             if (res['生命骰']) {
-                html += `<div class="dnd-res-item" title="生命骰"><span class="dnd-res-icon">💓</span> ${res['生命骰']}</div>`;
+                html += `<div class="dnd-res-item" title="生命骰"><span class="dnd-res-icon"><i class="fa-solid fa-heart"></i></span> ${res['生命骰']}</div>`;
             }
             
             // 职业资源简报
@@ -667,7 +667,7 @@ export default {
                     if (classRes) {
                         const firstKey = Object.keys(classRes)[0];
                         if (firstKey) {
-                            html += `<div class="dnd-res-item" title="${firstKey}"><span class="dnd-res-icon">⚡</span> ${classRes[firstKey]}</div>`;
+                            html += `<div class="dnd-res-item" title="${firstKey}"><span class="dnd-res-icon"><i class="fa-solid fa-bolt"></i></span> ${classRes[firstKey]}</div>`;
                         }
                     }
                 } catch(e) {}
@@ -683,7 +683,7 @@ export default {
                 if (count >= 2) return;
                 const relation = parseInt(f['关系等级']) || 0;
                 if (relation !== 0) {
-                    const icon = relation > 0 ? '🏛️' : '⚔️';
+                    const icon = relation > 0 ? '<i class="fa-solid fa-landmark"></i>' : '<i class="fa-solid fa-skull"></i>';
                     const color = relation > 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)';
                     factionHtml += `<span style="color:${color};margin-left:5px;cursor:help;" title="${f['势力名称']}: ${f['关系等级']} (声望:${f['声望值']||0})">${icon}</span>`;
                     count++;
@@ -701,20 +701,20 @@ export default {
         // [修复] 使用 data-action 属性，后续用事件委托绑定
         html += `
             <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="inventory" style="cursor:pointer;" title="背包物品">
-                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-main)">🎒</span>
+                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-main)"><i class="fa-solid fa-suitcase"></i></span>
             </div>
         `;
         
         html += `
             <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="equipment" style="cursor:pointer;" title="已装备物品">
-                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)">⚔️</span>
+                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)"><i class="fa-solid fa-shield-halved"></i></span>
             </div>
         `;
         
         if (factions.length > 0) {
             html += `
                 <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="faction" style="cursor:pointer;" title="势力与声望">
-                    <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)">🏛️</span>
+                    <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)"><i class="fa-solid fa-landmark"></i></span>
                 </div>
             `;
         }
@@ -722,21 +722,21 @@ export default {
         if (hasSpells) {
             html += `
                 <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="spellbook" style="cursor:pointer;" title="法术书">
-                    <span class="dnd-res-icon" style="font-size:16px;color:#aab">📖</span>
+                    <span class="dnd-res-icon" style="font-size:16px;color:#aab"><i class="fa-solid fa-book"></i></span>
                 </div>
             `;
         }
         
         html += `
             <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="dice" style="cursor:pointer;" title="快速投掷">
-                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)">🎲</span>
+                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-highlight)"><i class="fa-solid fa-dice-d20"></i></span>
             </div>
         `;
         
         // [新增] 手动更新数据按钮
         html += `
             <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="manual-update" style="cursor:pointer;" title="手动刷新数据">
-                <span class="dnd-res-icon dnd-refresh-icon" style="font-size:16px;color:var(--dnd-text-main)">🔄</span>
+                <span class="dnd-res-icon dnd-refresh-icon" style="font-size:16px;color:var(--dnd-text-main)"><i class="fa-solid fa-sync"></i></span>
             </div>
         `;
         

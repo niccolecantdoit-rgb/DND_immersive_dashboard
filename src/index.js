@@ -3,6 +3,7 @@ import { Logger } from './core/Logger.js';
 import { getCore, safeSave } from './core/Utils.js';
 import { CONFIG } from './config/Config.js';
 import { addStyles } from './ui/styles.js';
+import './ui/icons.js'; // FontAwesome SVGs
 import { UIRenderer } from './ui/UIRenderer.js';
 import { ThemeManager } from './features/ThemeManager.js';
 import { DBAdapter } from './core/DBAdapter.js';
@@ -46,8 +47,8 @@ import { NotificationSystem } from './ui/modules/UIUtils.js';
                 Logger.info('开始渲染 UI...');
                 addStyles();
                 
-                // [新增] 全局点击动效绑定
-                $(document).on('mousedown', '.dnd-clickable, .dnd-btn, button, .dnd-nav-item, .dnd-char-card, .dnd-item-card, .dnd-mini-char', function() {
+                // [新增] 全局点击动效绑定 (先 off 再 on 确保不重复)
+                $(document).off('mousedown.dndClick').on('mousedown.dndClick', '.dnd-clickable, .dnd-btn, button, .dnd-nav-item, .dnd-char-card, .dnd-item-card, .dnd-mini-char', function() {
                     const $el = $(this);
                     $el.removeClass('dnd-clicking'); // 重置
                     void $el[0].offsetWidth; // 强制重绘
