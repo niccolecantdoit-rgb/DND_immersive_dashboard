@@ -340,30 +340,80 @@ export default {
 
     // 计算点击的网格坐标
     getGridFromEvent(e, $container, $innerMap) {
-        const rect = $container[0].getBoundingClientRect();
-        
         // 获取当前的变换状态
         const state = this._mapZoom; // Uses this._mapZoom from the merged object
-        const scale = state.scale || 1;
+        const mapScale = state.scale || 1;
         
-        // 更稳健的方法：利用 innerMap 的 getBoundingClientRect
+        // 【关键修复】获取 UI 整体缩放比例
+        // UI 使用 CSS zoom 属性进行缩放
+        //
+        // 重要：不能使用 this.currentScale，因为 Object.assign() 是浅拷贝
+        // 当 UICore.applyUIScale() 更新 currentScale 时，合并后的对象不会同步
+        // 所以我们直接从 CSS 变量读取，这是实时更新的
+        //
+        // CSS zoom 的行为（在 Chrome 中）：
+        // - getBoundingClientRect() 返回的是经过 zoom 调整后的坐标
+        // - clientX/clientY 是真实的屏幕像素坐标（不受 zoom 影响）
+        //
+        // 所以当 zoom 存在时，我们需要将 innerRect 的坐标乘以 zoom
+        // 来得到真正的屏幕坐标，或者将 clientX/Y 除以 zoom
+        const cssScale = getComputedStyle(document.documentElement).getPropertyValue('--dnd-ui-scale');
+        const uiZoom = parseFloat(cssScale) || 1;
+        
+        // 获取 innerMap 的边界框
         const innerRect = $innerMap[0].getBoundingClientRect();
         
-        // 计算点击点相对于 innerMap 左上角的像素位置
+        // 方法：直接计算点击相对于元素的位置
+        // 在 CSS zoom 环境下：
+        // - innerRect 的坐标已经被 zoom 调整（乘以了 zoom）
+        // - clientX/clientY 是真实屏幕坐标
+        // 所以 relX = clientX - innerRect.left 在 zoom 环境下是正确的
+        //
+        // 但是，innerRect 的尺寸也被 zoom 调整了
+        // 所以 relX 是在 zoom 后的坐标系中
+        // 要还原到原始坐标，需要除以 zoom
         const relX = e.clientX - innerRect.left;
         const relY = e.clientY - innerRect.top;
         
-        // 此时 relX, relY 是受 scale 影响后的屏幕像素值
-        // 需要除以 scale 还原回原始像素值
-        const originalX = relX / scale;
-        const originalY = relY / scale;
+        // 考虑 UI zoom 和地图 transform scale 的组合效果
+        // 原始坐标 = 相对位置 / (uiZoom * mapScale)
+        //
+        // 解释：
+        // - uiZoom 使得整个 UI（包括地图）在视觉上放大
+        // - mapScale 使得地图内容在 UI 内部进一步缩放
+        // - 两者的效果是乘法关系
+        const totalScale = uiZoom * mapScale;
+        const originalX = relX / totalScale;
+        const originalY = relY / totalScale;
         
         // 获取 cellSize (存储在 data 属性中)
         const cellSize = parseFloat($innerMap.data('cell-size')) || 20;
         
-        // 转换为网格坐标 (向上取整，因为 0-20px 是第一格)
-        const gridX = Math.ceil(originalX / cellSize);
-        const gridY = Math.ceil(originalY / cellSize);
+        // 获取网格尺寸
+        const cols = parseFloat($innerMap.data('cols')) || 20;
+        const rows = parseFloat($innerMap.data('rows')) || 20;
+        
+        // 转换为网格坐标
+        // 使用 floor + 1：像素 [0, cellSize) 对应格子 1
+        let gridX = Math.floor(originalX / cellSize) + 1;
+        let gridY = Math.floor(originalY / cellSize) + 1;
+        
+        // 边界检查，确保在有效范围内 (1 到 cols/rows)
+        gridX = Math.max(1, Math.min(cols, gridX));
+        gridY = Math.max(1, Math.min(rows, gridY));
+        
+        // 调试日志 (可在确认修复后删除)
+        console.log('[getGridFromEvent] Debug:', {
+            click: { clientX: e.clientX, clientY: e.clientY },
+            innerRect: { left: innerRect.left, top: innerRect.top, width: innerRect.width, height: innerRect.height },
+            uiZoom,
+            mapScale,
+            totalScale,
+            rel: { relX, relY },
+            original: { originalX, originalY },
+            cellSize,
+            grid: { gridX, gridY }
+        });
         
         return { x: gridX, y: gridY };
     }
