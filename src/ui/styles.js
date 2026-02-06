@@ -384,7 +384,8 @@ export const addStyles = () => {
             padding: 12px !important;
             z-index: 2147483645 !important; /* Highest priority */
             box-shadow: 0 5px 25px rgba(0,0,0,0.9) !important;
-            width: 280px !important;
+            width: auto !important;
+            min-width: 200px !important;
             max-width: 90vw !important;
             color: var(--dnd-text-main) !important;
             border-radius: 4px !important;
@@ -1138,7 +1139,7 @@ export const addStyles = () => {
                 max-width: none !important;
                 left: 10px !important;
                 right: 10px !important;
-                max-height: 60vh !important;
+                max-height: 80vh !important;
             }
             .dnd-attr-grid {
                 grid-template-columns: repeat(3, 1fr) !important;
@@ -1826,6 +1827,99 @@ export const addStyles = () => {
             .dnd-dialog {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
+            }
+        }
+
+        /* ============================================
+           NPC详情模态框 (Modal Overlay)
+           ============================================ */
+        
+        /* 模态框遮罩层 */
+        .dnd-modal-overlay {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0, 0, 0, 0.85) !important;
+            backdrop-filter: blur(5px) !important;
+            z-index: 2147483646 !important;
+            display: none !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 20px !important;
+        }
+        .dnd-modal-overlay.active {
+            display: flex !important;
+        }
+        
+        /* 模态框主体 */
+        .dnd-modal {
+            background: var(--dnd-bg-popup) !important;
+            border: 1px solid var(--dnd-border-gold) !important;
+            border-radius: 10px !important;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(157, 139, 108, 0.1) !important;
+            color: var(--dnd-text-main) !important;
+            font-family: var(--dnd-font-sans) !important;
+            width: 420px !important;
+            max-width: 90vw !important;
+            max-height: 80vh !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+            animation: dnd-modal-in 0.25s ease-out !important;
+        }
+        
+        @keyframes dnd-modal-in {
+            0% {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        /* 模态框头部 */
+        .dnd-modal-header {
+            padding: 16px 20px !important;
+            background: rgba(0, 0, 0, 0.3) !important;
+            border-bottom: 1px solid var(--dnd-border-gold) !important;
+            flex-shrink: 0 !important;
+        }
+        
+        /* 模态框关闭按钮 */
+        .dnd-modal-close {
+            cursor: pointer !important;
+            font-size: 20px !important;
+            color: #888 !important;
+            width: 28px !important;
+            height: 28px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 4px !important;
+            transition: all 0.2s !important;
+            flex-shrink: 0 !important;
+        }
+        .dnd-modal-close:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: var(--dnd-text-highlight) !important;
+        }
+        
+        /* 模态框内容区 */
+        .dnd-modal-body {
+            padding: 20px !important;
+            overflow-y: auto !important;
+            flex: 1 !important;
+        }
+        
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .dnd-modal {
+                width: calc(100vw - 40px) !important;
+                max-height: 85vh !important;
             }
         }
 
