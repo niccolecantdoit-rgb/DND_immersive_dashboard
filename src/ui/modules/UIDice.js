@@ -151,34 +151,48 @@ export default {
 
     // 投掷骰子并显示结果
     rollDice(sides, event) {
+        const { $ } = getCore();
+        
+        // [美化] 添加骰子滚动动画到点击的按钮
+        if (event && event.target) {
+            const $btn = $(event.target).closest('.dnd-dice-btn');
+            if ($btn.length) {
+                $btn.addClass('dnd-dice-rolling');
+                setTimeout(() => $btn.removeClass('dnd-dice-rolling'), 500);
+            }
+        }
+        
         const result = Math.floor(Math.random() * sides) + 1;
         const isNat20 = sides === 20 && result === 20;
         const isNat1 = sides === 20 && result === 1;
         
+        // [美化] 增强结果显示动画
         let resultHtml = '';
+        let specialClass = '';
         if (isNat20) {
-            resultHtml = `<div style="text-align:center;padding:15px;">
-                <div style="font-size:48px;color:var(--dnd-accent-green);text-shadow:0 0 20px rgba(46, 204, 113, 0.5);animation:dnd-pulse 0.5s ease-in-out;">✨ ${result} ✨</div>
-                <div style="font-size:14px;color:var(--dnd-text-highlight);margin-top:5px;">大成功！NATURAL 20!</div>
+            specialClass = 'dnd-nat20-result';
+            resultHtml = `<div style="text-align:center;padding:20px;">
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">✨ ${result} ✨</div>
+                <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-text-highlight);margin-top:8px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">大成功！NATURAL 20!</div>
             </div>`;
         } else if (isNat1) {
-            resultHtml = `<div style="text-align:center;padding:15px;">
-                <div style="font-size:48px;color:var(--dnd-accent-red);text-shadow:0 0 20px rgba(192, 57, 43, 0.5);">💀 ${result} 💀</div>
-                <div style="font-size:14px;color:#e74c3c;margin-top:5px;">大失败... NATURAL 1</div>
+            specialClass = 'dnd-nat1-result';
+            resultHtml = `<div style="text-align:center;padding:20px;">
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">💀 ${result} 💀</div>
+                <div class="dnd-text-reveal" style="font-size:16px;color:#e74c3c;margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
             </div>`;
         } else {
             resultHtml = `<div style="text-align:center;padding:15px;">
-                <div style="font-size:36px;color:var(--dnd-text-highlight);">🎲 ${result}</div>
+                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">🎲 ${result}</div>
                 <div style="font-size:12px;color:#888;margin-top:5px;">D${sides} 投掷结果</div>
             </div>`;
         }
         
         // 更新弹窗内容而不是 alert
-        const { $ } = getCore();
         const $popup = $('#dnd-detail-popup-el');
         if ($popup.length) {
             // 在现有内容前插入结果
-            const $result = $(`<div class="dnd-roll-result" style="margin-bottom:10px;background:rgba(0,0,0,0.4);border-radius:6px;border:1px solid var(--dnd-border-gold);">${resultHtml}</div>`);
+            const $result = $(`<div class="dnd-roll-result ${specialClass}" style="margin-bottom:10px;background:linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3));border-radius:8px;border:1px solid var(--dnd-border-gold);box-shadow:0 4px 15px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);">${resultHtml}</div>`);
             
             // 移除之前的结果
             $popup.find('.dnd-roll-result').remove();
@@ -186,10 +200,14 @@ export default {
             // 在标题后插入
             $popup.find('> div').first().after($result);
             
-            // 动画效果
-            $result.css({ opacity: 0, transform: 'scale(0.8)' });
+            // [美化] 增强入场动画效果
+            $result.css({ opacity: 0, transform: 'scale(0.5) rotateX(-20deg)', transformOrigin: 'center center' });
             setTimeout(() => {
-                $result.css({ opacity: 1, transform: 'scale(1)', transition: 'all 0.3s ease-out' });
+                $result.css({
+                    opacity: 1,
+                    transform: 'scale(1) rotateX(0deg)',
+                    transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                });
             }, 10);
         }
     },

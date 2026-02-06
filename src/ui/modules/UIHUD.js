@@ -97,11 +97,17 @@ export default {
         // 清空主体
         $body.empty();
 
+        // [美化] 添加/移除战斗模式特殊样式类
         if (isCombat) {
+            $hud.addClass('dnd-combat-mode');
             this.renderCombatHUD($body);
         } else {
+            $hud.removeClass('dnd-combat-mode');
             this.renderExploreHUD($body);
         }
+        
+        // [美化] 为主体内容添加交错入场动画
+        $body.addClass('dnd-stagger-enter');
 
         // [优化] 渲染常驻横向队伍栏 (替代原有的折叠列表)
         this.renderPartyBar($body);

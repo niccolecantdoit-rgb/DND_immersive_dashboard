@@ -418,3 +418,101 @@ export default {
         return { x: gridX, y: gridY };
     }
 };
+
+// 辅助动画效果导出对象 - 直接引用默认导出的方法
+export const UIEffects = {
+    /**
+     * 为按钮添加涟漪点击效果
+     * @param {Event} e - 点击事件
+     * @param {HTMLElement|jQuery} element - 目标元素
+     */
+    addRippleEffect(e, element) {
+        const { $ } = getCore();
+        const $el = $(element);
+        
+        // 确保元素有相对定位和overflow hidden
+        if ($el.css('position') === 'static') {
+            $el.css('position', 'relative');
+        }
+        $el.css('overflow', 'hidden');
+        
+        // 计算涟漪位置
+        const rect = $el[0].getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const size = Math.max(rect.width, rect.height) * 2;
+        
+        // 创建涟漪元素
+        const $ripple = $(`<span class="dnd-ripple-effect" style="
+            width: ${size}px;
+            height: ${size}px;
+            left: ${x - size / 2}px;
+            top: ${y - size / 2}px;
+        "></span>`);
+        
+        $el.append($ripple);
+        
+        // 动画结束后移除
+        setTimeout(() => {
+            $ripple.remove();
+        }, 600);
+    },
+
+    /**
+     * 初始化全局涟漪效果监听器
+     */
+    initRippleListeners() {
+        const { $ } = getCore();
+        
+        // 为所有带有 dnd-btn-ripple 类的元素添加涟漪效果
+        $(document).on('click', '.dnd-btn-ripple', function(e) {
+            UIEffects.addRippleEffect(e, this);
+        });
+    },
+
+    /**
+     * 为元素添加低血量警告效果
+     * @param {jQuery} $element - HP 条容器元素
+     * @param {number} hpPercent - 当前 HP 百分比 (0-100)
+     */
+    updateHPCriticalEffect($element, hpPercent) {
+        if (hpPercent <= 25) {
+            $element.addClass('dnd-critical');
+        } else {
+            $element.removeClass('dnd-critical');
+        }
+    },
+
+    /**
+     * 为角色卡片添加高亮效果
+     * @param {jQuery} $card - 卡片元素
+     * @param {boolean} highlight - 是否高亮
+     */
+    setCardHighlight($card, highlight) {
+        if (highlight) {
+            $card.addClass('dnd-highlight-card');
+        } else {
+            $card.removeClass('dnd-highlight-card');
+        }
+    },
+
+    /**
+     * 触发交错入场动画
+     * @param {jQuery} $container - 容器元素
+     */
+    triggerStaggerAnimation($container) {
+        $container.addClass('dnd-stagger-enter');
+    },
+
+    /**
+     * 为元素添加文字渐显效果
+     * @param {jQuery} $element - 目标元素
+     * @param {number} delayIndex - 延迟索引 (1-3)
+     */
+    addTextReveal($element, delayIndex = 0) {
+        $element.addClass('dnd-text-reveal');
+        if (delayIndex > 0 && delayIndex <= 3) {
+            $element.addClass(`dnd-text-reveal-delay-${delayIndex}`);
+        }
+    }
+};
