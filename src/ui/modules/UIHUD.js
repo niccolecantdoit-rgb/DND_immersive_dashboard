@@ -5,6 +5,8 @@ import { DBAdapter } from '../../core/DBAdapter.js';
 import { DataManager } from '../../data/DataManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
+import { UITableManager } from './UITableManager.js';
+import UICore from './UICore.js';
 
 export default {
     renderHUD() {
@@ -56,23 +58,35 @@ export default {
         
         // 添加展开按钮 (如果尚未存在)
         if ($('#dnd-hud-toggle-bar').length === 0) {
-            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:linear-gradient(to bottom, #1a1a1a, #0a0a0a);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#666;font-size:8px;transition:all 0.2s;" title="展开/收起头部">▼</div>`);
+            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:linear-gradient(to bottom, #1a1a1a, #0a0a0a);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#666;font-size:8px;transition:all 0.2s;" title="展开/收起表格管理">▼</div>`);
             
             $toggleBar.hover(
                 function() { $(this).css({color: 'var(--dnd-text-highlight)', background: 'rgba(255,255,255,0.05)'}); },
                 function() { $(this).css({color: '#666', background: 'linear-gradient(to bottom, #1a1a1a, #0a0a0a)'}); }
             );
             
-            $toggleBar.on('click', function() {
-                const $loc = $('#dnd-hud-location');
-                const isExpanded = $loc.hasClass('dnd-expanded');
+            const self = this;
+            $toggleBar.on('click', async function() {
+                // [修改] 切换表格管理模块
+                const $hudBody = $('#dnd-hud-body');
+                const $tmContainer = $('#dnd-table-manager-container');
                 
-                if (isExpanded) {
-                    $loc.removeClass('dnd-expanded');
-                    $(this).text('▼').attr('title', '展开头部');
+                // 确保容器存在
+                if ($tmContainer.length === 0) {
+                     $('<div id="dnd-table-manager-container" style="display:none;border-bottom:1px solid var(--dnd-border-gold);"></div>').insertBefore($hudBody);
+                }
+                
+                const $tm = $('#dnd-table-manager-container');
+                
+                if ($tm.is(':visible')) {
+                    $tm.slideUp(200);
+                    $(this).text('▼').attr('title', '展开表格管理');
+                    UITableManager.state.isExpanded = false;
                 } else {
-                    $loc.addClass('dnd-expanded');
-                    $(this).text('▲').attr('title', '收起头部');
+                    $tm.slideDown(200);
+                    $(this).text('▲').attr('title', '收起表格管理');
+                    UITableManager.state.isExpanded = true;
+                    await UITableManager.render($tm);
                 }
             });
             
@@ -739,6 +753,13 @@ export default {
                 <span class="dnd-res-icon dnd-refresh-icon" style="font-size:16px;color:var(--dnd-text-main)"><i class="fa-solid fa-sync"></i></span>
             </div>
         `;
+
+        // [新增] 设置按钮
+        html += `
+            <div class="dnd-res-item dnd-footer-btn dnd-clickable" data-action="settings" style="cursor:pointer;" title="打开设置">
+                <span class="dnd-res-icon" style="font-size:16px;color:var(--dnd-text-dim)"><i class="fa-solid fa-cog"></i></span>
+            </div>
+        `;
         
         html += `</div></div>`; // End buttons & footer
         
@@ -758,6 +779,12 @@ export default {
                 case 'spellbook': self.showSpellBook(e); break;
                 case 'dice': self.showQuickDice(e); break;
                 case 'manual-update': self.triggerManualUpdate(e); break;
+                case 'settings':
+                    // 切换到完整面板并打开设置页
+                    $('.dnd-nav-item').removeClass('active');
+                    $('.dnd-nav-item[data-target="settings"]').addClass('active');
+                    UICore.setState('full');
+                    break;
             }
         });
         

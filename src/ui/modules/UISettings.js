@@ -19,6 +19,13 @@ export default {
         const syncStatus = await SettingsManager.getSyncStatus();
         const currentScale = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.UI_SCALE) || CONFIG.UI_SCALE.DEFAULT;
         
+        // 获取表格管理配置
+        const allData = DataManager.getAllData() || {};
+        const tables = Object.keys(allData).filter(k => k.startsWith('sheet_') || (allData[k].name && allData[k].mate));
+        const savedTmCols = await DBAdapter.getSetting('dnd_tm_cols') || 'auto';
+        const savedHiddenTables = await DBAdapter.getSetting('dnd_tm_hidden_tables');
+        const hiddenTables = savedHiddenTables ? JSON.parse(savedHiddenTables) : [];
+
         // 获取动态背景配置
         const savedBgConfig = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.DYNAMIC_BG);
         const bgConfig = savedBgConfig ? JSON.parse(savedBgConfig) : CONFIG.DYNAMIC_BG;
@@ -141,6 +148,41 @@ export default {
                     </div>
                 </div>
                 
+                <!-- 表格管理设置 -->
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">📋 表格管理</h3>
+                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                        自定义表格管理模块的布局和显示内容。
+                    </p>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">每行按钮数</label>
+                        <select id="dnd-tm-cols-setting" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                            <option value="auto" ${savedTmCols === 'auto' ? 'selected' : ''}>自动 (Auto)</option>
+                            <option value="2" ${savedTmCols == 2 ? 'selected' : ''}>2 列</option>
+                            <option value="3" ${savedTmCols == 3 ? 'selected' : ''}>3 列</option>
+                            <option value="4" ${savedTmCols == 4 ? 'selected' : ''}>4 列</option>
+                            <option value="5" ${savedTmCols == 5 ? 'selected' : ''}>5 列</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:10px;">
+                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">可见表格</label>
+                        <div style="background:rgba(0,0,0,0.2);border:1px solid #444;border-radius:4px;padding:10px;max-height:150px;overflow-y:auto;">
+                            ${tables.length > 0 ? tables.map(k => {
+                                const name = allData[k].name || k;
+                                const isChecked = !hiddenTables.includes(k);
+                                return `
+                                    <label style="display:flex;align-items:center;margin-bottom:5px;cursor:pointer;">
+                                        <input type="checkbox" class="dnd-tm-visible-check" value="${k}" ${isChecked ? 'checked' : ''} style="margin-right:8px;">
+                                        <span style="color:#ccc;font-size:12px;">${name}</span>
+                                    </label>
+                                `;
+                            }).join('') : '<div style="color:#666;font-size:12px;">暂无可用表格</div>'}
+                        </div>
+                    </div>
+                </div>
+
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">🔁 自动预设切换</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:20px;">
@@ -523,6 +565,19 @@ export default {
                 model: $c.find('#dnd-set-api-model').val().trim()
             };
             await SettingsManager.setAPIConfig(newApiConfig);
+
+            // 4. 保存表格管理配置
+            const tmCols = $c.find('#dnd-tm-cols-setting').val();
+            await DBAdapter.setSetting('dnd_tm_cols', tmCols);
+            
+            const hiddenTbls = [];
+            $c.find('.dnd-tm-visible-check:not(:checked)').each(function() {
+                hiddenTbls.push($(this).val());
+            });
+            await DBAdapter.setSetting('dnd_tm_hidden_tables', JSON.stringify(hiddenTbls));
+            
+            // 通知全局更新
+            $(document).trigger('dnd:settings-changed');
 
             // 视觉反馈
             const $btn = $(this);

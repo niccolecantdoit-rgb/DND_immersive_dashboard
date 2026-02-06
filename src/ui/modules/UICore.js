@@ -7,6 +7,7 @@ import { ThemeManager } from '../../features/ThemeManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { NotificationSystem } from './UIUtils.js';
 import { DynamicBackground } from '../DynamicBackground.js';
+import { UITableManager } from './UITableManager.js';
 
 export default {
     state: 'collapsed', // 'collapsed', 'mini', 'full'
@@ -139,6 +140,8 @@ export default {
                 $btn.removeClass('dnd-hidden');
                 // 销毁动态背景以节省性能
                 this._destroyDynamicBackgrounds();
+                // [修复] 隐藏表格管理器容器，防止隐藏后仍然可以点击
+                this._hideTableManager();
                 break;
             case 'mini':
                 $btn.removeClass('dnd-hidden');
@@ -214,6 +217,30 @@ export default {
             }
         } catch (e) {
             Logger.warn('[DynamicBackground] Destroy error:', e);
+        }
+    },
+
+    // [新增] 隐藏表格管理器面板，在 HUD 隐藏时调用
+    _hideTableManager() {
+        const { $ } = getCore();
+        
+        // 隐藏表格管理器容器
+        const $tmContainer = $('#dnd-table-manager-container');
+        if ($tmContainer.length && $tmContainer.is(':visible')) {
+            $tmContainer.hide();
+            
+            // 重置展开/收起按钮状态
+            const $toggleBar = $('#dnd-hud-toggle-bar');
+            if ($toggleBar.length) {
+                $toggleBar.text('▼').attr('title', '展开表格管理');
+            }
+            
+            // 重置 UITableManager 状态
+            if (UITableManager && UITableManager.state) {
+                UITableManager.state.isExpanded = false;
+            }
+            
+            Logger.debug('[UICore] 表格管理器已隐藏');
         }
     },
 
