@@ -11,8 +11,20 @@ import UICombat from './modules/UICombat.js';
 import UIMap from './modules/UIMap.js';
 import UISpells from './modules/UISpells.js';
 import UIDice from './modules/UIDice.js';
+import DynamicBackground from './DynamicBackground.js';
 
 export const UIRenderer = Object.assign({},
+    {
+        updateDynamicBackground: (config) => {
+            if (!config) return;
+            // 使用 body 作为容器，或者专门的背景容器
+            const container = document.body;
+            // 清除旧效果 (如果 DynamicBackground 支持按容器清除最好，这里假设全局单例或需自行管理)
+            // 简单起见，我们假设背景是全局唯一的
+            DynamicBackground.destroyAll();
+            DynamicBackground.init(container, config.type, config);
+        }
+    },
     UIUtils,
     UICore,
     UIHUD,

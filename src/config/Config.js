@@ -36,12 +36,16 @@ export const CONFIG = {
         TOGGLE_POS: 'dnd_toggle_pos',
         PARTY_EXPANDED: 'dnd_party_expanded',
         THEME: 'dnd_theme',
+        CUSTOM_THEME: 'dnd_custom_theme',
         MAP_ZOOM: 'dnd_map_zoom',
         PRESET_CONFIG: 'dnd_preset_config',
         QUICK_SLOTS: 'dnd_quick_slots',
         SYNC_QUEUE: 'dnd_sync_queue',
         UI_SCALE: 'dnd_ui_scale',
-        DYNAMIC_BG: 'dnd_dynamic_bg'
+        DYNAMIC_BG: 'dnd_dynamic_bg',
+        // 风格管理相关
+        CURRENT_STYLE: 'dnd_current_style',
+        CUSTOM_STYLES: 'dnd_custom_styles'
     },
     // 界面缩放配置
     UI_SCALE: {
@@ -70,6 +74,10 @@ export const CONFIG = {
             icon: '🏰',
             vars: {
                 '--dnd-bg-main': '#0f0b0a',
+                '--dnd-bg-panel-start': '#2b1b17',
+                '--dnd-bg-panel-end': '#1a100e',
+                '--dnd-bg-card-start': '#242424',
+                '--dnd-bg-card-end': '#1a1a1c',
                 '--dnd-bg-panel': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
                 '--dnd-bg-card': 'linear-gradient(135deg, #242424 0%, #1a1a1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
@@ -92,6 +100,10 @@ export const CONFIG = {
             icon: '🌲',
             vars: {
                 '--dnd-bg-main': '#0c1210',
+                '--dnd-bg-panel-start': '#1a2b22',
+                '--dnd-bg-panel-end': '#0e1a14',
+                '--dnd-bg-card-start': '#1c2e24',
+                '--dnd-bg-card-end': '#0f1c16',
                 '--dnd-bg-panel': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c2e24 0%, #0f1c16 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
@@ -114,6 +126,10 @@ export const CONFIG = {
             icon: '🔥',
             vars: {
                 '--dnd-bg-main': '#120808',
+                '--dnd-bg-panel-start': '#2b1717',
+                '--dnd-bg-panel-end': '#1a0e0e',
+                '--dnd-bg-card-start': '#2e1c1c',
+                '--dnd-bg-card-end': '#1c0f0f',
                 '--dnd-bg-panel': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
                 '--dnd-bg-card': 'linear-gradient(135deg, #2e1c1c 0%, #1c0f0f 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
@@ -136,6 +152,10 @@ export const CONFIG = {
             icon: '🔮',
             vars: {
                 '--dnd-bg-main': '#0a0a14',
+                '--dnd-bg-panel-start': '#1a1a2e',
+                '--dnd-bg-panel-end': '#0e0e1a',
+                '--dnd-bg-card-start': '#1c1c2e',
+                '--dnd-bg-card-end': '#0f0f1c',
                 '--dnd-bg-panel': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c1c2e 0%, #0f0f1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',

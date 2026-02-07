@@ -6,6 +6,7 @@ import { addStyles } from './ui/styles.js';
 import './ui/icons.js'; // FontAwesome SVGs
 import { UIRenderer } from './ui/UIRenderer.js';
 import { ThemeManager } from './features/ThemeManager.js';
+import { StyleManager } from './features/StyleManager.js';
 import { DBAdapter } from './core/DBAdapter.js';
 import { DiceManager } from './data/DiceManager.js';
 import { UpdateController } from './features/UpdateController.js';
@@ -59,6 +60,7 @@ import { NotificationSystem } from './ui/modules/UIUtils.js';
 
                 UIRenderer.init();
                 ThemeManager.init(); // [修复] 初始化主题
+                StyleManager.init(); // [新增] 初始化风格管理器
                 
                 // [新增] 异步加载设置 (覆盖默认/localStorage配置)
                 DBAdapter.getSetting(CONFIG.STORAGE_KEYS.PRESET_CONFIG).then(saved => {

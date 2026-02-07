@@ -4,6 +4,7 @@ import { CONFIG } from '../../config/Config.js';
 import { DBAdapter } from '../../core/DBAdapter.js';
 import { DataManager } from '../../data/DataManager.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
+import { StyleManager } from '../../features/StyleManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { NotificationSystem } from './UIUtils.js';
 import { DynamicBackground } from '../DynamicBackground.js';
@@ -244,21 +245,39 @@ export default {
         }
     },
 
-    // [新增] 切换动态背景效果
+    // [新增] 切换动态背景效果 (保留用于独立切换效果)
     switchDynamicBgEffect(effectType) {
+        this.updateDynamicBackground({ type: effectType });
+    },
+
+    // [新增] 更新动态背景配置 (从 StyleManager 调用)
+    updateDynamicBackground(config) {
+        if (!config || !config.type) return;
+        
         try {
+            // 更新当前配置缓存
+            if (!CONFIG.DYNAMIC_BG) CONFIG.DYNAMIC_BG = {};
+            // 合并配置，保留 enabled 状态
+            const enabled = CONFIG.DYNAMIC_BG.enabled !== false;
+            CONFIG.DYNAMIC_BG = { ...CONFIG.DYNAMIC_BG, ...config, enabled };
+            
+            // 如果已禁用，则不更新视觉
+            if (!enabled) return;
+
+            // 构建完整配置对象 (DynamicBackground 需要 type, colors 等在顶层或 customConfig 中)
+            // 这里我们传递 type 和 剩余属性作为 customConfig
+            const { type, ...customConfig } = config;
+
             if (this._dynamicBgIds.mini) {
-                DynamicBackground.switchEffect(this._dynamicBgIds.mini, effectType);
+                DynamicBackground.switchEffect(this._dynamicBgIds.mini, type, customConfig);
             }
             if (this._dynamicBgIds.full) {
-                DynamicBackground.switchEffect(this._dynamicBgIds.full, effectType);
+                DynamicBackground.switchEffect(this._dynamicBgIds.full, type, customConfig);
             }
-            // 保存设置
-            if (!CONFIG.DYNAMIC_BG) CONFIG.DYNAMIC_BG = {};
-            CONFIG.DYNAMIC_BG.type = effectType;
-            Logger.info('[DynamicBackground] Switched to:', effectType);
+            
+            Logger.info('[DynamicBackground] Updated configuration:', config.type);
         } catch (e) {
-            Logger.warn('[DynamicBackground] Switch error:', e);
+            Logger.warn('[DynamicBackground] Update error:', e);
         }
     },
 
@@ -628,30 +647,47 @@ export default {
         });
         
         
-        // 主题切换按钮
-        $('#dnd-hud-theme').on('click', function(e) {
+        // 主题切换按钮 (升级为皮肤切换)
+        $('#dnd-hud-theme').on('click', async function(e) {
             e.stopPropagation();
             try {
-                const themes = ThemeManager.getList();
-                const currentIdx = themes.findIndex(t => t.id === ThemeManager.currentTheme);
-                const nextIdx = (currentIdx + 1) % themes.length;
+                // 使用新的 StyleManager 获取可用皮肤列表
+                const styles = StyleManager.getAvailableStyles();
+                const currentStyle = StyleManager.getCurrentStyle();
                 
-                Logger.debug('Switching theme from', ThemeManager.currentTheme, 'to', themes[nextIdx].id);
-                ThemeManager.apply(themes[nextIdx].id);
+                let currentIdx = styles.findIndex(s => s.id === currentStyle.id);
+                if (currentIdx === -1) currentIdx = 0;
+                
+                const nextIdx = (currentIdx + 1) % styles.length;
+                const nextStyle = styles[nextIdx];
+                
+                Logger.debug('Switching style from', currentStyle.id, 'to', nextStyle.id);
+                
+                // 应用新皮肤
+                await StyleManager.apply(nextStyle.id);
                 
                 // 视觉反馈
-                const theme = themes[nextIdx];
-                $(this).attr('title', theme.name);
+                $(this).attr('title', nextStyle.name);
                 
                 // HUD 状态栏显示切换提示
                 const $status = $('#dnd-hud-status-text');
                 const originalHtml = $status.html();
-                $status.html(`<span style="color:var(--dnd-text-highlight);">${theme.icon} 主题: ${theme.name}</span>`);
+                $status.html(`<span style="color:var(--dnd-text-highlight);">${nextStyle.icon} 皮肤: ${nextStyle.name}</span>`);
+                
+                // 简单的按钮动画
+                const $btn = $(this);
+                $btn.css('transform', 'rotate(360deg)');
                 setTimeout(() => {
-                    if ($status.text().includes(theme.name)) $status.html(originalHtml);
+                    $btn.css('transition', 'none');
+                    $btn.css('transform', 'rotate(0deg)');
+                    setTimeout(() => $btn.css('transition', ''), 50);
+                }, 500);
+
+                setTimeout(() => {
+                    if ($status.text().includes(nextStyle.name)) $status.html(originalHtml);
                 }, 2000);
             } catch (err) {
-                Logger.error('Theme switch failed:', err);
+                Logger.error('Style switch failed:', err);
             }
         });
 

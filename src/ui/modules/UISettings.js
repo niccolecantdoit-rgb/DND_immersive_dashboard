@@ -9,6 +9,8 @@ import { TavernAPI } from '../../core/TavernAPI.js';
 import { NotificationSystem } from './UIUtils.js';
 import UICore from './UICore.js';
 import { DynamicBackground } from '../DynamicBackground.js';
+import { ThemeManager } from '../../features/ThemeManager.js';
+import { StyleManager } from '../../features/StyleManager.js';
 
 export default {
     async renderSettingsPanel($c) {
@@ -76,6 +78,161 @@ export default {
                                 min="${CONFIG.UI_SCALE.MIN}" max="${CONFIG.UI_SCALE.MAX}" step="${CONFIG.UI_SCALE.STEP}" value="${currentScale}"
                                 style="flex:1;cursor:pointer;">
                             <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 配色模板设置 -->
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎨 配色模板</h3>
+                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                        选择预设主题或自定义配色，让界面风格更符合你的喜好。
+                    </p>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">预设主题</label>
+                        <select id="dnd-theme-preset" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                            ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || '🎨'} ${t.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-custom-color-enabled" ${ThemeManager.currentTheme === 'custom' ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="font-weight:bold;">启用自定义配色</span>
+                        </label>
+                    </div>
+                    
+                    <div id="dnd-custom-color-panel" style="opacity:${ThemeManager.currentTheme === 'custom' ? 1 : 0.5};pointer-events:${ThemeManager.currentTheme === 'custom' ? 'auto' : 'none'};transition:all 0.3s;">
+                        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;margin-bottom:15px;">
+                            ${(() => {
+                                const editableVars = ThemeManager.getEditableVars();
+                                return Object.entries(editableVars).map(([key, info]) => `
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <input type="color" class="dnd-color-picker" data-var="${key}" value="${info.value.replace(/^#/, '#').substring(0, 7)}"
+                                            style="width:32px;height:32px;border:1px solid #444;border-radius:4px;cursor:pointer;background:transparent;padding:0;">
+                                        <span style="color:#ccc;font-size:12px;flex:1;">${info.label}</span>
+                                    </div>
+                                `).join('');
+                            })()}
+                        </div>
+                        
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button type="button" id="dnd-color-reset" style="
+                                background:rgba(231, 76, 60, 0.2);
+                                border:1px solid #e74c3c;
+                                color:#e74c3c;
+                                padding:6px 12px;
+                                border-radius:4px;
+                                cursor:pointer;
+                                font-size:12px;
+                            ">🔄 重置为默认</button>
+                            <button type="button" id="dnd-color-export" style="
+                                background:rgba(52, 152, 219, 0.2);
+                                border:1px solid #3498db;
+                                color:#3498db;
+                                padding:6px 12px;
+                                border-radius:4px;
+                                cursor:pointer;
+                                font-size:12px;
+                            ">📤 导出配色</button>
+                            <button type="button" id="dnd-color-import" style="
+                                background:rgba(46, 204, 113, 0.2);
+                                border:1px solid #2ecc71;
+                                color:#2ecc71;
+                                padding:6px 12px;
+                                border-radius:4px;
+                                cursor:pointer;
+                                font-size:12px;
+                            ">📥 导入配色</button>
+                        </div>
+                        <input type="file" id="dnd-color-import-input" accept=".json" style="display:none;">
+                        
+                        <div id="dnd-color-preview" style="margin-top:15px;padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);background:var(--dnd-bg-card);">
+                            <div style="font-weight:bold;margin-bottom:8px;color:var(--dnd-text-header);">配色预览</div>
+                            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                                <span class="dnd-badge dnd-badge-success" style="padding:4px 8px;">成功</span>
+                                <span class="dnd-badge dnd-badge-warning" style="padding:4px 8px;">警告</span>
+                                <span class="dnd-badge dnd-badge-error" style="padding:4px 8px;">错误</span>
+                            </div>
+                            <div style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;">
+                                <span style="color:var(--dnd-text-main);">主文本</span> ·
+                                <span style="color:var(--dnd-text-highlight);">高亮文本</span> ·
+                                <span style="color:var(--dnd-text-dim);">次要文本</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 风格管理 -->
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎭 风格管理</h3>
+                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                        选择完整的视觉风格主题，包含颜色、尺寸、圆角、动画等全套配置。
+                        风格是比配色更完整的视觉方案，能让界面看起来焕然一新。
+                    </p>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">当前风格</label>
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                            <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || '🎨'}</span>
+                            <div style="flex:1;">
+                                <div style="font-weight:bold;color:var(--dnd-text-header);">${StyleManager.getCurrentStyle().name || '经典DND'}</div>
+                                <div style="font-size:11px;color:#888;">${StyleManager.getCurrentStyle().description || ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">可用风格</label>
+                        <div id="dnd-style-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:10px;">
+                            ${StyleManager.getAvailableStyles().map(style => `
+                                <div class="dnd-style-card ${style.id === StyleManager.currentStyleId ? 'active' : ''}"
+                                     data-style-id="${style.id}">
+                                    <div style="font-size:28px;margin-bottom:6px;">${style.icon || '🎨'}</div>
+                                    <div style="font-size:12px;font-weight:bold;color:${style.id === StyleManager.currentStyleId ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};">${style.name}</div>
+                                    ${style.isCustom ? '<div style="font-size:9px;color:#888;margin-top:2px;">自定义</div>' : ''}
+                                    ${style.id === StyleManager.currentStyleId ? '<div style="font-size:9px;color:var(--dnd-text-highlight);margin-top:2px;">✓ 当前</div>' : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+                        <button type="button" id="dnd-style-import" style="
+                            background:rgba(46, 204, 113, 0.2);
+                            border:1px solid #2ecc71;
+                            color:#2ecc71;
+                            padding:8px 16px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:12px;
+                        ">📥 导入风格包</button>
+                        <button type="button" id="dnd-style-export" style="
+                            background:rgba(52, 152, 219, 0.2);
+                            border:1px solid #3498db;
+                            color:#3498db;
+                            padding:8px 16px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:12px;
+                        ">📤 导出当前风格</button>
+                        <button type="button" id="dnd-style-reset" style="
+                            background:rgba(231, 76, 60, 0.2);
+                            border:1px solid #e74c3c;
+                            color:#e74c3c;
+                            padding:8px 16px;
+                            border-radius:4px;
+                            cursor:pointer;
+                            font-size:12px;
+                        ">🔄 恢复默认</button>
+                    </div>
+                    <input type="file" id="dnd-style-import-input" accept=".json" style="display:none;">
+                    
+                    <div style="padding:10px;background:rgba(52, 152, 219, 0.1);border:1px solid rgba(52, 152, 219, 0.3);border-radius:4px;">
+                        <div style="font-size:11px;color:#888;">
+                            💡 <strong>提示:</strong> 风格包是完整的视觉主题配置。如果您只想微调颜色，可以使用上方的"配色模板"功能。
+                            风格和配色可以叠加使用 —— 先选择喜欢的风格，再通过配色进行个性化调整。
                         </div>
                     </div>
                 </div>
@@ -469,6 +626,253 @@ export default {
             $c.find('#dnd-set-ui-scale').val(def).trigger('input');
         });
 
+        // 配色模板设置
+        const $themePreset = $c.find('#dnd-theme-preset');
+        const $customColorEnabled = $c.find('#dnd-custom-color-enabled');
+        const $customColorPanel = $c.find('#dnd-custom-color-panel');
+        
+        // 预设主题切换
+        $themePreset.on('change', function() {
+            const themeId = $(this).val();
+            if (themeId && themeId !== 'custom') {
+                ThemeManager.apply(themeId);
+                $customColorEnabled.prop('checked', false);
+                $customColorPanel.css({ opacity: 0.5, pointerEvents: 'none' });
+                
+                // 更新颜色选择器显示
+                const editableVars = ThemeManager.getEditableVars();
+                Object.entries(editableVars).forEach(([key, info]) => {
+                    $c.find(`.dnd-color-picker[data-var="${key}"]`).val(info.value.substring(0, 7));
+                });
+            }
+        });
+        
+        // 启用/禁用自定义配色
+        $customColorEnabled.on('change', function() {
+            const checked = $(this).prop('checked');
+            $customColorPanel.css({ opacity: checked ? 1 : 0.5, pointerEvents: checked ? 'auto' : 'none' });
+            
+            if (checked) {
+                // 收集当前颜色值并应用
+                const customVars = {};
+                $c.find('.dnd-color-picker').each(function() {
+                    const varName = $(this).data('var');
+                    const value = $(this).val();
+                    customVars[varName] = value;
+                });
+                ThemeManager.applyCustom(customVars);
+                $themePreset.val('custom');
+            } else {
+                // 恢复到预设主题
+                const selectedPreset = $themePreset.val();
+                if (selectedPreset && selectedPreset !== 'custom') {
+                    ThemeManager.apply(selectedPreset);
+                } else {
+                    ThemeManager.apply('dark');
+                    $themePreset.val('dark');
+                }
+            }
+        });
+        
+        // 颜色选择器实时预览
+        $c.find('.dnd-color-picker').on('input', function() {
+            if (!$customColorEnabled.prop('checked')) return;
+            
+            const customVars = {};
+            $c.find('.dnd-color-picker').each(function() {
+                const varName = $(this).data('var');
+                const value = $(this).val();
+                customVars[varName] = value;
+            });
+            ThemeManager.applyCustom(customVars);
+        });
+        
+        // 重置为默认配色
+        $c.find('#dnd-color-reset').on('click', function() {
+            const defaultVars = ThemeManager.COLOR_VARS;
+            Object.entries(defaultVars).forEach(([key, info]) => {
+                $c.find(`.dnd-color-picker[data-var="${key}"]`).val(info.default);
+            });
+            
+            if ($customColorEnabled.prop('checked')) {
+                const customVars = {};
+                $c.find('.dnd-color-picker').each(function() {
+                    customVars[$(this).data('var')] = $(this).val();
+                });
+                ThemeManager.applyCustom(customVars);
+            }
+        });
+        
+        // 导出配色
+        $c.find('#dnd-color-export').on('click', function() {
+            const customVars = {};
+            $c.find('.dnd-color-picker').each(function() {
+                customVars[$(this).data('var')] = $(this).val();
+            });
+            
+            const dataStr = JSON.stringify(customVars, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dnd_custom_theme.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            NotificationSystem.success('配色方案已导出');
+        });
+        
+        // 导入配色
+        $c.find('#dnd-color-import').on('click', function() {
+            $c.find('#dnd-color-import-input').click();
+        });
+        
+        $c.find('#dnd-color-import-input').on('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const imported = JSON.parse(evt.target.result);
+                    
+                    // 应用导入的配色
+                    Object.entries(imported).forEach(([key, value]) => {
+                        const $picker = $c.find(`.dnd-color-picker[data-var="${key}"]`);
+                        if ($picker.length) {
+                            $picker.val(value);
+                        }
+                    });
+                    
+                    // 启用自定义配色
+                    $customColorEnabled.prop('checked', true);
+                    $customColorPanel.css({ opacity: 1, pointerEvents: 'auto' });
+                    $themePreset.val('custom');
+                    
+                    // 应用配色
+                    ThemeManager.applyCustom(imported);
+                    
+                    NotificationSystem.success('配色方案已导入');
+                } catch(err) {
+                    NotificationSystem.error('导入失败: 无效的配色文件');
+                    Logger.error('Failed to import theme:', err);
+                }
+            };
+            reader.readAsText(file);
+            
+            // 清空 input 以便再次选择同一文件
+            $(this).val('');
+        });
+
+        // ========== 风格管理事件 ==========
+        
+        // 风格卡片点击
+        $c.find('.dnd-style-card').on('click', async function() {
+            const styleId = $(this).data('style-id');
+            if (styleId === StyleManager.currentStyleId) return;
+            
+            const success = await StyleManager.apply(styleId);
+            if (success) {
+                // 更新卡片状态
+                $c.find('.dnd-style-card').each(function() {
+                    const id = $(this).data('style-id');
+                    const isActive = id === styleId;
+                    $(this)
+                        .toggleClass('active', isActive)
+                        .css({
+                            background: isActive ? 'rgba(157, 139, 108, 0.2)' : 'rgba(0,0,0,0.3)',
+                            borderColor: isActive ? 'var(--dnd-border-gold)' : '#444'
+                        })
+                        .find('div:first').nextAll('div:first').css({
+                            color: isActive ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'
+                        });
+                });
+                
+                // 更新当前风格显示
+                const currentStyle = StyleManager.getCurrentStyle();
+                $c.find('.dnd-style-card.active').closest('div').prev().find('span:first').text(currentStyle.icon || '🎨');
+                
+                NotificationSystem.success(`已切换至 "${currentStyle.name}" 风格`);
+                
+                // 刷新设置面板以更新显示
+                setTimeout(() => {
+                    UICore.renderPanel('settings');
+                }, 300);
+            }
+        });
+        
+        // 风格卡片悬停效果
+        $c.find('.dnd-style-card').on('mouseenter', function() {
+            if (!$(this).hasClass('active')) {
+                $(this).css({
+                    borderColor: 'var(--dnd-border-gold)',
+                    transform: 'translateY(-2px)'
+                });
+            }
+        }).on('mouseleave', function() {
+            if (!$(this).hasClass('active')) {
+                $(this).css({
+                    borderColor: '#444',
+                    transform: 'translateY(0)'
+                });
+            }
+        });
+        
+        // 导入风格包
+        $c.find('#dnd-style-import').on('click', function() {
+            $c.find('#dnd-style-import-input').click();
+        });
+        
+        $c.find('#dnd-style-import-input').on('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            try {
+                const result = await StyleManager.importFromFile(file);
+                if (result.success) {
+                    NotificationSystem.success(result.message);
+                    if (result.warnings && result.warnings.length > 0) {
+                        Logger.info('风格导入警告:', result.warnings);
+                    }
+                    // 刷新设置面板
+                    setTimeout(() => {
+                        UICore.renderPanel('settings');
+                    }, 300);
+                } else {
+                    NotificationSystem.error(result.message);
+                }
+            } catch (err) {
+                NotificationSystem.error('导入失败: ' + err.message);
+                Logger.error('风格导入错误:', err);
+            }
+            
+            // 清空 input
+            $(this).val('');
+        });
+        
+        // 导出当前风格
+        $c.find('#dnd-style-export').on('click', function() {
+            const success = StyleManager.downloadStyle();
+            if (success) {
+                NotificationSystem.success('风格包已导出');
+            } else {
+                NotificationSystem.error('导出失败');
+            }
+        });
+        
+        // 恢复默认风格
+        $c.find('#dnd-style-reset').on('click', async function() {
+            const result = await StyleManager.resetToDefault();
+            if (result.success) {
+                NotificationSystem.success('已恢复默认风格');
+                // 刷新设置面板
+                setTimeout(() => {
+                    UICore.renderPanel('settings');
+                }, 300);
+            }
+        });
+
         // 动态背景设置
         const $bgEnabled = $c.find('#dnd-bg-enabled');
         const $bgGroup = $c.find('.dnd-bg-group');
@@ -538,6 +942,18 @@ export default {
             // 0. 保存缩放设置
             const scaleVal = $c.find('#dnd-set-ui-scale').val();
             safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+
+            // 0.5 保存配色设置
+            if ($customColorEnabled.prop('checked')) {
+                const customVars = {};
+                $c.find('.dnd-color-picker').each(function() {
+                    customVars[$(this).data('var')] = $(this).val();
+                });
+                await ThemeManager.saveCustom(customVars);
+            } else {
+                const themeId = $themePreset.val();
+                safeSave(CONFIG.STORAGE_KEYS.THEME, themeId);
+            }
 
             // 1. 保存动态背景配置
             const newBgConfig = {

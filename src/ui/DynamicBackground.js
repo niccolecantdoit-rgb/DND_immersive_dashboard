@@ -317,6 +317,16 @@ export const DynamicBackground = {
         const { canvas } = this._canvasContexts.get(effectId);
         const width = canvas.width;
         const height = canvas.height;
+
+        // 兼容 count 参数 (StylePresets 可能使用 count 而不是特定的 xxxCount)
+        if (config.count !== undefined) {
+            if (config.type === 'particles') config.particleCount = config.count;
+            if (config.type === 'gears') config.gearCount = config.count;
+            if (config.type === 'ripples') config.rippleCount = config.count;
+            if (config.type === 'runes') config.runeCount = config.count;
+            if (config.type === 'starfield') config.starCount = config.count;
+            if (config.type === 'gradient') config.blobCount = config.count;
+        }
         
         switch (config.type) {
             case 'gears':
@@ -547,64 +557,103 @@ export const DynamicBackground = {
         const width = canvas.width;
         const height = canvas.height;
         
-        ctx.clearRect(0, 0, width, height);
-        
-        // 根据效果类型渲染
-        switch (config.type) {
-            case 'gears':
-                this._renderGears(ctx, config, width, height);
-                break;
-            case 'ripples':
-                this._renderRipples(ctx, config, width, height);
-                break;
-            case 'particles':
-                this._renderParticles(ctx, config, width, height);
-                break;
-            case 'runes':
-                this._renderRunes(ctx, config, width, height);
-                break;
-            case 'starfield':
-                this._renderStarfield(ctx, config, width, height);
-                break;
-            case 'gradient':
-                this._renderGradient(ctx, config, width, height);
-                break;
-            case 'grid':
-                this._renderGrid(ctx, config, width, height);
-                break;
-            case 'dna':
-                this._renderDNA(ctx, config, width, height);
-                break;
+        try {
+            ctx.clearRect(0, 0, width, height);
             
-            // New Effects
-            case 'stripes':
-                this._renderStripes(ctx, config, width, height);
-                break;
-            case 'dots':
-                this._renderDots(ctx, config, width, height);
-                break;
-            case 'hex':
-                this._renderHex(ctx, config, width, height);
-                break;
-            case 'topo':
-                this._renderTopo(ctx, config, width, height);
-                break;
-            case 'iso':
-                this._renderIso(ctx, config, width, height);
-                break;
-            case 'radar':
-                this._renderRadar(ctx, config, width, height);
-                break;
-            case 'blueprint':
-                this._renderBlueprint(ctx, config, width, height);
-                break;
-            case 'geo':
-                this._renderGeo(ctx, config, width, height);
-                break;
-            case 'crt':
-                this._renderCRT(ctx, config, width, height);
-                break;
+            // 根据效果类型渲染
+            switch (config.type) {
+                case 'gears':
+                    this._renderGears(ctx, config, width, height);
+                    break;
+                case 'ripples':
+                    this._renderRipples(ctx, config, width, height);
+                    break;
+                case 'particles':
+                    this._renderParticles(ctx, config, width, height);
+                    break;
+                case 'runes':
+                    this._renderRunes(ctx, config, width, height);
+                    break;
+                case 'starfield':
+                    this._renderStarfield(ctx, config, width, height);
+                    break;
+                case 'gradient':
+                    this._renderGradient(ctx, config, width, height);
+                    break;
+                case 'grid':
+                    this._renderGrid(ctx, config, width, height);
+                    break;
+                case 'dna':
+                    this._renderDNA(ctx, config, width, height);
+                    break;
+                
+                // New Effects
+                case 'stripes':
+                    this._renderStripes(ctx, config, width, height);
+                    break;
+                case 'dots':
+                    this._renderDots(ctx, config, width, height);
+                    break;
+                case 'hex':
+                    this._renderHex(ctx, config, width, height);
+                    break;
+                case 'topo':
+                    this._renderTopo(ctx, config, width, height);
+                    break;
+                case 'iso':
+                    this._renderIso(ctx, config, width, height);
+                    break;
+                case 'radar':
+                    this._renderRadar(ctx, config, width, height);
+                    break;
+                case 'blueprint':
+                    this._renderBlueprint(ctx, config, width, height);
+                    break;
+                case 'geo':
+                    this._renderGeo(ctx, config, width, height);
+                    break;
+                case 'crt':
+                    this._renderCRT(ctx, config, width, height);
+                    break;
+            }
+        } catch (e) {
+            console.error('[DynamicBackground] Render error:', e);
+            // Don't crash the loop, just log
         }
+    },
+    
+    /**
+     * 辅助方法：安全设置颜色透明度
+     */
+    _setAlpha(color, alpha) {
+        if (!color) return `rgba(255, 255, 255, ${alpha})`;
+        
+        // Hex (e.g. #FFF or #FFFFFF)
+        if (color.startsWith('#')) {
+            let r = 0, g = 0, b = 0;
+            if (color.length === 4) {
+                r = parseInt(color[1] + color[1], 16);
+                g = parseInt(color[2] + color[2], 16);
+                b = parseInt(color[3] + color[3], 16);
+            } else if (color.length === 7) {
+                r = parseInt(color.slice(1, 3), 16);
+                g = parseInt(color.slice(3, 5), 16);
+                b = parseInt(color.slice(5, 7), 16);
+            }
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+        
+        // RGBA
+        if (color.startsWith('rgba')) {
+            return color.replace(/[\d.]+\)$/, `${alpha})`);
+        }
+        
+        // RGB
+        if (color.startsWith('rgb')) {
+            return color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+        }
+        
+        return color;
     },
 
     // --- Existing Render Methods ---
@@ -655,6 +704,8 @@ export const DynamicBackground = {
 
     _renderRipples(ctx, config, width, height) {
         const { ripples } = config.data;
+        if (!ripples) return;
+        
         for (let i = ripples.length - 1; i >= 0; i--) {
             const ripple = ripples[i];
             ripple.radius += ripple.speed;
@@ -665,13 +716,13 @@ export const DynamicBackground = {
             }
             ctx.beginPath();
             ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
-            ctx.strokeStyle = ripple.color.replace(/[\d.]+\)$/, `${ripple.opacity * 0.8})`);
+            ctx.strokeStyle = this._setAlpha(ripple.color, ripple.opacity * 0.8);
             ctx.lineWidth = 2;
             ctx.stroke();
             if (ripple.radius > 20) {
                 ctx.beginPath();
                 ctx.arc(ripple.x, ripple.y, ripple.radius * 0.7, 0, Math.PI * 2);
-                ctx.strokeStyle = ripple.color.replace(/[\d.]+\)$/, `${ripple.opacity * 0.5})`);
+                ctx.strokeStyle = this._setAlpha(ripple.color, ripple.opacity * 0.5);
                 ctx.stroke();
             }
         }
@@ -679,25 +730,34 @@ export const DynamicBackground = {
 
     _renderParticles(ctx, config, width, height) {
         const { particles } = config.data;
+        if (!particles) return;
+        
         particles.forEach(p => {
             p.x += p.vx;
             p.y += p.vy;
             if (p.x < 0 || p.x > width) p.vx *= -1;
             if (p.y < 0 || p.y > height) p.vy *= -1;
+            
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.fill();
+            
+            // Glow effect
             const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3);
-            gradient.addColorStop(0, p.color.replace(/[\d.]+\)$/, '0.6)'));
+            gradient.addColorStop(0, this._setAlpha(p.color, 0.6));
             gradient.addColorStop(1, 'transparent');
+            
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * 3, 0, Math.PI * 2);
             ctx.fillStyle = gradient;
             ctx.fill();
         });
+        
         if (config.showConnections) {
-            ctx.strokeStyle = 'rgba(157, 139, 108, 0.2)';
+            // Default connection color
+            const baseColor = config.colors && config.colors.length > 0 ? config.colors[0] : 'rgba(157, 139, 108, 1)';
+            
             ctx.lineWidth = 0.5;
             for (let i = 0; i < particles.length; i++) {
                 for (let j = i + 1; j < particles.length; j++) {
@@ -706,7 +766,7 @@ export const DynamicBackground = {
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < config.connectionDistance) {
                         const opacity = 1 - (dist / config.connectionDistance);
-                        ctx.strokeStyle = `rgba(157, 139, 108, ${opacity * 0.3})`;
+                        ctx.strokeStyle = this._setAlpha(baseColor, opacity * 0.3);
                         ctx.beginPath();
                         ctx.moveTo(particles[i].x, particles[i].y);
                         ctx.lineTo(particles[j].x, particles[j].y);
@@ -719,6 +779,8 @@ export const DynamicBackground = {
 
     _renderRunes(ctx, config, width, height) {
         const { runes } = config.data;
+        if (!runes) return;
+        
         runes.forEach(rune => {
             rune.alpha += rune.alphaDirection * config.pulseSpeed;
             if (rune.alpha >= 1) {
@@ -739,7 +801,7 @@ export const DynamicBackground = {
             ctx.font = `${rune.fontSize}px serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = rune.color.replace(/[\d.]+\)$/, `${rune.alpha * 0.8})`);
+            ctx.fillStyle = this._setAlpha(rune.color, rune.alpha * 0.8);
             ctx.fillText(rune.symbol, 0, 0);
             ctx.shadowColor = 'rgba(255, 219, 133, 0.7)';
             ctx.shadowBlur = 10 * rune.alpha;
@@ -750,12 +812,14 @@ export const DynamicBackground = {
 
     _renderStarfield(ctx, config, width, height) {
         const { stars, shootingStars } = config.data;
+        if (!stars) return;
+        
         stars.forEach(star => {
             star.twinklePhase += config.twinkleSpeed;
             star.alpha = 0.5 + Math.sin(star.twinklePhase) * 0.3 + 0.2;
             ctx.beginPath();
             ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-            ctx.fillStyle = star.color.replace(/[\d.]+\)$/, `${star.alpha})`);
+            ctx.fillStyle = this._setAlpha(star.color, star.alpha);
             ctx.fill();
         });
         if (Math.random() < config.shootingStarChance) {
@@ -820,6 +884,8 @@ export const DynamicBackground = {
 
     _renderGrid(ctx, config, width, height) {
         const { pulses } = config.data;
+        if (!pulses) return;
+
         const now = Date.now();
         ctx.strokeStyle = config.lineColor;
         ctx.lineWidth = 0.5;
@@ -835,7 +901,7 @@ export const DynamicBackground = {
             ctx.lineTo(width, y);
             ctx.stroke();
         }
-        if (now - config.data.lastPulseTime > config.pulseFrequency) {
+        if (now - (config.data.lastPulseTime || 0) > config.pulseFrequency) {
             pulses.push({
                 x: Math.floor(Math.random() * (width / config.gridSize)) * config.gridSize,
                 y: Math.floor(Math.random() * (height / config.gridSize)) * config.gridSize,
@@ -854,7 +920,7 @@ export const DynamicBackground = {
                 continue;
             }
             const affectedRadius = pulse.radius;
-            ctx.strokeStyle = config.pulseColor.replace(/[\d.]+\)$/, `${pulse.alpha * 0.8})`);
+            ctx.strokeStyle = this._setAlpha(config.pulseColor, pulse.alpha * 0.8);
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(pulse.x, pulse.y, affectedRadius, 0, Math.PI * 2);
@@ -1260,15 +1326,15 @@ export const DynamicBackground = {
     },
 
     /**
-     * 切换效果类型
+     * 切换效果类型和配置
      * @param {string} effectId - 效果实例ID
      * @param {string} newType - 新的效果类型
+     * @param {Object} customConfig - 自定义配置（可选，包含颜色等）
      */
-    switchEffect(effectId, newType) {
+    switchEffect(effectId, newType, customConfig = {}) {
         const context = this._canvasContexts.get(effectId);
         if (!context) return;
         
-        const { canvas, container } = context;
         const config = this._effectConfigs[effectId];
         
         // 清除旧的interval
@@ -1276,14 +1342,17 @@ export const DynamicBackground = {
             clearInterval(config.intervalId);
         }
         
-        // 获取新配置
-        const newConfig = { ...this.PRESETS[newType], type: newType };
+        // 获取预设并合并自定义配置
+        // 注意：customConfig 中的 colors 等属性会覆盖预设
+        const preset = this.PRESETS[newType] || this.PRESETS.particles;
+        const newConfig = { ...preset, ...customConfig, type: newType };
+        
         this._effectConfigs[effectId] = newConfig;
         
         // 重新初始化数据
         this._initEffectData(effectId, newConfig);
         
-        Logger.debug('[DynamicBackground] Switched effect to:', newType);
+        Logger.debug('[DynamicBackground] Switched effect to:', newType, 'with config:', customConfig);
     },
 
     /**
