@@ -33,6 +33,10 @@ export default {
         const bgConfig = savedBgConfig ? JSON.parse(savedBgConfig) : CONFIG.DYNAMIC_BG;
         const bgEffects = DynamicBackground.getAvailableEffects();
         
+        // 获取选项换行设置
+        const savedOptionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
+        const optionWrapEnabled = savedOptionWrap === true || savedOptionWrap === 'true';
+        
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
             let html = `<option value="">-- 手动输入 --</option>`;
@@ -68,7 +72,7 @@ export default {
                         调整仪表盘和悬浮球的大小比例，适配不同分辨率的屏幕。
                     </p>
                     
-                    <div style="margin-bottom:10px;">
+                    <div style="margin-bottom:15px;">
                         <label style="display:flex;justify-content:space-between;margin-bottom:5px;color:var(--dnd-text-main);">
                             <span>缩放比例 (Scale)</span>
                             <span id="dnd-scale-value" style="color:var(--dnd-text-highlight);">${currentScale}</span>
@@ -79,6 +83,16 @@ export default {
                                 style="flex:1;cursor:pointer;">
                             <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
                         </div>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-option-wrap" ${optionWrapEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">行动选项自动换行</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后，HUD 中的行动选项按钮文本将自动换行显示完整内容，而不是截断。
+                        </p>
                     </div>
                 </div>
 
@@ -624,6 +638,13 @@ export default {
         $c.find('#dnd-reset-scale').on('click', function() {
             const def = CONFIG.UI_SCALE.DEFAULT;
             $c.find('#dnd-set-ui-scale').val(def).trigger('input');
+        });
+
+        // 选项换行设置
+        $c.find('#dnd-option-wrap').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP, checked);
+            NotificationSystem.notify(checked ? '已启用行动选项换行' : '已禁用行动选项换行', { type: 'success', duration: 2000 });
         });
 
         // 配色模板设置

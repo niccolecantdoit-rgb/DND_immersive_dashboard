@@ -844,7 +844,9 @@ const CONFIG = {
         DYNAMIC_BG: 'dnd_dynamic_bg',
         // 风格管理相关
         CURRENT_STYLE: 'dnd_current_style',
-        CUSTOM_STYLES: 'dnd_custom_styles'
+        CUSTOM_STYLES: 'dnd_custom_styles',
+        // 选项换行设置
+        OPTION_WRAP: 'dnd_option_wrap'
     },
     // 界面缩放配置
     UI_SCALE: {
@@ -30828,7 +30830,7 @@ const UITableManager = {
         this.renderMiniMap($('#dnd-hud-minimap-content'));
     },
 
-    renderExploreHUD($container) {
+    async renderExploreHUD($container) {
         const { $ } = getCore();
 
         // 0. 渲染探索地图 (新增)
@@ -30840,7 +30842,7 @@ const UITableManager = {
         this.renderMiniMap($mapContainer);
         
         // 1. 渲染行动选项 (优先)
-        this.renderActionOptions($container);
+        await this.renderActionOptions($container);
 
         // 2. 渲染任务 (精简版)
         const quests = DataManager.getTable('QUEST_Active');
@@ -30873,7 +30875,7 @@ const UITableManager = {
     },
 
     // [新增] 渲染行动选项
-    renderActionOptions($container) {
+    async renderActionOptions($container) {
         const { $ } = getCore();
         const optionsTable = DataManager.getTable('UI_ActionOptions');
         if (!optionsTable || optionsTable.length === 0) return;
@@ -30890,6 +30892,15 @@ const UITableManager = {
         
         if (validOpts.length === 0) return;
         
+        // 读取选项换行设置
+        const optionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
+        const enableWrap = optionWrap === true || optionWrap === 'true';
+        
+        // 根据换行设置决定样式
+        const wrapStyle = enableWrap
+            ? 'white-space: normal; word-break: break-word; min-height: 40px;'
+            : 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        
         let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">`;
         
         validOpts.forEach((opt, idx) => {
@@ -30903,11 +30914,9 @@ const UITableManager = {
                     cursor: pointer;
                     font-size: 12px;
                     text-align: left;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
+                    ${wrapStyle}
                     transition: all 0.2s;
-                " onmouseover="this.style.borderColor='var(--dnd-text-highlight)';this.style.color='var(--dnd-text-highlight)'" 
+                " onmouseover="this.style.borderColor='var(--dnd-text-highlight)';this.style.color='var(--dnd-text-highlight)'"
                 onmouseout="this.style.borderColor='var(--dnd-border-inner)';this.style.color='var(--dnd-text-main)'">
                     <span style="color:var(--dnd-border-gold);font-weight:bold;margin-right:4px;">${opt.key}.</span> ${opt.text}
                 </button>
@@ -35077,6 +35086,10 @@ ${JSON.stringify(state.characterData, null, 2)}
         const bgConfig = savedBgConfig ? JSON.parse(savedBgConfig) : CONFIG.DYNAMIC_BG;
         const bgEffects = DynamicBackground.getAvailableEffects();
         
+        // 获取选项换行设置
+        const savedOptionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
+        const optionWrapEnabled = savedOptionWrap === true || savedOptionWrap === 'true';
+        
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
             let html = `<option value="">-- 手动输入 --</option>`;
@@ -35112,7 +35125,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                         调整仪表盘和悬浮球的大小比例，适配不同分辨率的屏幕。
                     </p>
                     
-                    <div style="margin-bottom:10px;">
+                    <div style="margin-bottom:15px;">
                         <label style="display:flex;justify-content:space-between;margin-bottom:5px;color:var(--dnd-text-main);">
                             <span>缩放比例 (Scale)</span>
                             <span id="dnd-scale-value" style="color:var(--dnd-text-highlight);">${currentScale}</span>
@@ -35123,6 +35136,16 @@ ${JSON.stringify(state.characterData, null, 2)}
                                 style="flex:1;cursor:pointer;">
                             <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
                         </div>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-option-wrap" ${optionWrapEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">行动选项自动换行</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后，HUD 中的行动选项按钮文本将自动换行显示完整内容，而不是截断。
+                        </p>
                     </div>
                 </div>
 
@@ -35668,6 +35691,13 @@ ${JSON.stringify(state.characterData, null, 2)}
         $c.find('#dnd-reset-scale').on('click', function() {
             const def = CONFIG.UI_SCALE.DEFAULT;
             $c.find('#dnd-set-ui-scale').val(def).trigger('input');
+        });
+
+        // 选项换行设置
+        $c.find('#dnd-option-wrap').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP, checked);
+            NotificationSystem.notify(checked ? '已启用行动选项换行' : '已禁用行动选项换行', { type: 'success', duration: 2000 });
         });
 
         // 配色模板设置

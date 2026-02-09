@@ -444,7 +444,7 @@ export default {
         this.renderMiniMap($('#dnd-hud-minimap-content'));
     },
 
-    renderExploreHUD($container) {
+    async renderExploreHUD($container) {
         const { $ } = getCore();
 
         // 0. 渲染探索地图 (新增)
@@ -456,7 +456,7 @@ export default {
         this.renderMiniMap($mapContainer);
         
         // 1. 渲染行动选项 (优先)
-        this.renderActionOptions($container);
+        await this.renderActionOptions($container);
 
         // 2. 渲染任务 (精简版)
         const quests = DataManager.getTable('QUEST_Active');
@@ -489,7 +489,7 @@ export default {
     },
 
     // [新增] 渲染行动选项
-    renderActionOptions($container) {
+    async renderActionOptions($container) {
         const { $ } = getCore();
         const optionsTable = DataManager.getTable('UI_ActionOptions');
         if (!optionsTable || optionsTable.length === 0) return;
@@ -506,6 +506,15 @@ export default {
         
         if (validOpts.length === 0) return;
         
+        // 读取选项换行设置
+        const optionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
+        const enableWrap = optionWrap === true || optionWrap === 'true';
+        
+        // 根据换行设置决定样式
+        const wrapStyle = enableWrap
+            ? 'white-space: normal; word-break: break-word; min-height: 40px;'
+            : 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        
         let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">`;
         
         validOpts.forEach((opt, idx) => {
@@ -519,11 +528,9 @@ export default {
                     cursor: pointer;
                     font-size: 12px;
                     text-align: left;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
+                    ${wrapStyle}
                     transition: all 0.2s;
-                " onmouseover="this.style.borderColor='var(--dnd-text-highlight)';this.style.color='var(--dnd-text-highlight)'" 
+                " onmouseover="this.style.borderColor='var(--dnd-text-highlight)';this.style.color='var(--dnd-text-highlight)'"
                 onmouseout="this.style.borderColor='var(--dnd-border-inner)';this.style.color='var(--dnd-text-main)'">
                     <span style="color:var(--dnd-border-gold);font-weight:bold;margin-right:4px;">${opt.key}.</span> ${opt.text}
                 </button>

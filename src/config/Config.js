@@ -45,7 +45,9 @@ export const CONFIG = {
         DYNAMIC_BG: 'dnd_dynamic_bg',
         // 风格管理相关
         CURRENT_STYLE: 'dnd_current_style',
-        CUSTOM_STYLES: 'dnd_custom_styles'
+        CUSTOM_STYLES: 'dnd_custom_styles',
+        // 选项换行设置
+        OPTION_WRAP: 'dnd_option_wrap'
     },
     // 界面缩放配置
     UI_SCALE: {
