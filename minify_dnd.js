@@ -3,7 +3,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const inputFile = 'dist/DND_Dashboard_Immersive.user.js';
-const outputFile = 'DND_Dashboard_Immersive.min.js';
+const outputFile = 'dist/DND_Dashboard_Immersive.min.js';
 
 if (!fs.existsSync(inputFile)) {
     console.error(`Error: ${inputFile} not found.`);
