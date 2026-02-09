@@ -58,6 +58,14 @@ import { NotificationSystem } from './ui/modules/UIUtils.js';
                     $(this).removeClass('dnd-clicking');
                 });
 
+                // [修复] 入场动画完成后添加 dnd-anim-done 类，确保卡片在主题动画下保持可见
+                $(document).off('animationend.dndEntry').on('animationend.dndEntry', '.dnd-anim-entry', function(e) {
+                    // 只处理入场动画 (dnd-slide-up-fade)
+                    if (e.originalEvent && e.originalEvent.animationName === 'dnd-slide-up-fade') {
+                        $(this).addClass('dnd-anim-done').css('opacity', '1');
+                    }
+                });
+
                 UIRenderer.init();
                 ThemeManager.init(); // [修复] 初始化主题
                 StyleManager.init(); // [新增] 初始化风格管理器

@@ -1391,7 +1391,17 @@ export const addStyles = () => {
         }
         .dnd-anim-entry {
             opacity: 0; /* 初始隐藏，等待动画 */
-            animation: dnd-slide-up-fade 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            animation: dnd-slide-up-fade 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+        }
+        /* 确保入场动画完成后卡片保持可见，不受主题动画影响 */
+        .dnd-anim-entry.dnd-anim-done,
+        .dnd-char-card.dnd-anim-done,
+        .dnd-char-card.dnd-anim-done:hover {
+            opacity: 1 !important;
+        }
+        /* 确保所有主题的卡片在 hover 时保持可见 */
+        .dnd-char-card:hover {
+            opacity: 1 !important;
         }
 
         /* HUD 专用微动效 */

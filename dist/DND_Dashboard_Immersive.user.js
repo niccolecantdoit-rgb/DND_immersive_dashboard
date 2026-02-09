@@ -2377,7 +2377,17 @@ const addStyles = () => {
         }
         .dnd-anim-entry {
             opacity: 0; /* 初始隐藏，等待动画 */
-            animation: dnd-slide-up-fade 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            animation: dnd-slide-up-fade 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+        }
+        /* 确保入场动画完成后卡片保持可见，不受主题动画影响 */
+        .dnd-anim-entry.dnd-anim-done,
+        .dnd-char-card.dnd-anim-done,
+        .dnd-char-card.dnd-anim-done:hover {
+            opacity: 1 !important;
+        }
+        /* 确保所有主题的卡片在 hover 时保持可见 */
+        .dnd-char-card:hover {
+            opacity: 1 !important;
         }
 
         /* HUD 专用微动效 */
@@ -19469,8 +19479,8 @@ const ThemeManager = {
         // 生成渐变背景
         mergedVars['--dnd-bg-panel'] = `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`;
         mergedVars['--dnd-bg-hud'] = `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`;
-        mergedVars['--dnd-bg-card'] = `linear-gradient(135deg, ${cardStart} 0%, ${cardEnd} 100%)`;
-        // 使用辅助函数确保 popup 背景高不透明度，避免透明度问题
+        // 使用辅助函数确保卡片和弹窗背景高不透明度，避免透明度问题
+        mergedVars['--dnd-bg-card'] = `linear-gradient(135deg, ${ensureOpaqueColor(cardStart, 0.98)} 0%, ${ensureOpaqueColor(cardEnd, 0.98)} 100%)`;
         mergedVars['--dnd-bg-popup'] = `linear-gradient(to bottom, ${ensureOpaqueColor(cardStart)}, ${ensureOpaqueColor(cardEnd)})`;
         
         ThemeManager._applyVars(mergedVars);
@@ -20452,11 +20462,11 @@ const StyleEffects = {
                 break;
                 
             case 'organic':
-                // 有机/不规则圆角
+                // 有机/不规则圆角 - 使用更温和的不对称圆角，避免内容被裁切
                 rules.push(`
                     .dnd-char-card,
                     .dnd-panel {
-                        border-radius: 30% 70% 70% 30% / 30% 30% 70% 70% !important;
+                        border-radius: 20px 8px 20px 8px !important;
                     }
                 `);
                 break;
@@ -20984,22 +20994,20 @@ const StyleEffects = {
                 break;
 
             case 'leaves':
-                // 叶子分隔
+                // 叶子分隔 - 优雅的叶片装饰
                 rules.push(`
                     .dnd-card-header {
                         border-bottom: 1px solid ${borderColor} !important;
                         position: relative !important;
                     }
                     .dnd-card-header::after {
-                        content: "🍃" !important;
+                        content: "🌿" !important;
                         position: absolute !important;
-                        bottom: -10px !important;
-                        left: 50% !important;
-                        transform: translateX(-50%) !important;
-                        font-size: 14px !important;
-                        color: ${accentColor} !important;
-                        background: var(--dnd-bg-card) !important;
-                        padding: 0 5px !important;
+                        bottom: -8px !important;
+                        right: 12px !important;
+                        font-size: 12px !important;
+                        opacity: 0.6 !important;
+                        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)) !important;
                     }
                 `);
                 break;
@@ -26431,8 +26439,8 @@ const StyleManager = {
         
         root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
-        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${cardStart} 0%, ${cardEnd} 100%)`);
-        // 使用辅助函数确保 popup 背景高不透明度，避免透明度问题
+        // 使用辅助函数确保卡片和弹窗背景高不透明度，避免透明度问题
+        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${StyleManager_ensureOpaqueColor(cardStart, 0.98)} 0%, ${StyleManager_ensureOpaqueColor(cardEnd, 0.98)} 100%)`);
         root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${StyleManager_ensureOpaqueColor(cardStart)}, ${StyleManager_ensureOpaqueColor(cardEnd)})`);
     },
     
@@ -39698,6 +39706,14 @@ try {
                     $el.addClass('dnd-clicking');
                 }).on('animationend', '.dnd-clicking', function() {
                     $(this).removeClass('dnd-clicking');
+                });
+
+                // [修复] 入场动画完成后添加 dnd-anim-done 类，确保卡片在主题动画下保持可见
+                $(document).off('animationend.dndEntry').on('animationend.dndEntry', '.dnd-anim-entry', function(e) {
+                    // 只处理入场动画 (dnd-slide-up-fade)
+                    if (e.originalEvent && e.originalEvent.animationName === 'dnd-slide-up-fade') {
+                        $(this).addClass('dnd-anim-done').css('opacity', '1');
+                    }
                 });
 
                 UIRenderer.init();

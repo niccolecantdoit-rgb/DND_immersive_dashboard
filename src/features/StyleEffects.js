@@ -131,11 +131,11 @@ export const StyleEffects = {
                 break;
                 
             case 'organic':
-                // 有机/不规则圆角
+                // 有机/不规则圆角 - 使用更温和的不对称圆角，避免内容被裁切
                 rules.push(`
                     .dnd-char-card,
                     .dnd-panel {
-                        border-radius: 30% 70% 70% 30% / 30% 30% 70% 70% !important;
+                        border-radius: 20px 8px 20px 8px !important;
                     }
                 `);
                 break;
@@ -663,22 +663,20 @@ export const StyleEffects = {
                 break;
 
             case 'leaves':
-                // 叶子分隔
+                // 叶子分隔 - 优雅的叶片装饰
                 rules.push(`
                     .dnd-card-header {
                         border-bottom: 1px solid ${borderColor} !important;
                         position: relative !important;
                     }
                     .dnd-card-header::after {
-                        content: "🍃" !important;
+                        content: "🌿" !important;
                         position: absolute !important;
-                        bottom: -10px !important;
-                        left: 50% !important;
-                        transform: translateX(-50%) !important;
-                        font-size: 14px !important;
-                        color: ${accentColor} !important;
-                        background: var(--dnd-bg-card) !important;
-                        padding: 0 5px !important;
+                        bottom: -8px !important;
+                        right: 12px !important;
+                        font-size: 12px !important;
+                        opacity: 0.6 !important;
+                        filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)) !important;
                     }
                 `);
                 break;

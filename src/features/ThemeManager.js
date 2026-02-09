@@ -137,8 +137,8 @@ export const ThemeManager = {
         // 生成渐变背景
         mergedVars['--dnd-bg-panel'] = `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`;
         mergedVars['--dnd-bg-hud'] = `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`;
-        mergedVars['--dnd-bg-card'] = `linear-gradient(135deg, ${cardStart} 0%, ${cardEnd} 100%)`;
-        // 使用辅助函数确保 popup 背景高不透明度，避免透明度问题
+        // 使用辅助函数确保卡片和弹窗背景高不透明度，避免透明度问题
+        mergedVars['--dnd-bg-card'] = `linear-gradient(135deg, ${ensureOpaqueColor(cardStart, 0.98)} 0%, ${ensureOpaqueColor(cardEnd, 0.98)} 100%)`;
         mergedVars['--dnd-bg-popup'] = `linear-gradient(to bottom, ${ensureOpaqueColor(cardStart)}, ${ensureOpaqueColor(cardEnd)})`;
         
         ThemeManager._applyVars(mergedVars);

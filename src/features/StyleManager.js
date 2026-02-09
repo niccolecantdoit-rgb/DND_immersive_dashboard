@@ -363,8 +363,8 @@ export const StyleManager = {
         
         root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
-        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${cardStart} 0%, ${cardEnd} 100%)`);
-        // 使用辅助函数确保 popup 背景高不透明度，避免透明度问题
+        // 使用辅助函数确保卡片和弹窗背景高不透明度，避免透明度问题
+        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${ensureOpaqueColor(cardStart, 0.98)} 0%, ${ensureOpaqueColor(cardEnd, 0.98)} 100%)`);
         root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${ensureOpaqueColor(cardStart)}, ${ensureOpaqueColor(cardEnd)})`);
     },
     
