@@ -9,6 +9,57 @@ import { StyleEffects } from './StyleEffects.js';
 import { STYLE_PRESETS, getStyleList, getStylePreset, isBuiltinStyle } from '../config/StylePresets.js';
 
 /**
+ * 将颜色转换为高不透明度的 rgba 格式
+ * 支持 #RGB, #RRGGBB, #RRGGBBAA, rgb(), rgba() 等格式
+ * @param {string} color - 输入颜色
+ * @param {number} alpha - 目标透明度 (0-1)，默认 0.99
+ * @returns {string} rgba 格式的颜色
+ */
+function ensureOpaqueColor(color, alpha = 0.99) {
+    if (!color || typeof color !== 'string') return `rgba(36, 36, 36, ${alpha})`;
+    
+    color = color.trim();
+    
+    // 处理 rgba 格式
+    const rgbaMatch = color.match(/^rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+)?\s*\)$/i);
+    if (rgbaMatch) {
+        return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
+    }
+    
+    // 处理十六进制格式
+    let hex = color;
+    if (hex.startsWith('#')) {
+        hex = hex.slice(1);
+    }
+    
+    // 处理 3 位十六进制 (#RGB)
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // 处理 4 位十六进制 (#RGBA)
+    if (hex.length === 4) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    
+    // 处理 8 位十六进制 (#RRGGBBAA) - 截取前6位
+    if (hex.length === 8) {
+        hex = hex.slice(0, 6);
+    }
+    
+    // 确保是有效的 6 位十六进制
+    if (hex.length !== 6 || !/^[0-9a-fA-F]+$/.test(hex)) {
+        return `rgba(36, 36, 36, ${alpha})`;
+    }
+    
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
  * 样式管理器 - 管理完整的视觉风格包
  * 
  * 与 ThemeManager 的关系：
@@ -313,7 +364,8 @@ export const StyleManager = {
         root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${cardStart} 0%, ${cardEnd} 100%)`);
-        root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${cardStart}fc, ${cardEnd}fc)`);
+        // 使用辅助函数确保 popup 背景高不透明度，避免透明度问题
+        root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${ensureOpaqueColor(cardStart)}, ${ensureOpaqueColor(cardEnd)})`);
     },
     
     /**

@@ -444,7 +444,7 @@ export default {
         this.renderMiniMap($('#dnd-hud-minimap-content'));
     },
 
-    async renderExploreHUD($container) {
+    renderExploreHUD($container) {
         const { $ } = getCore();
 
         // 0. 渲染探索地图 (新增)
@@ -456,7 +456,10 @@ export default {
         this.renderMiniMap($mapContainer);
         
         // 1. 渲染行动选项 (优先)
-        await this.renderActionOptions($container);
+        // [修复] 使用独立容器并移除 await，确保渲染顺序正确（地图 -> 选项 -> 任务 -> 其他）
+        const $optionsContainer = $('<div></div>');
+        $container.append($optionsContainer);
+        this.renderActionOptions($optionsContainer);
 
         // 2. 渲染任务 (精简版)
         const quests = DataManager.getTable('QUEST_Active');
