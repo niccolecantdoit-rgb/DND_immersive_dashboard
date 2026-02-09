@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DND 沉浸式仪表盘
 // @namespace    http://tampermonkey.net/
-// @version      1.9.0
+// @version      1.9.1
 // @description  专为 DND 模板设计的游戏风格仪表盘
 // @author       Niccole
 // @match        */*
@@ -3215,6 +3215,22 @@ const addStyles = () => {
             .dnd-dialog {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
+                max-width: 400px !important;
+                /* 修复移动端对话框被截断到顶部的问题 */
+                /* 使用 inset + margin auto 实现稳定居中 */
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                margin: auto !important;
+                height: fit-content !important;
+                max-height: calc(100vh - 40px) !important;
+                max-height: calc(100dvh - 40px) !important; /* 动态视口高度，更适合移动端 */
+                overflow-y: auto !important;
+                transform: scale(0.9) !important;
+            }
+            .dnd-dialog-visible {
+                transform: scale(1) !important;
             }
         }
 
@@ -18283,16 +18299,31 @@ const DataManager = {
         return maxLevel;
     },
 
-    // [新增] 导出队伍数据为 JSON
-    exportPartyData: () => {
+    // [新增] 导出队伍数据为 JSON (支持选择性导出)
+    // @param selectedCharIds - 可选，要导出的角色ID数组。如果为空则导出全部
+    exportPartyData: (selectedCharIds = null) => {
         const party = DataManager.getPartyData();
         if (!party || party.length === 0) {
             console.warn('[DND DataManager] 无队伍数据可导出');
             return null;
         }
 
+        // 如果指定了角色ID列表，则过滤
+        let exportParty = party;
+        if (selectedCharIds && Array.isArray(selectedCharIds) && selectedCharIds.length > 0) {
+            exportParty = party.filter(char => {
+                const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+                return selectedCharIds.includes(charId);
+            });
+        }
+
+        if (exportParty.length === 0) {
+            console.warn('[DND DataManager] 没有选中任何角色');
+            return null;
+        }
+
         const exportData = {
-            version: '1.0',
+            version: '1.1',
             exportDate: new Date().toISOString(),
             exportSource: 'DND_Dashboard_Immersive',
             party: [],
@@ -18301,7 +18332,7 @@ const DataManager = {
             spells: {}
         };
 
-        party.forEach(char => {
+        exportParty.forEach(char => {
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             
             // 添加角色基础数据
@@ -18330,15 +18361,76 @@ const DataManager = {
     },
 
     // [新增] 导入队伍数据
-    importPartyData: async (jsonData) => {
+    // @param jsonData - 导入的数据
+    // @param options - 导入选项
+    //   - mode: 'append' (追加，默认) 或 'replace' (替换当前队伍)
+    //   - selectedCharIds: 可选，要导入的角色ID数组。如果为空则导入全部
+    importPartyData: async (jsonData, options = {}) => {
         try {
+            const { mode = 'append', selectedCharIds = null } = options;
+
             // 验证数据格式
             if (!jsonData || !jsonData.party || !Array.isArray(jsonData.party)) {
                 return { success: false, message: '无效的数据格式' };
             }
 
+            // 过滤要导入的角色
+            let partyToImport = jsonData.party;
+            if (selectedCharIds && Array.isArray(selectedCharIds) && selectedCharIds.length > 0) {
+                partyToImport = jsonData.party.filter(char => {
+                    const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+                    return selectedCharIds.includes(charId);
+                });
+            }
+
+            if (partyToImport.length === 0) {
+                return { success: false, message: '没有选中任何角色' };
+            }
+
+            // 同样过滤关联数据
+            const filteredSkills = {};
+            const filteredFeats = {};
+            const filteredSpells = {};
+            
+            if (selectedCharIds && selectedCharIds.length > 0) {
+                selectedCharIds.forEach(charId => {
+                    if (jsonData.skills && jsonData.skills[charId]) {
+                        filteredSkills[charId] = jsonData.skills[charId];
+                    }
+                    if (jsonData.feats && jsonData.feats[charId]) {
+                        filteredFeats[charId] = jsonData.feats[charId];
+                    }
+                    if (jsonData.spells && jsonData.spells[charId]) {
+                        filteredSpells[charId] = jsonData.spells[charId];
+                    }
+                });
+            } else {
+                Object.assign(filteredSkills, jsonData.skills || {});
+                Object.assign(filteredFeats, jsonData.feats || {});
+                Object.assign(filteredSpells, jsonData.spells || {});
+            }
+
             const rawData = DataManager.getAllData();
             if (!rawData) return { success: false, message: '无法读取数据库' };
+
+            // 如果是替换模式，先清空现有队伍数据
+            if (mode === 'replace') {
+                const clearTable = (tableNameFragment) => {
+                    const tableKey = DataManager.findTableKey(rawData, tableNameFragment);
+                    if (!tableKey) return;
+                    const sheet = rawData[tableKey];
+                    if (!sheet || !sheet.content || sheet.content.length < 1) return;
+                    // 保留表头，清空数据行
+                    sheet.content = [sheet.content[0]];
+                };
+                
+                // 清空角色相关表
+                clearTable('CHARACTER_Registry');
+                clearTable('CHARACTER_Attributes');
+                clearTable('CHARACTER_Resources');
+                clearTable('CHARACTER_Skills');
+                clearTable('CHARACTER_Feats');
+            }
 
             // 辅助函数：处理单个表的更新/插入
             const processTable = (tableNameFragment, dataList) => {
@@ -18392,10 +18484,10 @@ const DataManager = {
                 });
             };
 
-            // 分别处理三个主表
-            processTable('CHARACTER_Registry', jsonData.party);
-            processTable('CHARACTER_Attributes', jsonData.party);
-            processTable('CHARACTER_Resources', jsonData.party);
+            // 分别处理三个主表 (使用过滤后的列表)
+            processTable('CHARACTER_Registry', partyToImport);
+            processTable('CHARACTER_Attributes', partyToImport);
+            processTable('CHARACTER_Resources', partyToImport);
 
             // 辅助函数：处理关联数据 (技能/专长/法术)
             const processAuxData = (dataMap, libTableName, linkTableName, idField, nameField, typeField = null, fixedType = null) => {
@@ -18472,20 +18564,21 @@ const DataManager = {
                 });
             };
 
-            // 处理技能
-            processAuxData(jsonData.skills, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称');
+            // 处理技能 (使用过滤后的数据)
+            processAuxData(filteredSkills, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称');
             // 处理法术 (也是技能库，但可能有特殊字段)
-            processAuxData(jsonData.spells, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称', '技能类型', '法术');
+            processAuxData(filteredSpells, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称', '技能类型', '法术');
             // 处理专长
-            processAuxData(jsonData.feats, 'FEAT_Library', 'CHARACTER_Feats', 'FEAT_ID', '专长名称');
+            processAuxData(filteredFeats, 'FEAT_Library', 'CHARACTER_Feats', 'FEAT_ID', '专长名称');
 
             // 保存
             await DiceManager.saveData(rawData);
 
+            const modeText = mode === 'replace' ? '替换' : '追加';
             return {
                 success: true,
-                message: `成功导入 ${jsonData.party.length} 个角色`,
-                count: jsonData.party.length
+                message: `成功${modeText}导入 ${partyToImport.length} 个角色`,
+                count: partyToImport.length
             };
         } catch (err) {
             console.error('[DND DataManager] 导入队伍数据失败:', err);
@@ -29986,18 +30079,30 @@ const UITableManager = {
             }
 
             if (isDragging) {
-                let newLeft = btnStartX + dx;
-                let newTop = btnStartY + dy;
+                // [关键修复] 同时处理两种缩放：
+                // 1. 应用内 UI 缩放（CSS zoom，通过 this.currentScale）
+                // 2. 浏览器缩放（Ctrl+/-，通过 devicePixelRatio）
+                // screenX/Y 是物理像素，getBoundingClientRect() 返回 CSS 像素
+                // 需要将物理像素位移转换为 CSS 像素，再除以应用缩放
+                const uiScale = this.currentScale || 1;
+                const browserZoom = window.devicePixelRatio || 1;
+                // 综合缩放因子：浏览器缩放 * 应用缩放
+                const totalScale = browserZoom * uiScale;
+                
+                // 计算新位置：起始视觉坐标 + 补偿后的位移
+                let newLeft = btnStartX + dx / totalScale;
+                let newTop = btnStartY + dy / totalScale;
                 
                 const btnDom = $btn[0];
                 const win = btnDom.ownerDocument.defaultView || window;
                 const winW = win.innerWidth;
                 const winH = win.innerHeight;
-                const btnSize = CONFIG.SIZE.TOGGLE_BTN;
+                // 边界计算使用缩放后的按钮尺寸
+                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * scale;
                 
-                // 边界限制
-                newLeft = Math.max(5, Math.min(newLeft, winW - btnSize - 5));
-                newTop = Math.max(5, Math.min(newTop, winH - btnSize - 5));
+                // 边界限制（确保按钮不会超出视口）
+                newLeft = Math.max(5, Math.min(newLeft, winW - scaledBtnSize - 5));
+                newTop = Math.max(5, Math.min(newTop, winH - scaledBtnSize - 5));
                 
                 // [关键修改] 直接操作 DOM 样式，使用 setProperty 覆盖 !important
                 btnDom.style.setProperty('left', newLeft + 'px', 'important');
@@ -30984,7 +31089,15 @@ const UITableManager = {
                 if (relation !== 0) {
                     const icon = relation > 0 ? '<i class="fa-solid fa-landmark"></i>' : '<i class="fa-solid fa-skull"></i>';
                     const color = relation > 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)';
-                    factionHtml += `<span style="color:${color};margin-left:5px;cursor:help;" title="${f['势力名称']}: ${f['关系等级']} (声望:${f['声望值']||0})">${icon}</span>`;
+                    // 增强tooltip显示更多势力信息
+                    const tooltipParts = [
+                        f['势力名称'],
+                        `关系: ${f['关系等级']} (声望:${f['声望值']||0})`,
+                        f['势力类型'] ? `类型: ${f['势力类型']}` : null,
+                        f['主角头衔'] ? `头衔: ${f['主角头衔']}` : null
+                    ].filter(Boolean);
+                    const tooltip = tooltipParts.join(' | ');
+                    factionHtml += `<span style="color:${color};margin-left:5px;cursor:help;" title="${tooltip}">${icon}</span>`;
                     count++;
                 }
             });
@@ -34553,34 +34666,120 @@ ${JSON.stringify(state.characterData, null, 2)}
         $c.append($selector).append($viewArea);
     },
 
-    // [新增] 导出队伍数据到文件
+    // [新增] 导出队伍数据到文件 (支持角色选择)
     exportPartyToFile() {
-        try {
-            const data = DataManager.exportPartyData();
-            if (!data) {
-                NotificationSystem.error('无数据可导出');
-                return;
-            }
-
-            // 使用浏览器 API 下载
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `DND_Party_${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            NotificationSystem.success('已导出队伍数据');
-        } catch (e) {
-            Logger.error('Export failed:', e);
-            NotificationSystem.error('导出失败: ' + e.message);
+        const { $ } = getCore();
+        const party = DataManager.getPartyData() || [];
+        
+        if (party.length === 0) {
+            NotificationSystem.error('无队伍数据可导出');
+            return;
         }
+
+        // 构建角色选择模态框内容
+        let checkboxHtml = `
+            <div style="margin-bottom:15px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--dnd-text-highlight);font-weight:bold;">
+                    <input type="checkbox" id="dnd-export-select-all" checked style="width:18px;height:18px;cursor:pointer;">
+                    <span>全选/取消全选</span>
+                </label>
+            </div>
+            <div style="max-height:300px;overflow-y:auto;border:1px solid var(--dnd-border-inner);border-radius:4px;padding:10px;">
+        `;
+        
+        party.forEach(char => {
+            const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+            const charName = char['姓名'] || charId;
+            const charClass = char['职业'] || '未知职业';
+            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            
+            checkboxHtml += `
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
+                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                    <input type="checkbox" class="dnd-export-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span style="flex:1;">
+                        <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
+                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                    </span>
+                </label>
+            `;
+        });
+        
+        checkboxHtml += `</div>`;
+        
+        const modalContent = `
+            <div style="margin-bottom:20px;">
+                <p style="color:#888;margin-bottom:15px;">选择要导出的角色：</p>
+                ${checkboxHtml}
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="dnd-btn dnd-export-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
+            </div>
+        `;
+        
+        this.showModal('📤 导出队伍', modalContent);
+        
+        // 绑定全选/取消全选
+        const $overlay = $('#dnd-modal-overlay');
+        $overlay.find('#dnd-export-select-all').on('change', function() {
+            const checked = $(this).prop('checked');
+            $overlay.find('.dnd-export-char-checkbox').prop('checked', checked);
+        });
+        
+        // 更新全选状态
+        $overlay.find('.dnd-export-char-checkbox').on('change', function() {
+            const allChecked = $overlay.find('.dnd-export-char-checkbox:checked').length === $overlay.find('.dnd-export-char-checkbox').length;
+            $overlay.find('#dnd-export-select-all').prop('checked', allChecked);
+        });
+        
+        // 取消按钮
+        $overlay.find('.dnd-export-cancel-btn').on('click', () => {
+            $overlay.removeClass('active');
+        });
+        
+        // 确认导出按钮
+        const self = this;
+        $overlay.find('.dnd-export-confirm-btn').on('click', function() {
+            try {
+                const selectedIds = [];
+                $overlay.find('.dnd-export-char-checkbox:checked').each(function() {
+                    selectedIds.push($(this).val());
+                });
+                
+                if (selectedIds.length === 0) {
+                    NotificationSystem.error('请至少选择一个角色');
+                    return;
+                }
+                
+                const data = DataManager.exportPartyData(selectedIds);
+                if (!data) {
+                    NotificationSystem.error('导出失败');
+                    return;
+                }
+
+                // 使用浏览器 API 下载
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `DND_Party_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                $overlay.removeClass('active');
+                NotificationSystem.success(`已导出 ${selectedIds.length} 个角色`);
+            } catch (e) {
+                Logger.error('Export failed:', e);
+                NotificationSystem.error('导出失败: ' + e.message);
+            }
+        });
     },
 
-    // [新增] 从文件导入队伍数据
+    // [新增] 从文件导入队伍数据 (支持角色选择和导入模式)
     importPartyFromFile() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -34594,14 +34793,15 @@ ${JSON.stringify(state.characterData, null, 2)}
             reader.onload = async (event) => {
                 try {
                     const json = JSON.parse(event.target.result);
-                    const result = await DataManager.importPartyData(json);
-                    if (result.success) {
-                        NotificationSystem.success(result.message);
-                        // 刷新界面
-                        this.renderPanel('party');
-                    } else {
-                        NotificationSystem.error(result.message);
+                    
+                    // 验证数据格式
+                    if (!json || !json.party || !Array.isArray(json.party) || json.party.length === 0) {
+                        NotificationSystem.error('无效的数据格式或无角色数据');
+                        return;
                     }
+                    
+                    // 显示导入选项对话框
+                    this.showImportOptionsDialog(json);
                 } catch (err) {
                     Logger.error('Import parse error:', err);
                     NotificationSystem.error('文件解析失败');
@@ -34611,6 +34811,147 @@ ${JSON.stringify(state.characterData, null, 2)}
         };
         
         input.click();
+    },
+
+    // [新增] 显示导入选项对话框 (角色选择 + 导入模式)
+    showImportOptionsDialog(jsonData) {
+        const { $ } = getCore();
+        const party = jsonData.party || [];
+        
+        // 构建角色选择区域
+        let checkboxHtml = `
+            <div style="margin-bottom:10px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--dnd-text-highlight);font-weight:bold;">
+                    <input type="checkbox" id="dnd-import-select-all" checked style="width:18px;height:18px;cursor:pointer;">
+                    <span>全选/取消全选</span>
+                </label>
+            </div>
+            <div style="max-height:200px;overflow-y:auto;border:1px solid var(--dnd-border-inner);border-radius:4px;padding:10px;margin-bottom:15px;">
+        `;
+        
+        party.forEach(char => {
+            const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+            const charName = char['姓名'] || charId;
+            const charClass = char['职业'] || '未知职业';
+            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            
+            checkboxHtml += `
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
+                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                    <input type="checkbox" class="dnd-import-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span style="flex:1;">
+                        <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
+                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                    </span>
+                </label>
+            `;
+        });
+        
+        checkboxHtml += `</div>`;
+        
+        // 构建导入模式选择区域
+        const modeHtml = `
+            <div style="margin-bottom:20px;">
+                <p style="color:var(--dnd-text-highlight);font-weight:bold;margin-bottom:10px;">导入模式：</p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
+                        <input type="radio" name="dnd-import-mode" value="append" checked style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
+                        <span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">📥 追加角色</span>
+                            <span style="color:#888;font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
+                        </span>
+                    </label>
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
+                        <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
+                        <span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">🔄 替换队伍</span>
+                            <span style="color:#e74c3c;font-size:12px;">⚠️ 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        `;
+        
+        const modalContent = `
+            <div style="margin-bottom:15px;">
+                <p style="color:#888;margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
+                ${checkboxHtml}
+            </div>
+            ${modeHtml}
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="dnd-btn dnd-import-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
+            </div>
+        `;
+        
+        this.showModal('📥 导入队伍', modalContent);
+        
+        const $overlay = $('#dnd-modal-overlay');
+        
+        // 绑定全选/取消全选
+        $overlay.find('#dnd-import-select-all').on('change', function() {
+            const checked = $(this).prop('checked');
+            $overlay.find('.dnd-import-char-checkbox').prop('checked', checked);
+        });
+        
+        // 更新全选状态
+        $overlay.find('.dnd-import-char-checkbox').on('change', function() {
+            const allChecked = $overlay.find('.dnd-import-char-checkbox:checked').length === $overlay.find('.dnd-import-char-checkbox').length;
+            $overlay.find('#dnd-import-select-all').prop('checked', allChecked);
+        });
+        
+        // 导入模式切换视觉效果
+        $overlay.find('input[name="dnd-import-mode"]').on('change', function() {
+            $overlay.find('#dnd-import-mode-append-label, #dnd-import-mode-replace-label').css('border-color', 'transparent');
+            $(this).closest('label').css('border-color', 'var(--dnd-border-gold)');
+        });
+        
+        // 取消按钮
+        $overlay.find('.dnd-import-cancel-btn').on('click', () => {
+            $overlay.removeClass('active');
+        });
+        
+        // 确认导入按钮
+        const self = this;
+        $overlay.find('.dnd-import-confirm-btn').on('click', async function() {
+            try {
+                const selectedIds = [];
+                $overlay.find('.dnd-import-char-checkbox:checked').each(function() {
+                    selectedIds.push($(this).val());
+                });
+                
+                if (selectedIds.length === 0) {
+                    NotificationSystem.error('请至少选择一个角色');
+                    return;
+                }
+                
+                const mode = $overlay.find('input[name="dnd-import-mode"]:checked').val();
+                
+                // 如果是替换模式，显示二次确认
+                if (mode === 'replace') {
+                    const confirmReplace = confirm('⚠️ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
+                    if (!confirmReplace) return;
+                }
+                
+                const result = await DataManager.importPartyData(jsonData, {
+                    mode: mode,
+                    selectedCharIds: selectedIds
+                });
+                
+                if (result.success) {
+                    $overlay.removeClass('active');
+                    NotificationSystem.success(result.message);
+                    // 刷新界面
+                    self.renderPanel('party');
+                } else {
+                    NotificationSystem.error(result.message);
+                }
+            } catch (err) {
+                Logger.error('Import failed:', err);
+                NotificationSystem.error('导入失败: ' + err.message);
+            }
+        });
     },
 
     // [新增] 从 FVTT 文件导入
@@ -36211,7 +36552,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 <span>🏛️ 势力与声望</span>
                 <span style="font-size:11px;color:#888;">${factions.length} 个势力</span>
             </div>
-            <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
         `;
         
         factions.forEach(f => {
@@ -36235,21 +36576,73 @@ ${JSON.stringify(state.characterData, null, 2)}
             
             const repVal = f['声望值'] || 0;
             
+            // 势力类型图标映射
+            const typeIcons = {
+                '王国': '<i class="fa-solid fa-crown"></i>',
+                '公会': '<i class="fa-solid fa-users"></i>',
+                '教团': '<i class="fa-solid fa-cross"></i>',
+                '商会': '<i class="fa-solid fa-coins"></i>',
+                '秘社': '<i class="fa-solid fa-eye-slash"></i>',
+                '部落': '<i class="fa-solid fa-campground"></i>',
+                '军团': '<i class="fa-solid fa-shield"></i>',
+                '其他': '<i class="fa-solid fa-flag"></i>'
+            };
+            const factionType = f['势力类型'] || '其他';
+            const typeIcon = typeIcons[factionType] || typeIcons['其他'];
+            
             html += `
-                <div class="dnd-faction-item">
-                    <div class="dnd-faction-header">
-                        <span style="color:${color}">${icon} ${f['势力名称']}</span>
-                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:3px;">${statusText} (${relation})</span>
+                <div class="dnd-faction-item" style="padding:10px;background:rgba(30,30,30,0.8);border:1px solid rgba(197,160,89,0.3);border-radius:6px;">
+                    <!-- 势力标题行 -->
+                    <div class="dnd-faction-header" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:${color};font-size:14px;font-weight:bold;">${icon} ${f['势力名称']}</span>
+                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
                     </div>
-                    <div style="font-size:11px;color:#aaa;margin-top:2px;">
-                        ${f['势力描述'] || '无描述'}
+                    
+                    <!-- 势力类型和领袖 -->
+                    <div style="display:flex;gap:12px;font-size:11px;color:#aaa;margin-top:6px;flex-wrap:wrap;">
+                        <span title="势力类型">${typeIcon} ${factionType}</span>
+                        ${f['势力领袖'] ? `<span title="势力领袖"><i class="fa-solid fa-user-tie"></i> ${f['势力领袖']}</span>` : ''}
+                        ${f['势力总部'] ? `<span title="势力总部"><i class="fa-solid fa-location-dot"></i> ${f['势力总部']}</span>` : ''}
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:4px;">
+                    
+                    <!-- 势力宗旨 -->
+                    ${f['势力宗旨'] ? `
+                    <div style="font-size:11px;color:#c5a059;margin-top:6px;padding:4px 8px;background:rgba(197,160,89,0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                        <i class="fa-solid fa-scroll"></i> ${f['势力宗旨']}
+                    </div>
+                    ` : ''}
+                    
+                    <!-- 势力描述 -->
+                    <div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.4;">
+                        ${f['势力描述'] || '暂无描述'}
+                    </div>
+                    
+                    <!-- 声望条 -->
+                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:8px;">
                         <span>声望: ${repVal}</span>
-                        <div class="dnd-faction-rep-bar" style="flex:1;">
-                            <div class="dnd-faction-rep-fill" style="width:${percent}%;background:${color};"></div>
+                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                            <div class="dnd-faction-rep-fill" style="width:${percent}%;height:100%;background:${color};transition:width 0.3s;"></div>
                         </div>
                     </div>
+                    
+                    <!-- 主角在势力中的信息 -->
+                    ${(f['主角头衔'] || f['特权/通缉']) ? `
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
+                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
+                        <div style="display:flex;gap:10px;font-size:11px;flex-wrap:wrap;">
+                            ${f['主角头衔'] ? `<span style="color:var(--dnd-text-highlight);"><i class="fa-solid fa-medal"></i> ${f['主角头衔']}</span>` : ''}
+                            ${f['特权/通缉'] ? `<span style="color:${relation >= 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};"><i class="fa-solid fa-scroll"></i> ${f['特权/通缉']}</span>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- 关键事件 -->
+                    ${f['关键事件'] ? `
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
+                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
+                        <div style="font-size:11px;color:#bbb;line-height:1.4;">${f['关键事件']}</div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         });
@@ -37609,7 +38002,7 @@ ${structureJSON}
         if (mapDataExploration) {
             const forcedMap = mapDataExploration.find(m => {
                 const val = m['当前显示地图'];
-                return val === '是' || val === true || val === 'True' || val === 'true';
+                return val === '是' || val === true || val === 'True' || val === 'true' || val === 1 || val === '1';
             });
             if (forcedMap && forcedMap['LocationName']) {
                 locationName = forcedMap['LocationName'];
@@ -37622,6 +38015,11 @@ ${structureJSON}
         if (!isCombat) {
             // 检查是否需要初始化容器
             let $innerMap = $el.find('.dnd-exploration-inner');
+            
+            // [修复] 检测 locationName 是否改变，如果改变则强制重新加载
+            const cachedLocationName = $el.data('current-location-name');
+            const locationChanged = cachedLocationName && cachedLocationName !== locationName;
+            
             if ($innerMap.length === 0) {
                 $el.empty();
                 $el.css({
@@ -37637,6 +38035,16 @@ ${structureJSON}
                 // 绑定缩放
                 this.bindMapZoom($el, $innerMap);
             }
+            
+            // [修复] 如果 locationName 改变，清空容器以强制重新加载
+            if (locationChanged) {
+                $innerMap.empty();
+                // 同时更新控制按钮
+                $el.find('.dnd-map-controls').remove();
+            }
+            
+            // 保存当前 locationName
+            $el.data('current-location-name', locationName);
 
             // 尝试获取地图
             const containerId = 'dnd-exploration-map-loader';

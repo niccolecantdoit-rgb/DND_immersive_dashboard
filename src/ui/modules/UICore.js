@@ -520,18 +520,30 @@ export default {
             }
 
             if (isDragging) {
-                let newLeft = btnStartX + dx;
-                let newTop = btnStartY + dy;
+                // [关键修复] 同时处理两种缩放：
+                // 1. 应用内 UI 缩放（CSS zoom，通过 this.currentScale）
+                // 2. 浏览器缩放（Ctrl+/-，通过 devicePixelRatio）
+                // screenX/Y 是物理像素，getBoundingClientRect() 返回 CSS 像素
+                // 需要将物理像素位移转换为 CSS 像素，再除以应用缩放
+                const uiScale = this.currentScale || 1;
+                const browserZoom = window.devicePixelRatio || 1;
+                // 综合缩放因子：浏览器缩放 * 应用缩放
+                const totalScale = browserZoom * uiScale;
+                
+                // 计算新位置：起始视觉坐标 + 补偿后的位移
+                let newLeft = btnStartX + dx / totalScale;
+                let newTop = btnStartY + dy / totalScale;
                 
                 const btnDom = $btn[0];
                 const win = btnDom.ownerDocument.defaultView || window;
                 const winW = win.innerWidth;
                 const winH = win.innerHeight;
-                const btnSize = CONFIG.SIZE.TOGGLE_BTN;
+                // 边界计算使用缩放后的按钮尺寸
+                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * scale;
                 
-                // 边界限制
-                newLeft = Math.max(5, Math.min(newLeft, winW - btnSize - 5));
-                newTop = Math.max(5, Math.min(newTop, winH - btnSize - 5));
+                // 边界限制（确保按钮不会超出视口）
+                newLeft = Math.max(5, Math.min(newLeft, winW - scaledBtnSize - 5));
+                newTop = Math.max(5, Math.min(newTop, winH - scaledBtnSize - 5));
                 
                 // [关键修改] 直接操作 DOM 样式，使用 setProperty 覆盖 !important
                 btnDom.style.setProperty('left', newLeft + 'px', 'important');

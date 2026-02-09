@@ -322,16 +322,31 @@ export const DataManager = {
         return maxLevel;
     },
 
-    // [新增] 导出队伍数据为 JSON
-    exportPartyData: () => {
+    // [新增] 导出队伍数据为 JSON (支持选择性导出)
+    // @param selectedCharIds - 可选，要导出的角色ID数组。如果为空则导出全部
+    exportPartyData: (selectedCharIds = null) => {
         const party = DataManager.getPartyData();
         if (!party || party.length === 0) {
             console.warn('[DND DataManager] 无队伍数据可导出');
             return null;
         }
 
+        // 如果指定了角色ID列表，则过滤
+        let exportParty = party;
+        if (selectedCharIds && Array.isArray(selectedCharIds) && selectedCharIds.length > 0) {
+            exportParty = party.filter(char => {
+                const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+                return selectedCharIds.includes(charId);
+            });
+        }
+
+        if (exportParty.length === 0) {
+            console.warn('[DND DataManager] 没有选中任何角色');
+            return null;
+        }
+
         const exportData = {
-            version: '1.0',
+            version: '1.1',
             exportDate: new Date().toISOString(),
             exportSource: 'DND_Dashboard_Immersive',
             party: [],
@@ -340,7 +355,7 @@ export const DataManager = {
             spells: {}
         };
 
-        party.forEach(char => {
+        exportParty.forEach(char => {
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             
             // 添加角色基础数据
@@ -369,15 +384,76 @@ export const DataManager = {
     },
 
     // [新增] 导入队伍数据
-    importPartyData: async (jsonData) => {
+    // @param jsonData - 导入的数据
+    // @param options - 导入选项
+    //   - mode: 'append' (追加，默认) 或 'replace' (替换当前队伍)
+    //   - selectedCharIds: 可选，要导入的角色ID数组。如果为空则导入全部
+    importPartyData: async (jsonData, options = {}) => {
         try {
+            const { mode = 'append', selectedCharIds = null } = options;
+
             // 验证数据格式
             if (!jsonData || !jsonData.party || !Array.isArray(jsonData.party)) {
                 return { success: false, message: '无效的数据格式' };
             }
 
+            // 过滤要导入的角色
+            let partyToImport = jsonData.party;
+            if (selectedCharIds && Array.isArray(selectedCharIds) && selectedCharIds.length > 0) {
+                partyToImport = jsonData.party.filter(char => {
+                    const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+                    return selectedCharIds.includes(charId);
+                });
+            }
+
+            if (partyToImport.length === 0) {
+                return { success: false, message: '没有选中任何角色' };
+            }
+
+            // 同样过滤关联数据
+            const filteredSkills = {};
+            const filteredFeats = {};
+            const filteredSpells = {};
+            
+            if (selectedCharIds && selectedCharIds.length > 0) {
+                selectedCharIds.forEach(charId => {
+                    if (jsonData.skills && jsonData.skills[charId]) {
+                        filteredSkills[charId] = jsonData.skills[charId];
+                    }
+                    if (jsonData.feats && jsonData.feats[charId]) {
+                        filteredFeats[charId] = jsonData.feats[charId];
+                    }
+                    if (jsonData.spells && jsonData.spells[charId]) {
+                        filteredSpells[charId] = jsonData.spells[charId];
+                    }
+                });
+            } else {
+                Object.assign(filteredSkills, jsonData.skills || {});
+                Object.assign(filteredFeats, jsonData.feats || {});
+                Object.assign(filteredSpells, jsonData.spells || {});
+            }
+
             const rawData = DataManager.getAllData();
             if (!rawData) return { success: false, message: '无法读取数据库' };
+
+            // 如果是替换模式，先清空现有队伍数据
+            if (mode === 'replace') {
+                const clearTable = (tableNameFragment) => {
+                    const tableKey = DataManager.findTableKey(rawData, tableNameFragment);
+                    if (!tableKey) return;
+                    const sheet = rawData[tableKey];
+                    if (!sheet || !sheet.content || sheet.content.length < 1) return;
+                    // 保留表头，清空数据行
+                    sheet.content = [sheet.content[0]];
+                };
+                
+                // 清空角色相关表
+                clearTable('CHARACTER_Registry');
+                clearTable('CHARACTER_Attributes');
+                clearTable('CHARACTER_Resources');
+                clearTable('CHARACTER_Skills');
+                clearTable('CHARACTER_Feats');
+            }
 
             // 辅助函数：处理单个表的更新/插入
             const processTable = (tableNameFragment, dataList) => {
@@ -431,10 +507,10 @@ export const DataManager = {
                 });
             };
 
-            // 分别处理三个主表
-            processTable('CHARACTER_Registry', jsonData.party);
-            processTable('CHARACTER_Attributes', jsonData.party);
-            processTable('CHARACTER_Resources', jsonData.party);
+            // 分别处理三个主表 (使用过滤后的列表)
+            processTable('CHARACTER_Registry', partyToImport);
+            processTable('CHARACTER_Attributes', partyToImport);
+            processTable('CHARACTER_Resources', partyToImport);
 
             // 辅助函数：处理关联数据 (技能/专长/法术)
             const processAuxData = (dataMap, libTableName, linkTableName, idField, nameField, typeField = null, fixedType = null) => {
@@ -511,20 +587,21 @@ export const DataManager = {
                 });
             };
 
-            // 处理技能
-            processAuxData(jsonData.skills, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称');
+            // 处理技能 (使用过滤后的数据)
+            processAuxData(filteredSkills, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称');
             // 处理法术 (也是技能库，但可能有特殊字段)
-            processAuxData(jsonData.spells, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称', '技能类型', '法术');
+            processAuxData(filteredSpells, 'SKILL_Library', 'CHARACTER_Skills', 'SKILL_ID', '技能名称', '技能类型', '法术');
             // 处理专长
-            processAuxData(jsonData.feats, 'FEAT_Library', 'CHARACTER_Feats', 'FEAT_ID', '专长名称');
+            processAuxData(filteredFeats, 'FEAT_Library', 'CHARACTER_Feats', 'FEAT_ID', '专长名称');
 
             // 保存
             await DiceManager.saveData(rawData);
 
+            const modeText = mode === 'replace' ? '替换' : '追加';
             return {
                 success: true,
-                message: `成功导入 ${jsonData.party.length} 个角色`,
-                count: jsonData.party.length
+                message: `成功${modeText}导入 ${partyToImport.length} 个角色`,
+                count: partyToImport.length
             };
         } catch (err) {
             console.error('[DND DataManager] 导入队伍数据失败:', err);

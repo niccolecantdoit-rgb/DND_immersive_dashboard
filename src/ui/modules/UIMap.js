@@ -231,7 +231,7 @@ export default {
         if (mapDataExploration) {
             const forcedMap = mapDataExploration.find(m => {
                 const val = m['当前显示地图'];
-                return val === '是' || val === true || val === 'True' || val === 'true';
+                return val === '是' || val === true || val === 'True' || val === 'true' || val === 1 || val === '1';
             });
             if (forcedMap && forcedMap['LocationName']) {
                 locationName = forcedMap['LocationName'];
@@ -244,6 +244,11 @@ export default {
         if (!isCombat) {
             // 检查是否需要初始化容器
             let $innerMap = $el.find('.dnd-exploration-inner');
+            
+            // [修复] 检测 locationName 是否改变，如果改变则强制重新加载
+            const cachedLocationName = $el.data('current-location-name');
+            const locationChanged = cachedLocationName && cachedLocationName !== locationName;
+            
             if ($innerMap.length === 0) {
                 $el.empty();
                 $el.css({
@@ -259,6 +264,16 @@ export default {
                 // 绑定缩放
                 this.bindMapZoom($el, $innerMap);
             }
+            
+            // [修复] 如果 locationName 改变，清空容器以强制重新加载
+            if (locationChanged) {
+                $innerMap.empty();
+                // 同时更新控制按钮
+                $el.find('.dnd-map-controls').remove();
+            }
+            
+            // 保存当前 locationName
+            $el.data('current-location-name', locationName);
 
             // 尝试获取地图
             const containerId = 'dnd-exploration-map-loader';

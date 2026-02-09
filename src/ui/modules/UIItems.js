@@ -487,7 +487,7 @@ export default {
                 <span>🏛️ 势力与声望</span>
                 <span style="font-size:11px;color:#888;">${factions.length} 个势力</span>
             </div>
-            <div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
         `;
         
         factions.forEach(f => {
@@ -511,21 +511,73 @@ export default {
             
             const repVal = f['声望值'] || 0;
             
+            // 势力类型图标映射
+            const typeIcons = {
+                '王国': '<i class="fa-solid fa-crown"></i>',
+                '公会': '<i class="fa-solid fa-users"></i>',
+                '教团': '<i class="fa-solid fa-cross"></i>',
+                '商会': '<i class="fa-solid fa-coins"></i>',
+                '秘社': '<i class="fa-solid fa-eye-slash"></i>',
+                '部落': '<i class="fa-solid fa-campground"></i>',
+                '军团': '<i class="fa-solid fa-shield"></i>',
+                '其他': '<i class="fa-solid fa-flag"></i>'
+            };
+            const factionType = f['势力类型'] || '其他';
+            const typeIcon = typeIcons[factionType] || typeIcons['其他'];
+            
             html += `
-                <div class="dnd-faction-item">
-                    <div class="dnd-faction-header">
-                        <span style="color:${color}">${icon} ${f['势力名称']}</span>
-                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:3px;">${statusText} (${relation})</span>
+                <div class="dnd-faction-item" style="padding:10px;background:rgba(30,30,30,0.8);border:1px solid rgba(197,160,89,0.3);border-radius:6px;">
+                    <!-- 势力标题行 -->
+                    <div class="dnd-faction-header" style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="color:${color};font-size:14px;font-weight:bold;">${icon} ${f['势力名称']}</span>
+                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
                     </div>
-                    <div style="font-size:11px;color:#aaa;margin-top:2px;">
-                        ${f['势力描述'] || '无描述'}
+                    
+                    <!-- 势力类型和领袖 -->
+                    <div style="display:flex;gap:12px;font-size:11px;color:#aaa;margin-top:6px;flex-wrap:wrap;">
+                        <span title="势力类型">${typeIcon} ${factionType}</span>
+                        ${f['势力领袖'] ? `<span title="势力领袖"><i class="fa-solid fa-user-tie"></i> ${f['势力领袖']}</span>` : ''}
+                        ${f['势力总部'] ? `<span title="势力总部"><i class="fa-solid fa-location-dot"></i> ${f['势力总部']}</span>` : ''}
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:4px;">
+                    
+                    <!-- 势力宗旨 -->
+                    ${f['势力宗旨'] ? `
+                    <div style="font-size:11px;color:#c5a059;margin-top:6px;padding:4px 8px;background:rgba(197,160,89,0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                        <i class="fa-solid fa-scroll"></i> ${f['势力宗旨']}
+                    </div>
+                    ` : ''}
+                    
+                    <!-- 势力描述 -->
+                    <div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.4;">
+                        ${f['势力描述'] || '暂无描述'}
+                    </div>
+                    
+                    <!-- 声望条 -->
+                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:8px;">
                         <span>声望: ${repVal}</span>
-                        <div class="dnd-faction-rep-bar" style="flex:1;">
-                            <div class="dnd-faction-rep-fill" style="width:${percent}%;background:${color};"></div>
+                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                            <div class="dnd-faction-rep-fill" style="width:${percent}%;height:100%;background:${color};transition:width 0.3s;"></div>
                         </div>
                     </div>
+                    
+                    <!-- 主角在势力中的信息 -->
+                    ${(f['主角头衔'] || f['特权/通缉']) ? `
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
+                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
+                        <div style="display:flex;gap:10px;font-size:11px;flex-wrap:wrap;">
+                            ${f['主角头衔'] ? `<span style="color:var(--dnd-text-highlight);"><i class="fa-solid fa-medal"></i> ${f['主角头衔']}</span>` : ''}
+                            ${f['特权/通缉'] ? `<span style="color:${relation >= 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};"><i class="fa-solid fa-scroll"></i> ${f['特权/通缉']}</span>` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <!-- 关键事件 -->
+                    ${f['关键事件'] ? `
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
+                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
+                        <div style="font-size:11px;color:#bbb;line-height:1.4;">${f['关键事件']}</div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
         });

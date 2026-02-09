@@ -698,34 +698,120 @@ export default {
         $c.append($selector).append($viewArea);
     },
 
-    // [新增] 导出队伍数据到文件
+    // [新增] 导出队伍数据到文件 (支持角色选择)
     exportPartyToFile() {
-        try {
-            const data = DataManager.exportPartyData();
-            if (!data) {
-                NotificationSystem.error('无数据可导出');
-                return;
-            }
-
-            // 使用浏览器 API 下载
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `DND_Party_${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            NotificationSystem.success('已导出队伍数据');
-        } catch (e) {
-            Logger.error('Export failed:', e);
-            NotificationSystem.error('导出失败: ' + e.message);
+        const { $ } = getCore();
+        const party = DataManager.getPartyData() || [];
+        
+        if (party.length === 0) {
+            NotificationSystem.error('无队伍数据可导出');
+            return;
         }
+
+        // 构建角色选择模态框内容
+        let checkboxHtml = `
+            <div style="margin-bottom:15px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--dnd-text-highlight);font-weight:bold;">
+                    <input type="checkbox" id="dnd-export-select-all" checked style="width:18px;height:18px;cursor:pointer;">
+                    <span>全选/取消全选</span>
+                </label>
+            </div>
+            <div style="max-height:300px;overflow-y:auto;border:1px solid var(--dnd-border-inner);border-radius:4px;padding:10px;">
+        `;
+        
+        party.forEach(char => {
+            const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+            const charName = char['姓名'] || charId;
+            const charClass = char['职业'] || '未知职业';
+            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            
+            checkboxHtml += `
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
+                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                    <input type="checkbox" class="dnd-export-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span style="flex:1;">
+                        <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
+                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                    </span>
+                </label>
+            `;
+        });
+        
+        checkboxHtml += `</div>`;
+        
+        const modalContent = `
+            <div style="margin-bottom:20px;">
+                <p style="color:#888;margin-bottom:15px;">选择要导出的角色：</p>
+                ${checkboxHtml}
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="dnd-btn dnd-export-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
+            </div>
+        `;
+        
+        this.showModal('📤 导出队伍', modalContent);
+        
+        // 绑定全选/取消全选
+        const $overlay = $('#dnd-modal-overlay');
+        $overlay.find('#dnd-export-select-all').on('change', function() {
+            const checked = $(this).prop('checked');
+            $overlay.find('.dnd-export-char-checkbox').prop('checked', checked);
+        });
+        
+        // 更新全选状态
+        $overlay.find('.dnd-export-char-checkbox').on('change', function() {
+            const allChecked = $overlay.find('.dnd-export-char-checkbox:checked').length === $overlay.find('.dnd-export-char-checkbox').length;
+            $overlay.find('#dnd-export-select-all').prop('checked', allChecked);
+        });
+        
+        // 取消按钮
+        $overlay.find('.dnd-export-cancel-btn').on('click', () => {
+            $overlay.removeClass('active');
+        });
+        
+        // 确认导出按钮
+        const self = this;
+        $overlay.find('.dnd-export-confirm-btn').on('click', function() {
+            try {
+                const selectedIds = [];
+                $overlay.find('.dnd-export-char-checkbox:checked').each(function() {
+                    selectedIds.push($(this).val());
+                });
+                
+                if (selectedIds.length === 0) {
+                    NotificationSystem.error('请至少选择一个角色');
+                    return;
+                }
+                
+                const data = DataManager.exportPartyData(selectedIds);
+                if (!data) {
+                    NotificationSystem.error('导出失败');
+                    return;
+                }
+
+                // 使用浏览器 API 下载
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `DND_Party_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                $overlay.removeClass('active');
+                NotificationSystem.success(`已导出 ${selectedIds.length} 个角色`);
+            } catch (e) {
+                Logger.error('Export failed:', e);
+                NotificationSystem.error('导出失败: ' + e.message);
+            }
+        });
     },
 
-    // [新增] 从文件导入队伍数据
+    // [新增] 从文件导入队伍数据 (支持角色选择和导入模式)
     importPartyFromFile() {
         const input = document.createElement('input');
         input.type = 'file';
@@ -739,14 +825,15 @@ export default {
             reader.onload = async (event) => {
                 try {
                     const json = JSON.parse(event.target.result);
-                    const result = await DataManager.importPartyData(json);
-                    if (result.success) {
-                        NotificationSystem.success(result.message);
-                        // 刷新界面
-                        this.renderPanel('party');
-                    } else {
-                        NotificationSystem.error(result.message);
+                    
+                    // 验证数据格式
+                    if (!json || !json.party || !Array.isArray(json.party) || json.party.length === 0) {
+                        NotificationSystem.error('无效的数据格式或无角色数据');
+                        return;
                     }
+                    
+                    // 显示导入选项对话框
+                    this.showImportOptionsDialog(json);
                 } catch (err) {
                     Logger.error('Import parse error:', err);
                     NotificationSystem.error('文件解析失败');
@@ -756,6 +843,147 @@ export default {
         };
         
         input.click();
+    },
+
+    // [新增] 显示导入选项对话框 (角色选择 + 导入模式)
+    showImportOptionsDialog(jsonData) {
+        const { $ } = getCore();
+        const party = jsonData.party || [];
+        
+        // 构建角色选择区域
+        let checkboxHtml = `
+            <div style="margin-bottom:10px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--dnd-text-highlight);font-weight:bold;">
+                    <input type="checkbox" id="dnd-import-select-all" checked style="width:18px;height:18px;cursor:pointer;">
+                    <span>全选/取消全选</span>
+                </label>
+            </div>
+            <div style="max-height:200px;overflow-y:auto;border:1px solid var(--dnd-border-inner);border-radius:4px;padding:10px;margin-bottom:15px;">
+        `;
+        
+        party.forEach(char => {
+            const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
+            const charName = char['姓名'] || charId;
+            const charClass = char['职业'] || '未知职业';
+            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            
+            checkboxHtml += `
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
+                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                    <input type="checkbox" class="dnd-import-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
+                    <span style="flex:1;">
+                        <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
+                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                    </span>
+                </label>
+            `;
+        });
+        
+        checkboxHtml += `</div>`;
+        
+        // 构建导入模式选择区域
+        const modeHtml = `
+            <div style="margin-bottom:20px;">
+                <p style="color:var(--dnd-text-highlight);font-weight:bold;margin-bottom:10px;">导入模式：</p>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
+                        <input type="radio" name="dnd-import-mode" value="append" checked style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
+                        <span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">📥 追加角色</span>
+                            <span style="color:#888;font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
+                        </span>
+                    </label>
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
+                        <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
+                        <span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">🔄 替换队伍</span>
+                            <span style="color:#e74c3c;font-size:12px;">⚠️ 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+        `;
+        
+        const modalContent = `
+            <div style="margin-bottom:15px;">
+                <p style="color:#888;margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
+                ${checkboxHtml}
+            </div>
+            ${modeHtml}
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="dnd-btn dnd-import-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
+            </div>
+        `;
+        
+        this.showModal('📥 导入队伍', modalContent);
+        
+        const $overlay = $('#dnd-modal-overlay');
+        
+        // 绑定全选/取消全选
+        $overlay.find('#dnd-import-select-all').on('change', function() {
+            const checked = $(this).prop('checked');
+            $overlay.find('.dnd-import-char-checkbox').prop('checked', checked);
+        });
+        
+        // 更新全选状态
+        $overlay.find('.dnd-import-char-checkbox').on('change', function() {
+            const allChecked = $overlay.find('.dnd-import-char-checkbox:checked').length === $overlay.find('.dnd-import-char-checkbox').length;
+            $overlay.find('#dnd-import-select-all').prop('checked', allChecked);
+        });
+        
+        // 导入模式切换视觉效果
+        $overlay.find('input[name="dnd-import-mode"]').on('change', function() {
+            $overlay.find('#dnd-import-mode-append-label, #dnd-import-mode-replace-label').css('border-color', 'transparent');
+            $(this).closest('label').css('border-color', 'var(--dnd-border-gold)');
+        });
+        
+        // 取消按钮
+        $overlay.find('.dnd-import-cancel-btn').on('click', () => {
+            $overlay.removeClass('active');
+        });
+        
+        // 确认导入按钮
+        const self = this;
+        $overlay.find('.dnd-import-confirm-btn').on('click', async function() {
+            try {
+                const selectedIds = [];
+                $overlay.find('.dnd-import-char-checkbox:checked').each(function() {
+                    selectedIds.push($(this).val());
+                });
+                
+                if (selectedIds.length === 0) {
+                    NotificationSystem.error('请至少选择一个角色');
+                    return;
+                }
+                
+                const mode = $overlay.find('input[name="dnd-import-mode"]:checked').val();
+                
+                // 如果是替换模式，显示二次确认
+                if (mode === 'replace') {
+                    const confirmReplace = confirm('⚠️ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
+                    if (!confirmReplace) return;
+                }
+                
+                const result = await DataManager.importPartyData(jsonData, {
+                    mode: mode,
+                    selectedCharIds: selectedIds
+                });
+                
+                if (result.success) {
+                    $overlay.removeClass('active');
+                    NotificationSystem.success(result.message);
+                    // 刷新界面
+                    self.renderPanel('party');
+                } else {
+                    NotificationSystem.error(result.message);
+                }
+            } catch (err) {
+                Logger.error('Import failed:', err);
+                NotificationSystem.error('导入失败: ' + err.message);
+            }
+        });
     },
 
     // [新增] 从 FVTT 文件导入

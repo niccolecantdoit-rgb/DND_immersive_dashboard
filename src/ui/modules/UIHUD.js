@@ -705,7 +705,15 @@ export default {
                 if (relation !== 0) {
                     const icon = relation > 0 ? '<i class="fa-solid fa-landmark"></i>' : '<i class="fa-solid fa-skull"></i>';
                     const color = relation > 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)';
-                    factionHtml += `<span style="color:${color};margin-left:5px;cursor:help;" title="${f['势力名称']}: ${f['关系等级']} (声望:${f['声望值']||0})">${icon}</span>`;
+                    // 增强tooltip显示更多势力信息
+                    const tooltipParts = [
+                        f['势力名称'],
+                        `关系: ${f['关系等级']} (声望:${f['声望值']||0})`,
+                        f['势力类型'] ? `类型: ${f['势力类型']}` : null,
+                        f['主角头衔'] ? `头衔: ${f['主角头衔']}` : null
+                    ].filter(Boolean);
+                    const tooltip = tooltipParts.join(' | ');
+                    factionHtml += `<span style="color:${color};margin-left:5px;cursor:help;" title="${tooltip}">${icon}</span>`;
                     count++;
                 }
             });

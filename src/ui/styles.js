@@ -2231,6 +2231,22 @@ export const addStyles = () => {
             .dnd-dialog {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
+                max-width: 400px !important;
+                /* 修复移动端对话框被截断到顶部的问题 */
+                /* 使用 inset + margin auto 实现稳定居中 */
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                margin: auto !important;
+                height: fit-content !important;
+                max-height: calc(100vh - 40px) !important;
+                max-height: calc(100dvh - 40px) !important; /* 动态视口高度，更适合移动端 */
+                overflow-y: auto !important;
+                transform: scale(0.9) !important;
+            }
+            .dnd-dialog-visible {
+                transform: scale(1) !important;
             }
         }
 
