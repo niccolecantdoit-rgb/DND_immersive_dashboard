@@ -21,7 +21,7 @@ export const STYLE_PRESETS = {
         meta: {
             id: 'classic-dnd',
             name: '经典羊皮纸',
-            icon: '📜',
+            icon: '<i class="fa-solid fa-scroll"></i>',
             description: '传统的D&D风格，仿佛置身于古老的书卷之中',
             author: 'System'
         },
@@ -2629,7 +2629,7 @@ export const STYLE_PRESETS = {
         meta: {
             id: 'star-trek',
             name: '星际联邦',
-            icon: '🚀',
+            icon: '<i class="fa-solid fa-rocket"></i>',
             description: '极简干净的科幻风格，类似于LCARS界面',
             author: 'System'
         },
@@ -3823,7 +3823,7 @@ export const STYLE_PRESETS = {
         meta: {
             id: 'steampunk',
             name: '蒸汽纪元',
-            icon: '⚙️',
+            icon: '<i class="fa-solid fa-cog"></i>',
             description: '维多利亚时代的机械美学，黄铜与皮革的交响',
             author: 'System'
         },

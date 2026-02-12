@@ -24,7 +24,7 @@ export const DynamicBackground = {
         // 机械齿轮效果 - 蒸汽朋克风格
         gears: {
             name: '机械齿轮',
-            icon: '⚙️',
+            icon: '<i class="fa-solid fa-cog"></i>',
             description: '缓慢转动的齿轮，蒸汽朋克风格',
             gearCount: 5,
             colors: ['rgba(157, 139, 108, 0.3)', 'rgba(92, 75, 53, 0.25)', 'rgba(139, 119, 89, 0.2)'],
@@ -49,7 +49,7 @@ export const DynamicBackground = {
         // 粒子效果 - 浮动光点
         particles: {
             name: '魔法粒子',
-            icon: '✨',
+            icon: '<i class="fa-solid fa-bolt"></i>',
             description: '漂浮的魔法光点',
             particleCount: 30,
             colors: ['rgba(255, 219, 133, 0.8)', 'rgba(157, 139, 108, 0.6)', 'rgba(255, 255, 255, 0.5)'],
@@ -165,7 +165,7 @@ export const DynamicBackground = {
         // 等高线 (Death Stranding)
         topo: {
             name: '地理等高线',
-            icon: '🗺️',
+            icon: '<i class="fa-solid fa-map"></i>',
             description: '动态流动的地理等高线',
             color: 'rgba(157, 139, 108, 0.5)',
             lineCount: 10,

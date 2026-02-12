@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DND 沉浸式仪表盘
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1
+// @version      1.9.2
 // @description  专为 DND 模板设计的游戏风格仪表盘
 // @author       Niccole
 // @match        */*
@@ -377,14 +377,14 @@ const TavernSettingsSync = {
                 const pendingCount = Object.keys(queue).length;
                 if (pendingCount > 0) {
                     // Only notify if there is actual work to do
-                    this._notify('info', `正在同步 ${pendingCount} 项本地更改...`, '🔄 同步中');
+                    this._notify('info', `正在同步 ${pendingCount} 项本地更改...`, '<i class="fa-solid fa-sync fa-spin"></i> 同步中');
                     await this._processSyncQueue();
                 }
             } catch (e) {
                 Logger.error('[TavernSettingsSync] Initial sync failed:', e);
             }
         } else {
-            this._notify('warning', '数据仅保存在本地，连接酒馆后将自动同步', '📴 离线模式');
+            this._notify('warning', '数据仅保存在本地，连接酒馆后将自动同步', '<i class="fa-solid fa-ban"></i> 离线模式');
         }
         
         // Start background check
@@ -407,7 +407,7 @@ const TavernSettingsSync = {
                 await this._processSyncQueue();
             } else if (!currentState && this._previousState) {
                 // Changed from online to offline
-                this._notify('warning', '数据将暂存本地，恢复连接后自动同步', '📴 酒馆连接已断开');
+                this._notify('warning', '数据将暂存本地，恢复连接后自动同步', '<i class="fa-solid fa-ban"></i> 酒馆连接已断开');
             }
             this._previousState = currentState;
         }
@@ -726,13 +726,13 @@ const TavernSettingsSync = {
             const saved = await this._saveTavernSettings();
             if (saved) {
                 await DBAdapter.setSetting(this.SYNC_QUEUE_KEY, '{}');
-                this._notify('success', `${successCount} 项设置已同步到酒馆`, '✅ 同步完成');
+                this._notify('success', `${successCount} 项设置已同步到酒馆`, '<i class="fa-solid fa-check-circle"></i> 同步完成');
             } else {
                  Logger.warn('[TavernSettingsSync] Save triggered but returned false');
             }
         } catch(e) {
             Logger.error('[TavernSettingsSync] Sync processing failed:', e);
-            this._notify('error', '请检查网络连接', '❌ 同步失败');
+            this._notify('error', '请检查网络连接', '<i class="fa-solid fa-times-circle"></i> 同步失败');
         }
     },
     
@@ -758,9 +758,9 @@ const TavernSettingsSync = {
         return {
             connected: this._tavernAvailable,
             pendingSync: pendingCount,
-            statusText: this._tavernAvailable 
-                ? (pendingCount > 0 ? `☁️ 在线 (${pendingCount} 待同步)` : '☁️ 在线同步')
-                : '📴 离线模式',
+            statusText: this._tavernAvailable
+                ? (pendingCount > 0 ? `<i class="fa-solid fa-cloud"></i> 在线 (${pendingCount} 待同步)` : '<i class="fa-solid fa-cloud"></i> 在线同步')
+                : '<i class="fa-solid fa-ban"></i> 离线模式',
             statusClass: this._tavernAvailable 
                 ? (pendingCount > 0 ? 'warning' : 'success')
                 : 'warning'
@@ -872,7 +872,7 @@ const CONFIG = {
     THEMES: {
         dark: {
             name: '暗黑城堡',
-            icon: '🏰',
+            icon: '<i class="fa-solid fa-landmark"></i>',
             vars: {
                 '--dnd-bg-main': '#0f0b0a',
                 '--dnd-bg-panel-start': '#2b1b17',
@@ -924,7 +924,7 @@ const CONFIG = {
         },
         crimson: {
             name: '血色深渊',
-            icon: '🔥',
+            icon: '<i class="fa-solid fa-fire"></i>',
             vars: {
                 '--dnd-bg-main': '#120808',
                 '--dnd-bg-panel-start': '#2b1717',
@@ -950,7 +950,7 @@ const CONFIG = {
         },
         arcane: {
             name: '奥术塔楼',
-            icon: '🔮',
+            icon: '<i class="fa-solid fa-gem"></i>',
             vars: {
                 '--dnd-bg-main': '#0a0a14',
                 '--dnd-bg-panel-start': '#1a1a2e',
@@ -17745,7 +17745,23 @@ library$1.add(
     faArrowUp,
     faHeart,
     faLandmark,
-    faSync
+    faSync,
+    // [新增] emoji → SVG 替换所需图标
+    faPalette,
+    faBullseye,
+    faFire,
+    faMasksTheater,
+    faTriangleExclamation,
+    faSun,
+    faCloudSun,
+    faCloudRain,
+    faCloudBolt,
+    faSnowflake,
+    faSmog,
+    faWind,
+    faLocationDot,
+    faWandMagicSparkles,
+    faBan
 );
 
 // 开启监视：自动将页面中的 <i class="fa-solid fa-xxx"> 转换为 SVG
@@ -17965,7 +17981,7 @@ const DiceManager = {
                         // 临时显示状态
                         const $status = $('#dnd-hud-status-text');
                         const originalHtml = $status.html();
-                        $status.html('<span style="color:var(--dnd-text-highlight);animation:dnd-pulse 1s infinite;">🎲 骰子池已自动补充</span>');
+                        $status.html('<span style="color:var(--dnd-text-highlight);animation:dnd-pulse 1s infinite;"><i class="fa-solid fa-dice-d20"></i> 骰子池已自动补充</span>');
                         setTimeout(() => {
                             // 只有当内容没变时才恢复，防止覆盖了新的状态更新
                             if ($status.text().includes('骰子池已自动补充')) {
@@ -19543,7 +19559,7 @@ const ThemeManager = {
         const list = Object.keys(CONFIG.THEMES).map(id => ({ id, ...CONFIG.THEMES[id] }));
         // 如果有自定义配色，添加到列表
         if (ThemeManager.customTheme) {
-            list.push({ id: 'custom', name: '自定义配色', icon: '🎨' });
+            list.push({ id: 'custom', name: '自定义配色', icon: '<i class="fa-solid fa-palette"></i>' });
         }
         return list;
     }
@@ -19833,7 +19849,7 @@ const StyleValidator = {
             version: String(meta.version || '1.0.0').substring(0, 20),
             author: String(meta.author || '').substring(0, 100),
             description: String(meta.description || '').substring(0, 500),
-            icon: this._sanitizeEmoji(meta.icon) || '🎨',
+            icon: this._sanitizeEmoji(meta.icon) || '<i class="fa-solid fa-palette"></i>',
             preview: this._sanitizePreview(meta.preview)
         };
     },
@@ -20761,7 +20777,7 @@ const StyleEffects = {
                         100% { transform: rotate(360deg); }
                     }
                     .dnd-char-card::before {
-                        content: "⚙️" !important;
+                        content: "⚙" !important;
                         position: absolute !important;
                         font-size: 100px !important;
                         opacity: 0.05 !important;
@@ -20922,7 +20938,7 @@ const StyleEffects = {
                 rules.push(`
                     .dnd-card-header::before,
                     .dnd-card-header::after {
-                        content: "⚙️" !important;
+                        content: "⚙" !important;
                         position: absolute !important;
                         font-size: 14px !important;
                         color: ${borderColor} !important;
@@ -21572,7 +21588,7 @@ const STYLE_PRESETS = {
         meta: {
             id: 'classic-dnd',
             name: '经典羊皮纸',
-            icon: '📜',
+            icon: '<i class="fa-solid fa-scroll"></i>',
             description: '传统的D&D风格，仿佛置身于古老的书卷之中',
             author: 'System'
         },
@@ -24180,7 +24196,7 @@ const STYLE_PRESETS = {
         meta: {
             id: 'star-trek',
             name: '星际联邦',
-            icon: '🚀',
+            icon: '<i class="fa-solid fa-rocket"></i>',
             description: '极简干净的科幻风格，类似于LCARS界面',
             author: 'System'
         },
@@ -25374,7 +25390,7 @@ const STYLE_PRESETS = {
         meta: {
             id: 'steampunk',
             name: '蒸汽纪元',
-            icon: '⚙️',
+            icon: '<i class="fa-solid fa-cog"></i>',
             description: '维多利亚时代的机械美学，黄铜与皮革的交响',
             author: 'System'
         },
@@ -26290,7 +26306,7 @@ const StyleManager = {
         const customList = Object.values(this.customStyles).map(style => ({
             id: style.meta.id,
             name: style.meta.name,
-            icon: style.meta.icon || '🎨',
+            icon: style.meta.icon || '<i class="fa-solid fa-palette"></i>',
             description: style.meta.description || '',
             author: style.meta.author || '用户',
             isCustom: true
@@ -26955,7 +26971,7 @@ const PresetSwitcher = {
         const $status = $('#dnd-hud-status-text');
         if (!$status.length) return;
         
-        const icon = isCombat ? '⚔️' : '🧭';
+        const icon = isCombat ? '<i class="fa-solid fa-gavel"></i>' : '<i class="fa-solid fa-compass"></i>';
         const color = isCombat ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)';
         const originalHtml = $status.html();
         
@@ -27014,7 +27030,7 @@ const DynamicBackground = {
         // 机械齿轮效果 - 蒸汽朋克风格
         gears: {
             name: '机械齿轮',
-            icon: '⚙️',
+            icon: '<i class="fa-solid fa-cog"></i>',
             description: '缓慢转动的齿轮，蒸汽朋克风格',
             gearCount: 5,
             colors: ['rgba(157, 139, 108, 0.3)', 'rgba(92, 75, 53, 0.25)', 'rgba(139, 119, 89, 0.2)'],
@@ -27039,7 +27055,7 @@ const DynamicBackground = {
         // 粒子效果 - 浮动光点
         particles: {
             name: '魔法粒子',
-            icon: '✨',
+            icon: '<i class="fa-solid fa-bolt"></i>',
             description: '漂浮的魔法光点',
             particleCount: 30,
             colors: ['rgba(255, 219, 133, 0.8)', 'rgba(157, 139, 108, 0.6)', 'rgba(255, 255, 255, 0.5)'],
@@ -27155,7 +27171,7 @@ const DynamicBackground = {
         // 等高线 (Death Stranding)
         topo: {
             name: '地理等高线',
-            icon: '🗺️',
+            icon: '<i class="fa-solid fa-map"></i>',
             description: '动态流动的地理等高线',
             color: 'rgba(157, 139, 108, 0.5)',
             lineCount: 10,
@@ -29670,7 +29686,102 @@ const UITableManager = {
     }
 };
 
+;// ./src/ui/SVGIcons.js
+// src/ui/SVGIcons.js
+// 统一的 SVG 图标常量映射
+// 将所有 emoji 替换为 FontAwesome SVG 图标 (inline <i> 标签)
+// 使用方式: import { ICONS } from './SVGIcons.js';
+//          然后在 HTML 模板中使用 ${ICONS.DICE} 替代 '🎲'
+
+/**
+ * FontAwesome SVG 图标映射表
+ * 所有图标通过 icons.js 中注册的 FontAwesome library 渲染
+ * dom.watch() 会自动将 <i class="fa-solid fa-xxx"> 转换为内联 SVG
+ */
+const ICONS = {
+    // ============================================
+    // 🎮 游戏核心
+    // ============================================
+    DICE:           '<i class="fa-solid fa-dice-d20"></i>',          // 🎲 骰子
+    SWORD:          '<i class="fa-solid fa-gavel"></i>',             // ⚔️ 战斗/攻击 (用 gavel 代替)
+    SHIELD:         '<i class="fa-solid fa-shield-halved"></i>',     // 🛡️ 防御/护盾
+    SKULL:          '<i class="fa-solid fa-skull"></i>',             // 💀 死亡/大失败
+    TARGET:         '<i class="fa-solid fa-bullseye"></i>',          // 🎯 目标/瞄准
+    TROPHY:         '<i class="fa-solid fa-trophy"></i>',            // 🏆 奖励/成就
+    SPARKLES:       '<i class="fa-solid fa-bolt"></i>',              // ✨ 技能/魔法效果
+    SCROLL:         '<i class="fa-solid fa-scroll"></i>',            // 📜 法术/任务卷轴
+    BACKPACK:       '<i class="fa-solid fa-suitcase"></i>',          // 🎒 背包/物品
+    COMPASS:        '<i class="fa-solid fa-compass"></i>',           // 🧭 探索/导航
+    CASTLE:         '<i class="fa-solid fa-landmark"></i>',          // 🏰 城堡/据点
+    FIRE:           '<i class="fa-solid fa-fire"></i>',              // 🔥 火焰
+    CRYSTAL:        '<i class="fa-solid fa-gem"></i>',               // 🔮 魔法/水晶球
+    HAT_WIZARD:     '<i class="fa-solid fa-hat-wizard"></i>',        // 🧙 法师
+    LEVEL_UP:       '<i class="fa-solid fa-arrow-up"></i>',          // 🆙 升级
+    GAMEPAD:        '<i class="fa-solid fa-gamepad"></i>',           // 🎮 游戏
+
+    // ============================================
+    // 👤 角色相关
+    // ============================================
+    USER:           '<i class="fa-solid fa-user"></i>',              // 👤 角色/用户
+    USERS:          '<i class="fa-solid fa-users"></i>',             // 👥 队伍/多人
+    MASK:           '<i class="fa-solid fa-masks-theater"></i>',     // 🎭 主角/角色扮演
+
+    // ============================================
+    // 🎨 界面/设置
+    // ============================================
+    PALETTE:        '<i class="fa-solid fa-palette"></i>',           // 🎨 主题/配色
+    COG:            '<i class="fa-solid fa-cog"></i>',               // ⚙️ 设置/齿轮
+    LIGHTBULB:      '<i class="fa-solid fa-lightbulb"></i>',         // 💡 提示/灯泡
+    SEARCH:         '<i class="fa-solid fa-search"></i>',            // 🔍 搜索/检查
+    SYNC:           '<i class="fa-solid fa-sync"></i>',              // 🔄 刷新/同步
+    CHECK:          '<i class="fa-solid fa-check"></i>',             // ✅ 完成/确认
+    TIMES:          '<i class="fa-solid fa-times"></i>',             // ❌ 关闭/失败
+    WARNING:        '<i class="fa-solid fa-exclamation-triangle"></i>', // ⚠️ 警告
+    QUESTION:       '<i class="fa-solid fa-question"></i>',          // ❓ 未知/问号
+    CLOUD:          '<i class="fa-solid fa-cloud"></i>',             // ☁️ 云/云同步
+    CLOUD_OFF:      '<i class="fa-solid fa-cloud-slash"></i>',       // 📴 离线
+    MAP:            '<i class="fa-solid fa-map"></i>',               // 🗺️ 地图
+    LOCATION:       '<i class="fa-solid fa-map-marker-alt"></i>',    // 📍 位置标记
+    ROCKET:         '<i class="fa-solid fa-rocket"></i>',            // 🚀 火箭/科幻
+    EYE:            '<i class="fa-solid fa-eye"></i>',               // 👁️ 查看
+    DOWNLOAD:       '<i class="fa-solid fa-download"></i>',          // 📥 下载
+    UPLOAD:         '<i class="fa-solid fa-upload"></i>',            // 📤 上传
+
+    // ============================================
+    // 🌤️ 天气图标
+    // ============================================
+    WEATHER_SUNNY:      '<i class="fa-solid fa-sun"></i>',           // ☀️
+    WEATHER_CLOUDY:     '<i class="fa-solid fa-cloud"></i>',         // ☁️
+    WEATHER_PARTLY:     '<i class="fa-solid fa-cloud-sun"></i>',     // 🌤️
+    WEATHER_RAIN:       '<i class="fa-solid fa-cloud-rain"></i>',    // 🌧️
+    WEATHER_STORM:      '<i class="fa-solid fa-cloud-bolt"></i>',    // ⛈️
+    WEATHER_SNOW:       '<i class="fa-solid fa-snowflake"></i>',     // 🌨️❄️
+    WEATHER_FOG:        '<i class="fa-solid fa-smog"></i>',          // 🌫️
+    WEATHER_WIND:       '<i class="fa-solid fa-wind"></i>',          // 🌪️
+    WEATHER_DEFAULT:    '<i class="fa-solid fa-cloud-sun"></i>',     // 默认天气
+};
+
+/**
+ * 将天气描述文本匹配到对应的 FontAwesome 图标
+ * @param {string} weatherText - 天气描述文本
+ * @returns {string} FontAwesome 图标 HTML
+ */
+function getWeatherIcon(weatherText) {
+    if (!weatherText) return '';
+    const text = weatherText.toLowerCase();
+    if (text.includes('晴') || text.includes('sunny') || text.includes('clear')) return ICONS.WEATHER_SUNNY;
+    if (text.includes('雷') || text.includes('storm') || text.includes('thunder')) return ICONS.WEATHER_STORM;
+    if (text.includes('雨') || text.includes('rain')) return ICONS.WEATHER_RAIN;
+    if (text.includes('雪') || text.includes('snow')) return ICONS.WEATHER_SNOW;
+    if (text.includes('雾') || text.includes('fog') || text.includes('mist')) return ICONS.WEATHER_FOG;
+    if (text.includes('风') || text.includes('wind') || text.includes('tornado')) return ICONS.WEATHER_WIND;
+    if (text.includes('多云') || text.includes('cloudy') || text.includes('overcast')) return ICONS.WEATHER_CLOUDY;
+    if (text.includes('阴') || text.includes('cloud')) return ICONS.WEATHER_PARTLY;
+    return ICONS.WEATHER_DEFAULT;
+}
+
 ;// ./src/ui/modules/UICore.js
+
 
 
 
@@ -30020,7 +30131,7 @@ const UITableManager = {
             <div id="dnd-dashboard-root">
                 <div class="dnd-top-bar">
                     <div class="dnd-title">DND Adventure Log</div>
-                    <button class="dnd-close-btn" id="dnd-close">✕ 关闭面板</button>
+                    <button class="dnd-close-btn" id="dnd-close"><i class="fa-solid fa-times"></i> 关闭面板</button>
                 </div>
                 <div class="dnd-main-container">
                     <div class="dnd-nav-sidebar">
@@ -30058,7 +30169,7 @@ const UITableManager = {
                     
                     <div style="display:flex;gap:5px;align-items:center;margin-left:10px;">
                         <button class="dnd-hud-expand-btn" id="dnd-hud-theme" title="切换主题">
-                            🎨
+                            <i class="fa-solid fa-palette"></i>
                         </button>
                     </div>
                 </div>
@@ -30212,7 +30323,7 @@ const UITableManager = {
                 const winW = win.innerWidth;
                 const winH = win.innerHeight;
                 // 边界计算使用缩放后的按钮尺寸
-                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * scale;
+                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * uiScale;
                 
                 // 边界限制（确保按钮不会超出视口）
                 newLeft = Math.max(5, Math.min(newLeft, winW - scaledBtnSize - 5));
@@ -30452,7 +30563,7 @@ const UITableManager = {
             // D - 快速投骰子 (按住 Alt 时)
             if (e.altKey && (key === 'd' || key === 'D')) {
                 const roll = Math.floor(Math.random() * 20) + 1;
-                NotificationSystem.info(`🎲 D20: ${roll}`, '快速投骰');
+                NotificationSystem.info(`<i class="fa-solid fa-dice-d20"></i> D20: ${roll}`, '快速投骰');
                 e.preventDefault();
                 return;
             }
@@ -30506,6 +30617,7 @@ const UITableManager = {
 
 
 
+
 /* harmony default export */ const UIHUD = ({
     renderHUD() {
         const { $ } = getCore();
@@ -30531,8 +30643,8 @@ const UITableManager = {
 
         // 提取时间 (仅显示 HH:MM 或原始内容)
         const timeStr = gInfo['游戏时间'] && gInfo['游戏时间'].includes(' ') ? gInfo['游戏时间'].split(' ')[1] : gInfo['游戏时间'];
-        // 提取天气图标 (简单匹配)
-        const weatherIcon = weather ? (weather.match(/[🌤️☀️☁️🌧️⛈️🌩️🌨️❄️🌫️🌪️]/)?.[0] || '🌤️') : '';
+        // 提取天气图标 (使用 SVG 图标)
+        const weatherIcon = weather ? getWeatherIcon(weather) : '';
 
         // [修复] 恢复头部完整显示逻辑 - 优化布局和图标显示
         const statusIcon = isCombat ? '<i class="fa-solid fa-skull"></i>' : '<i class="fa-solid fa-compass"></i>';
@@ -30748,8 +30860,8 @@ const UITableManager = {
         const html = `
             <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#161618;border:1px solid #9d8b6c;border-radius:8px;padding:15px;z-index:2147483650;box-shadow:0 10px 40px rgba(0,0,0,0.8);min-width:280px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid #444;padding-bottom:8px;">
-                    <span style="color:#ffdb85;font-weight:bold;">📍 悬浮球位置</span>
-                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;">✕</span>
+                    <span style="color:#ffdb85;font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
+                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;"><i class="fa-solid fa-times"></i></span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px;">${btnsHtml}</div>
                 <div style="font-size:11px;color:#666;text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
@@ -31326,7 +31438,7 @@ const UITableManager = {
         const npcs = DataManager.getTable('NPC_Registry');
         
         if (!npcs || npcs.length === 0) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">👥 暂无NPC数据</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.USERS} 暂无NPC数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -31334,7 +31446,7 @@ const UITableManager = {
         const statuses = [...new Set(npcs.map(n => n['当前状态'] || '未知'))].sort();
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>👥 NPC列表</span>
+            <span>${ICONS.USERS} NPC列表</span>
             <span style="font-size:11px;color:#888;">${npcs.length} 人</span>
         </div>`;
         
@@ -32033,6 +32145,7 @@ const SettingsManager = {
 
 
 
+
 /* harmony default export */ const UICharacter = ({
     // 头像存储管理 (使用 IndexedDB + Chat Metadata)
     avatarStorage: {
@@ -32164,7 +32277,7 @@ const SettingsManager = {
                 ">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-inner);padding-bottom:10px;">
                         <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${charName}</span>
-                        <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭">✕</span>
+                        <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭"><i class="fa-solid fa-times"></i></span>
                     </div>
                     
                     <div style="display:flex;flex-direction:column;align-items:center;gap:15px;">
@@ -32428,7 +32541,7 @@ const SettingsManager = {
                         <div class="dnd-detail-sub">${char['种族/性别/年龄'] || '未知'} | ${char['职业'] || '无职业'}</div>
                     </div>
                 </div>
-                <div class="dnd-detail-close" id="dnd-card-close">✕</div>
+                <div class="dnd-detail-close" id="dnd-card-close"><i class="fa-solid fa-times"></i></div>
             </div>
             
             <div class="dnd-detail-body">
@@ -32611,7 +32724,7 @@ const SettingsManager = {
                 <span>${skill['技能名称']} <span style="font-size:10px;color:#888;font-weight:normal">(${skill['环阶']||'-'} · ${skill['学派']||'-'})</span></span>
                 <button class="dnd-clickable" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
                     onclick="window.DND_Dashboard_UI.handleCastClick('${safeName}', '${safeRange}', '${skill['环阶']||''}', 'skill')">
-                    ✨ 施放
+                    ${ICONS.SPARKLES} 施放
                 </button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:#aaa;margin-bottom:8px;">
@@ -32896,7 +33009,7 @@ const SettingsManager = {
         }
         
         const isLevelUp = state.mode === 'levelup';
-        const title = isLevelUp ? '🆙 角色升级向导' : '⚔️ AI 角色创建向导';
+        const title = isLevelUp ? `${ICONS.LEVEL_UP} 角色升级向导` : `${ICONS.SWORD} AI 角色创建向导`;
         
         const html = `
             <div class="dnd-char-creator-panel" style="max-width:800px;margin:0 auto;">
@@ -33090,7 +33203,7 @@ const SettingsManager = {
     showStatsGenerator(e) {
         const html = `
             <div style="padding-bottom:10px; border-bottom:1px solid #444; margin-bottom:10px; font-weight:bold; color:var(--dnd-text-highlight);">
-                🎲 属性分配生成器
+                ${ICONS.DICE} 属性分配生成器
             </div>
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <!-- 标准数列 -->
@@ -33114,7 +33227,7 @@ const SettingsManager = {
                     <div style="font-size:13px; font-weight:bold; margin-bottom:5px;">3. 骰子决定 (4d6 drop lowest)</div>
                     <div id="dnd-stats-roll-result" style="font-family:monospace; color:var(--dnd-text-highlight); margin-bottom:5px; min-height:20px; font-size:14px; text-align:center;">???</div>
                     <div style="display:flex; gap:5px;">
-                        <button onclick="window.DND_Dashboard_UI.performStatsRoll()" style="flex:1; padding:5px; background:var(--dnd-border-gold); color:#000; border:none; border-radius:3px; cursor:pointer; font-weight:bold;">🎲 投掷 (x6)</button>
+                        <button onclick="window.DND_Dashboard_UI.performStatsRoll()" style="flex:1; padding:5px; background:var(--dnd-border-gold); color:#000; border:none; border-radius:3px; cursor:pointer; font-weight:bold;">${ICONS.DICE} 投掷 (x6)</button>
                         <button id="dnd-btn-use-roll" onclick="window.DND_Dashboard_UI.confirmStatsRoll()" style="flex:1; padding:5px; background:#333; border:1px solid #555; color:#fff; border-radius:3px; cursor:pointer;" disabled>使用结果</button>
                     </div>
                 </div>
@@ -33694,7 +33807,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             
             state.conversationHistory.push({
                 role: 'assistant',
-                content: `❌ 抱歉，生成失败：${error.message}\n\n请检查 API 连接或重试。`
+                content: `抱歉，生成失败：${error.message}\n\n请检查 API 连接或重试。`
             });
         } finally {
             state.isGenerating = false;
@@ -34090,6 +34203,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 });
 
 ;// ./src/ui/modules/UIPanels.js
+
 
 
 
@@ -34734,7 +34848,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         $modal.html(`
             <div class="dnd-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-gold);padding-bottom:12px;">
                 <h3 style="margin:0;color:var(--dnd-text-highlight);font-size:18px;">${title}</h3>
-                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;">✕</span>
+                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
             </div>
             <div class="dnd-modal-body" style="max-height:60vh;overflow-y:auto;padding-right:5px;text-align: left;">${content}</div>
         `);
@@ -34815,7 +34929,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             const charName = char['姓名'] || charId;
             const charClass = char['职业'] || '未知职业';
-            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
                 <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
@@ -34957,7 +35071,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             const charName = char['姓名'] || charId;
             const charClass = char['职业'] || '未知职业';
-            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
                 <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
@@ -34989,8 +35103,8 @@ ${JSON.stringify(state.characterData, null, 2)}
                     <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
                         <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
-                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">🔄 替换队伍</span>
-                            <span style="color:#e74c3c;font-size:12px;">⚠️ 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">${ICONS.SYNC} 替换队伍</span>
+                            <span style="color:#e74c3c;font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
                         </span>
                     </label>
                 </div>
@@ -35054,7 +35168,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 // 如果是替换模式，显示二次确认
                 if (mode === 'replace') {
-                    const confirmReplace = confirm('⚠️ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
+                    const confirmReplace = confirm('⚠ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
                     if (!confirmReplace) return;
                 }
                 
@@ -35180,6 +35294,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 
 
+
 /* harmony default export */ const UISettings = ({
     async renderSettingsPanel($c) {
         const { $ } = getCore();
@@ -35218,18 +35333,18 @@ ${JSON.stringify(state.characterData, null, 2)}
         const html = `
             <div style="padding:20px; max-width: 600px;">
                 <h2 style="color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:10px;margin-top:0;">
-                    ⚙️ 仪表盘设置
+                    ${ICONS.COG} 仪表盘设置
                 </h2>
 
                 <!-- 同步状态 -->
                 <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
                     <div>
-                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">☁️ 云同步状态</div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">${ICONS.CLOUD} 云同步状态</div>
                         <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
-                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">🔄</button>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
                     </div>
                 </div>
 
@@ -35266,7 +35381,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                 <!-- 配色模板设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎨 配色模板</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.PALETTE} 配色模板</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择预设主题或自定义配色，让界面风格更符合你的喜好。
                     </p>
@@ -35274,7 +35389,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">预设主题</label>
                         <select id="dnd-theme-preset" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                            ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || '🎨'} ${t.name}</option>`).join('')}
+                            ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || ICONS.PALETTE} ${t.name}</option>`).join('')}
                         </select>
                     </div>
                     
@@ -35308,7 +35423,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                                 border-radius:4px;
                                 cursor:pointer;
                                 font-size:12px;
-                            ">🔄 重置为默认</button>
+                            ">${ICONS.SYNC} 重置为默认</button>
                             <button type="button" id="dnd-color-export" style="
                                 background:rgba(52, 152, 219, 0.2);
                                 border:1px solid #3498db;
@@ -35348,7 +35463,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                 <!-- 风格管理 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎭 风格管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.MASK} 风格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择完整的视觉风格主题，包含颜色、尺寸、圆角、动画等全套配置。
                         风格是比配色更完整的视觉方案，能让界面看起来焕然一新。
@@ -35357,7 +35472,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">当前风格</label>
                         <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                            <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || '🎨'}</span>
+                            <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || ICONS.PALETTE}</span>
                             <div style="flex:1;">
                                 <div style="font-weight:bold;color:var(--dnd-text-header);">${StyleManager.getCurrentStyle().name || '经典DND'}</div>
                                 <div style="font-size:11px;color:#888;">${StyleManager.getCurrentStyle().description || ''}</div>
@@ -35371,7 +35486,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             ${StyleManager.getAvailableStyles().map(style => `
                                 <div class="dnd-style-card ${style.id === StyleManager.currentStyleId ? 'active' : ''}"
                                      data-style-id="${style.id}">
-                                    <div style="font-size:28px;margin-bottom:6px;">${style.icon || '🎨'}</div>
+                                    <div style="font-size:28px;margin-bottom:6px;">${style.icon || ICONS.PALETTE}</div>
                                     <div style="font-size:12px;font-weight:bold;color:${style.id === StyleManager.currentStyleId ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};">${style.name}</div>
                                     ${style.isCustom ? '<div style="font-size:9px;color:#888;margin-top:2px;">自定义</div>' : ''}
                                     ${style.id === StyleManager.currentStyleId ? '<div style="font-size:9px;color:var(--dnd-text-highlight);margin-top:2px;">✓ 当前</div>' : ''}
@@ -35389,7 +35504,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">📥 导入风格包</button>
+                        ">${ICONS.DOWNLOAD} 导入风格包</button>
                         <button type="button" id="dnd-style-export" style="
                             background:rgba(52, 152, 219, 0.2);
                             border:1px solid #3498db;
@@ -35398,7 +35513,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">📤 导出当前风格</button>
+                        ">${ICONS.UPLOAD} 导出当前风格</button>
                         <button type="button" id="dnd-style-reset" style="
                             background:rgba(231, 76, 60, 0.2);
                             border:1px solid #e74c3c;
@@ -35407,13 +35522,13 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">🔄 恢复默认</button>
+                        ">${ICONS.SYNC} 恢复默认</button>
                     </div>
                     <input type="file" id="dnd-style-import-input" accept=".json" style="display:none;">
                     
                     <div style="padding:10px;background:rgba(52, 152, 219, 0.1);border:1px solid rgba(52, 152, 219, 0.3);border-radius:4px;">
                         <div style="font-size:11px;color:#888;">
-                            💡 <strong>提示:</strong> 风格包是完整的视觉主题配置。如果您只想微调颜色，可以使用上方的"配色模板"功能。
+                            ${ICONS.LIGHTBULB} <strong>提示:</strong> 风格包是完整的视觉主题配置。如果您只想微调颜色，可以使用上方的"配色模板"功能。
                             风格和配色可以叠加使用 —— 先选择喜欢的风格，再通过配色进行个性化调整。
                         </div>
                     </div>
@@ -35421,7 +35536,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                 <!-- 动态背景设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">✨ 动态背景</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.SPARKLES} 动态背景</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         为界面添加动态背景效果，类似游戏UI设计，让背景不再单调。
                     </p>
@@ -35437,7 +35552,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">背景效果</label>
                             <select id="dnd-bg-type" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                                ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || '✨'} ${e.name}</option>`).join('')}
+                                ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || ICONS.SPARKLES} ${e.name}</option>`).join('')}
                             </select>
                         </div>
                         
@@ -35457,7 +35572,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                 <!-- API 配置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🔌 API 连接配置</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-plug"></i> API 连接配置</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         配置 OpenAI 兼容 API，用于角色生成和地图绘制。
                     </p>
@@ -35489,7 +35604,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 <!-- 表格管理设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">📋 表格管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-clipboard-list"></i> 表格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         自定义表格管理模块的布局和显示内容。
                     </p>
@@ -35537,7 +35652,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <div class="dnd-cfg-group" style="opacity:${config.ENABLED ? 1 : 0.5};pointer-events:${config.ENABLED ? 'auto' : 'none'};transition:all 0.3s;">
                         <div style="margin-bottom:15px;">
-                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">⚔️ 战斗状态预设</label>
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.SWORD} 战斗状态预设</label>
                             <div style="display:flex;gap:10px;">
                                 <select id="dnd-cfg-combat-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.COMBAT_PRESET)}
@@ -35547,7 +35662,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                         </div>
                         
                         <div style="margin-bottom:20px;">
-                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">🧭 探索状态预设</label>
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.COMPASS} 探索状态预设</label>
                             <div style="display:flex;gap:10px;">
                                 <select id="dnd-cfg-explore-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.EXPLORE_PRESET)}
@@ -35566,7 +35681,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🔄 刷新预设列表</button>
+                        ">${ICONS.SYNC} 刷新预设列表</button>
                         <button type="button" id="dnd-cfg-save" style="
                             background:linear-gradient(135deg, var(--dnd-accent-green), #27ae60);
                             border:none;
@@ -35577,13 +35692,13 @@ ${JSON.stringify(state.characterData, null, 2)}
                             font-weight:bold;
                             font-size:14px;
                             display:flex;align-items:center;gap:5px;
-                        ">💾 保存设置</button>
+                        "><i class="fa-solid fa-save"></i> 保存设置</button>
                     </div>
                 </div>
 
                 <!-- 存储诊断工具 -->
                 <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-database"></i> 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
                     </p>
@@ -35598,7 +35713,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🔍 检查存储使用量</button>
+                        ">${ICONS.SEARCH} 检查存储使用量</button>
                         
                         <button type="button" id="dnd-clear-avatars" class="dnd-clickable" style="
                             background:rgba(231, 76, 60, 0.2);
@@ -35608,7 +35723,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🗑️ 清理头像缓存</button>
+                        "><i class="fa-solid fa-trash"></i> 清理头像缓存</button>
                         
                         <button type="button" id="dnd-clear-maps" class="dnd-clickable" style="
                             background:rgba(231, 76, 60, 0.2);
@@ -35618,12 +35733,12 @@ ${JSON.stringify(state.characterData, null, 2)}
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🗺️ 清理地图缓存</button>
+                        ">${ICONS.MAP} 清理地图缓存</button>
                     </div>
                 </div>
                 
                 <div style="margin-top:20px;padding:15px;background:rgba(197, 160, 89, 0.1);border-left:3px solid var(--dnd-border-gold);border-radius:4px;">
-                    <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:5px;">💡 提示</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:5px;">${ICONS.LIGHTBULB} 提示</div>
                     <div style="font-size:12px;color:#ccc;line-height:1.5;">
                         预设名称必须与酒馆 World Info 界面中的 Plot 预设名称完全一致。<br>
                         如未找到预设，将会在控制台输出警告且不执行切换。
@@ -35692,7 +35807,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         $c.find('#dnd-sync-force').on('click', async function() {
             const $btn = $(this);
             $btn.prop('disabled', true).css('opacity', 0.5);
-            $c.find('#dnd-sync-badge').text('🔄 同步中...');
+            $c.find('#dnd-sync-badge').html('<i class="fa-solid fa-sync fa-spin"></i> 同步中...');
             
             await SettingsManager.forceSync();
             
@@ -35773,7 +35888,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             updateSelect($c.find('#dnd-cfg-explore-sel'), $c.find('#dnd-cfg-explore-input').val());
             
             setTimeout(() => {
-                $btn.text('🔄 刷新预设列表').prop('disabled', false);
+                $btn.html('<i class="fa-solid fa-sync"></i> 刷新预设列表').prop('disabled', false);
             }, 500);
         });
         
@@ -35980,7 +36095,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 // 更新当前风格显示
                 const currentStyle = StyleManager.getCurrentStyle();
-                $c.find('.dnd-style-card.active').closest('div').prev().find('span:first').text(currentStyle.icon || '🎨');
+                $c.find('.dnd-style-card.active').closest('div').prev().find('span:first').html(currentStyle.icon || ICONS.PALETTE);
                 
                 NotificationSystem.success(`已切换至 "${currentStyle.name}" 风格`);
                 
@@ -36187,7 +36302,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             // 视觉反馈
             const $btn = $(this);
             const originalText = $btn.html();
-            $btn.html('✅ 已保存').prop('disabled', true);
+            $btn.html('<i class="fa-solid fa-check"></i> 已保存').prop('disabled', true);
             setTimeout(() => {
                 $btn.html(originalText).prop('disabled', false);
             }, 1500);
@@ -36208,6 +36323,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 });
 
 ;// ./src/ui/modules/UIItems.js
+
 
 
 
@@ -36348,7 +36464,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         }
 
         // 添加关闭按钮到内容顶部
-        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()">✕</div>`;
+        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
         $popup.html(closeBtn + '<div style="padding-right:20px;">' + contentHtml + '</div>');
         
         // 使用 coreWin 获取正确的窗口尺寸（兼容 iframe）
@@ -36563,7 +36679,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const items = DataManager.getTable('ITEM_Inventory');
         
         if (!items || items.length === 0) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">🎒 背包空空如也</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -36577,7 +36693,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const categories = [...new Set(backpackItems.map(i => i['类别'] || '杂物'))].sort();
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>🎒 背包物品</span>
+            <span>${ICONS.BACKPACK} 背包物品</span>
             <span style="font-size:11px;color:#888;">${backpackItems.length} 件</span>
         </div>`;
 
@@ -36608,7 +36724,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:flex;flex-direction:column;">
                             <span>${item['物品名称']}</span>
-                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · 👤${item['所属人']}` : ''}</span>
+                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
                         </div>
                         <span style="color:#888;flex-shrink:0;">x${item['数量']}</span>
                     </div>
@@ -36646,7 +36762,7 @@ ${JSON.stringify(state.characterData, null, 2)}
     showEquipmentPanel(event) {
         const items = DataManager.getTable('ITEM_Inventory');
         if (!items) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">⚔️ 无装备数据</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -36657,7 +36773,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         });
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>⚔️ 已装备</span>
+            <span>${ICONS.SWORD} 已装备</span>
             <span style="font-size:11px;color:#888;">${equippedItems.length} 件</span>
         </div>`;
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">`;
@@ -36805,7 +36921,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         const html = `
             <div style="border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:var(--dnd-text-highlight);font-size:16px;display:flex;justify-content:space-between;align-items:center;">
-                <span>📜 ${quest['任务名称']}</span>
+                <span>${ICONS.SCROLL} ${quest['任务名称']}</span>
                 <span style="font-size:11px;background:${statusColor};color:#fff;padding:2px 6px;border-radius:4px;">${quest['状态'] || '进行中'}</span>
             </div>
             
@@ -36827,7 +36943,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     <div><strong>难度:</strong> ${quest['难度']||'-'}</div>
                 </div>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #444;color:var(--dnd-text-highlight);">
-                    <strong>🏆 奖励:</strong> ${quest['奖励']||'-'}
+                    <strong>${ICONS.TROPHY} 奖励:</strong> ${quest['奖励']||'-'}
                 </div>
             </div>
         `;
@@ -36837,6 +36953,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 });
 
 ;// ./src/ui/modules/UICombat.js
+
 
 
 
@@ -37102,7 +37219,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const { $ } = getCore();
         const $popup = $('#dnd-detail-popup-el');
         if ($popup.length) {
-            let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">✨ 选择施法环阶 (${spellName})</div>`;
+            let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">${ICONS.SPARKLES} 选择施法环阶 (${spellName})</div>`;
             html += `<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;">`;
             
             for (let i = baseLevel; i <= limit; i++) {
@@ -37164,7 +37281,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         if (type !== 'move' && costType) {
             const key = costType.toLowerCase();
             if (this._turnResources[key] <= 0) {
-                NotificationSystem.warning(`❌ 无法执行：${costType} 资源已耗尽！`);
+                NotificationSystem.warning(`<i class="fa-solid fa-times-circle"></i> 无法执行：${costType} 资源已耗尽！`);
                 return;
             }
         }
@@ -37185,7 +37302,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         // 显示提示
         const { window: coreWin } = getCore();
         const msg = type === 'move' ? '请选择移动目标点' : `请选择 ${skillName} 的目标`;
-        this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-accent-green);font-weight:bold;">🎯 ${msg}</div>`, coreWin.innerWidth/2, 100);
+        this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-accent-green);font-weight:bold;">${ICONS.TARGET} ${msg}</div>`, coreWin.innerWidth/2, 100);
     },
 
     // [新增] 结束瞄准模式
@@ -37921,6 +38038,7 @@ ${structureJSON}
 
 
 
+
 /* harmony default export */ const UIMap = ({
     // [新增] 地图缩放状态
     _mapZoom: {
@@ -38260,7 +38378,7 @@ ${structureJSON}
                     if ($el.find('.dnd-map-controls').length === 0) {
                         const overlayHtml = `
                             <div class="dnd-map-controls" style="position:absolute;top:5px;right:5px;display:flex;gap:5px;opacity:0;transition:opacity 0.2s;z-index:10;">
-                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;">🎨 重绘</button>
+                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
                             </div>
                         `;
                         $el.append(overlayHtml);
@@ -38275,7 +38393,7 @@ ${structureJSON}
                     // 尚未生成
                         $innerMap.html(`
                         <div style="text-align:center;color:#888;">
-                            <div style="font-size:24px;margin-bottom:5px;">🗺️</div>
+                            <div style="font-size:24px;margin-bottom:5px;">${ICONS.MAP}</div>
                             <div style="font-size:10px;margin-bottom:10px;">${mapResult.message}</div>
                         </div>
                     `);
@@ -38435,7 +38553,7 @@ ${structureJSON}
                     
                     <!-- Battle Map Controls -->
                     <div class="dnd-map-controls" style="position:absolute;top:2px;right:2px;display:flex;gap:2px;pointer-events:auto;opacity:0.8;">
-                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;">🎨 AI底图</button>
+                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
                     </div>
                 </div>
             `);
@@ -38743,7 +38861,7 @@ ${structureJSON}
         // 显示简易菜单: "移动到这里"
         const menuHtml = `
             <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
-                📍 位置: ${String.fromCharCode(64 + gridX)}${gridY}
+                <i class="fa-solid fa-location-dot"></i> 位置: ${String.fromCharCode(64 + gridX)}${gridY}
             </div>
             <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:rgba(46, 204, 113, 0.2);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;"
                 onclick="window.DND_Dashboard_UI.executeAction('move', { x: ${gridX}, y: ${gridY} }); window.DND_Dashboard_UI.hideDetailPopup();">
@@ -39009,6 +39127,7 @@ ${structureJSON}
 
 
 
+
 /* harmony default export */ const UIDice = ({
     // [改进] 显示快速投掷面板 + 骰子池可视化
     showQuickDice(event) {
@@ -39021,7 +39140,7 @@ ${structureJSON}
         
         let html = `
             <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-                <span>🎲 快速投掷</span>
+                <span>${ICONS.DICE} 快速投掷</span>
                 <span style="font-size:11px;color:${statusColor};background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">
                     池: ${poolCount} (${statusText})
                 </span>
@@ -39031,7 +39150,7 @@ ${structureJSON}
             <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;margin-bottom:12px;">
                 <div style="font-size:11px;color:#888;margin-bottom:6px;display:flex;justify-content:space-between;">
                     <span>预投骰子池</span>
-                    <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">🔄 补充</span>
+                    <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">${ICONS.SYNC} 补充</span>
                 </div>
                 <div style="display:flex;gap:3px;flex-wrap:wrap;max-height:60px;overflow-y:auto;">
                     ${poolData && poolData.length > 0 ? poolData.slice(0, 20).map((row, idx) => {
@@ -39073,7 +39192,7 @@ ${structureJSON}
                 " onmouseover="this.style.background='rgba(155, 89, 182, 0.3)'" 
                 onmouseout="this.style.background='linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1))'"
                 onclick="window.DND_Dashboard_UI.rollDice(100, event)">
-                    🎯 D100 (百分骰)
+                    ${ICONS.TARGET} D100 (百分骰)
                 </button>
             </div>
             
@@ -39137,7 +39256,7 @@ ${structureJSON}
         // 显示加载状态
         const $poolArea = $('#dnd-detail-popup-el').find('.dnd-dice-pool-visual');
         if ($poolArea.length) {
-            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;">🔄 补充中...</div>');
+            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
         }
         
         // 强制补充
@@ -39175,18 +39294,18 @@ ${structureJSON}
         if (isNat20) {
             specialClass = 'dnd-nat20-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">✨ ${result} ✨</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-text-highlight);margin-top:8px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">大成功！NATURAL 20!</div>
             </div>`;
         } else if (isNat1) {
             specialClass = 'dnd-nat1-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">💀 ${result} 💀</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:#e74c3c;margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
             </div>`;
         } else {
             resultHtml = `<div style="text-align:center;padding:15px;">
-                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">🎲 ${result}</div>
+                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">${ICONS.DICE} ${result}</div>
                 <div style="font-size:12px;color:#888;margin-top:5px;">D${sides} 投掷结果</div>
             </div>`;
         }
@@ -39254,7 +39373,7 @@ ${structureJSON}
             const modStr = modifier > 0 ? ` + ${modifier}` : (modifier < 0 ? ` - ${Math.abs(modifier)}` : '');
             
             const resultHtml = `<div style="text-align:center;padding:15px;">
-                <div style="font-size:32px;color:var(--dnd-text-highlight);">🎲 ${total}</div>
+                <div style="font-size:32px;color:var(--dnd-text-highlight);">${ICONS.DICE} ${total}</div>
                 <div style="font-size:11px;color:#888;margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
             </div>`;
             
@@ -39319,7 +39438,7 @@ ${structureJSON}
                 html += `
                     <div class="dnd-quick-slot dnd-hover-lift" title="${name}" onclick="window.DND_Dashboard_UI.executeQuickSlot(${index})">
                         ${shortName}
-                        <div class="dnd-quick-slot-remove" onclick="event.stopPropagation(); window.DND_Dashboard_UI.removeQuickSlot(${index})">✕</div>
+                        <div class="dnd-quick-slot-remove" onclick="event.stopPropagation(); window.DND_Dashboard_UI.removeQuickSlot(${index})"><i class="fa-solid fa-times"></i></div>
                     </div>
                 `;
             });
@@ -39384,9 +39503,9 @@ ${structureJSON}
             </div>
             
             <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.1);">
-                <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">🎒 物品</div>
-                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">✨ 技能</div>
-                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">📜 法书</div>
+                <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">${ICONS.BACKPACK} 物品</div>
+                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SPARKLES} 技能</div>
+                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SCROLL} 法书</div>
             </div>
             
             <div id="dnd-quick-tab-items" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
@@ -39395,7 +39514,7 @@ ${structureJSON}
                     const id = i['物品ID'] || name;
                     // 使用 data 属性传递数据，避免 HTML 生成错误
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;"
-                            data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="🎒" data-level=""
+                            data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="backpack" data-level=""
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">${name}</div>`;
                 }).join('') || '<div style="text-align:center;color:#666">无物品</div>'}
             </div>
@@ -39407,7 +39526,7 @@ ${structureJSON}
                     const levelLabel = (level && level !== '0' && level !== '戏法') ? `(${level}环)` : '';
                     
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
-                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="✨" data-level="${esc(level)}"
+                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="sparkles" data-level="${esc(level)}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
                             <span>${name}</span> <span style="font-size:11px;color:#888;">${levelLabel}</span>
                             </div>`;
@@ -39419,7 +39538,7 @@ ${structureJSON}
                     const name = s['法术名称'];
                     const level = s['环阶'] === '0' || s['环阶'] === 0 ? '戏法' : (s['环阶']+'环');
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
-                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="📜" data-level="${esc(s['环阶'])}"
+                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="scroll" data-level="${esc(s['环阶'])}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
                             <span>${name}</span><span style="color:#888;font-size:11px;">${level}</span>
                             </div>`;
@@ -39459,7 +39578,7 @@ ${structureJSON}
     async addQuickSlot(type, name, id, icon, level) {
         name = name || '未命名';
         id = String(id || '');
-        icon = icon || '❓';
+        icon = icon || 'question';
         level = String(level || '');
 
         const data = { name, id, icon, level };
@@ -39553,7 +39672,7 @@ ${structureJSON}
                     const winH = coreWin.innerHeight || $(coreWin).height();
                     
                     const isSpell = slot.type === 'spell';
-                    const title = isSpell ? `✨ 选择施法环阶 (${slot.data.name})` : `✨ 选择技能等级 (${slot.data.name})`;
+                    const title = isSpell ? `${ICONS.SPARKLES} 选择施法环阶 (${slot.data.name})` : `${ICONS.SPARKLES} 选择技能等级 (${slot.data.name})`;
                     
                     let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">${title}</div>`;
                     html += `<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;">`;

@@ -5,23 +5,23 @@
 import { library, dom } from '@fortawesome/fontawesome-svg-core';
 
 // 从 solid 集中按需引入需要的图标
-import { 
-    faDiceD20, 
-    faSkull, 
-    faScroll, 
-    faSuitcase, 
-    faBook, 
+import {
+    faDiceD20,
+    faSkull,
+    faScroll,
+    faSuitcase,
+    faBook,
     faBookSkull,
-    faUsers, 
-    faMap, 
-    faCog, 
-    faTimes, 
-    faChevronDown, 
-    faChevronUp, 
-    faPlusCircle, 
-    faGlobe, 
-    faDatabase, 
-    faAddressBook, 
+    faUsers,
+    faMap,
+    faCog,
+    faTimes,
+    faChevronDown,
+    faChevronUp,
+    faPlusCircle,
+    faGlobe,
+    faDatabase,
+    faAddressBook,
     faHistory,
     faCloudMoon,
     faClock,
@@ -81,7 +81,23 @@ import {
     faArrowUp,
     faHeart,
     faLandmark,
-    faSync
+    faSync,
+    // [新增] emoji → SVG 替换所需图标
+    faPalette,
+    faBullseye,
+    faFire,
+    faMasksTheater,
+    faTriangleExclamation,
+    faSun,
+    faCloudSun,
+    faCloudRain,
+    faCloudBolt,
+    faSnowflake,
+    faSmog,
+    faWind,
+    faLocationDot,
+    faWandMagicSparkles,
+    faBan
 } from '@fortawesome/free-solid-svg-icons';
 
 // 将图标添加到库中
@@ -161,7 +177,23 @@ library.add(
     faArrowUp,
     faHeart,
     faLandmark,
-    faSync
+    faSync,
+    // [新增] emoji → SVG 替换所需图标
+    faPalette,
+    faBullseye,
+    faFire,
+    faMasksTheater,
+    faTriangleExclamation,
+    faSun,
+    faCloudSun,
+    faCloudRain,
+    faCloudBolt,
+    faSnowflake,
+    faSmog,
+    faWind,
+    faLocationDot,
+    faWandMagicSparkles,
+    faBan
 );
 
 // 开启监视：自动将页面中的 <i class="fa-solid fa-xxx"> 转换为 SVG

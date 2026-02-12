@@ -3,6 +3,7 @@ import { Logger } from '../../core/Logger.js';
 import { DataManager } from '../../data/DataManager.js';
 import { ItemManager } from '../../data/ItemManager.js';
 import { NotificationSystem } from './UIUtils.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     renderItemCard(item, isEquippedHighlight, delay = 0) {
@@ -138,7 +139,7 @@ export default {
         }
 
         // 添加关闭按钮到内容顶部
-        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()">✕</div>`;
+        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
         $popup.html(closeBtn + '<div style="padding-right:20px;">' + contentHtml + '</div>');
         
         // 使用 coreWin 获取正确的窗口尺寸（兼容 iframe）
@@ -353,7 +354,7 @@ export default {
         const items = DataManager.getTable('ITEM_Inventory');
         
         if (!items || items.length === 0) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">🎒 背包空空如也</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -367,7 +368,7 @@ export default {
         const categories = [...new Set(backpackItems.map(i => i['类别'] || '杂物'))].sort();
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>🎒 背包物品</span>
+            <span>${ICONS.BACKPACK} 背包物品</span>
             <span style="font-size:11px;color:#888;">${backpackItems.length} 件</span>
         </div>`;
 
@@ -398,7 +399,7 @@ export default {
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:flex;flex-direction:column;">
                             <span>${item['物品名称']}</span>
-                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · 👤${item['所属人']}` : ''}</span>
+                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
                         </div>
                         <span style="color:#888;flex-shrink:0;">x${item['数量']}</span>
                     </div>
@@ -436,7 +437,7 @@ export default {
     showEquipmentPanel(event) {
         const items = DataManager.getTable('ITEM_Inventory');
         if (!items) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">⚔️ 无装备数据</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -447,7 +448,7 @@ export default {
         });
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>⚔️ 已装备</span>
+            <span>${ICONS.SWORD} 已装备</span>
             <span style="font-size:11px;color:#888;">${equippedItems.length} 件</span>
         </div>`;
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">`;
@@ -595,7 +596,7 @@ export default {
         
         const html = `
             <div style="border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:var(--dnd-text-highlight);font-size:16px;display:flex;justify-content:space-between;align-items:center;">
-                <span>📜 ${quest['任务名称']}</span>
+                <span>${ICONS.SCROLL} ${quest['任务名称']}</span>
                 <span style="font-size:11px;background:${statusColor};color:#fff;padding:2px 6px;border-radius:4px;">${quest['状态'] || '进行中'}</span>
             </div>
             
@@ -617,7 +618,7 @@ export default {
                     <div><strong>难度:</strong> ${quest['难度']||'-'}</div>
                 </div>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #444;color:var(--dnd-text-highlight);">
-                    <strong>🏆 奖励:</strong> ${quest['奖励']||'-'}
+                    <strong>${ICONS.TROPHY} 奖励:</strong> ${quest['奖励']||'-'}
                 </div>
             </div>
         `;

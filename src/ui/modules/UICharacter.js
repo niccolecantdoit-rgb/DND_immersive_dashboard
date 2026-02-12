@@ -8,6 +8,7 @@ import { CONFIG } from '../../config/Config.js';
 import { DiceManager } from '../../data/DiceManager.js';
 import { NotificationSystem } from './UIUtils.js';
 import { TavernSettingsSync } from '../../core/TavernSettingsSync.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     // 头像存储管理 (使用 IndexedDB + Chat Metadata)
@@ -140,7 +141,7 @@ export default {
                 ">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-inner);padding-bottom:10px;">
                         <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${charName}</span>
-                        <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭">✕</span>
+                        <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭"><i class="fa-solid fa-times"></i></span>
                     </div>
                     
                     <div style="display:flex;flex-direction:column;align-items:center;gap:15px;">
@@ -404,7 +405,7 @@ export default {
                         <div class="dnd-detail-sub">${char['种族/性别/年龄'] || '未知'} | ${char['职业'] || '无职业'}</div>
                     </div>
                 </div>
-                <div class="dnd-detail-close" id="dnd-card-close">✕</div>
+                <div class="dnd-detail-close" id="dnd-card-close"><i class="fa-solid fa-times"></i></div>
             </div>
             
             <div class="dnd-detail-body">
@@ -587,7 +588,7 @@ export default {
                 <span>${skill['技能名称']} <span style="font-size:10px;color:#888;font-weight:normal">(${skill['环阶']||'-'} · ${skill['学派']||'-'})</span></span>
                 <button class="dnd-clickable" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
                     onclick="window.DND_Dashboard_UI.handleCastClick('${safeName}', '${safeRange}', '${skill['环阶']||''}', 'skill')">
-                    ✨ 施放
+                    ${ICONS.SPARKLES} 施放
                 </button>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:#aaa;margin-bottom:8px;">
@@ -872,7 +873,7 @@ export default {
         }
         
         const isLevelUp = state.mode === 'levelup';
-        const title = isLevelUp ? '🆙 角色升级向导' : '⚔️ AI 角色创建向导';
+        const title = isLevelUp ? `${ICONS.LEVEL_UP} 角色升级向导` : `${ICONS.SWORD} AI 角色创建向导`;
         
         const html = `
             <div class="dnd-char-creator-panel" style="max-width:800px;margin:0 auto;">
@@ -1066,7 +1067,7 @@ export default {
     showStatsGenerator(e) {
         const html = `
             <div style="padding-bottom:10px; border-bottom:1px solid #444; margin-bottom:10px; font-weight:bold; color:var(--dnd-text-highlight);">
-                🎲 属性分配生成器
+                ${ICONS.DICE} 属性分配生成器
             </div>
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <!-- 标准数列 -->
@@ -1090,7 +1091,7 @@ export default {
                     <div style="font-size:13px; font-weight:bold; margin-bottom:5px;">3. 骰子决定 (4d6 drop lowest)</div>
                     <div id="dnd-stats-roll-result" style="font-family:monospace; color:var(--dnd-text-highlight); margin-bottom:5px; min-height:20px; font-size:14px; text-align:center;">???</div>
                     <div style="display:flex; gap:5px;">
-                        <button onclick="window.DND_Dashboard_UI.performStatsRoll()" style="flex:1; padding:5px; background:var(--dnd-border-gold); color:#000; border:none; border-radius:3px; cursor:pointer; font-weight:bold;">🎲 投掷 (x6)</button>
+                        <button onclick="window.DND_Dashboard_UI.performStatsRoll()" style="flex:1; padding:5px; background:var(--dnd-border-gold); color:#000; border:none; border-radius:3px; cursor:pointer; font-weight:bold;">${ICONS.DICE} 投掷 (x6)</button>
                         <button id="dnd-btn-use-roll" onclick="window.DND_Dashboard_UI.confirmStatsRoll()" style="flex:1; padding:5px; background:#333; border:1px solid #555; color:#fff; border-radius:3px; cursor:pointer;" disabled>使用结果</button>
                     </div>
                 </div>
@@ -1670,7 +1671,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             
             state.conversationHistory.push({
                 role: 'assistant',
-                content: `❌ 抱歉，生成失败：${error.message}\n\n请检查 API 连接或重试。`
+                content: `抱歉，生成失败：${error.message}\n\n请检查 API 连接或重试。`
             });
         } finally {
             state.isGenerating = false;

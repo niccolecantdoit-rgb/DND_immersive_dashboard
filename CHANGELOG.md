@@ -1,6 +1,19 @@
 # 更新日志
 
 
+## [1.9.2] - 2026-02-10
+
+### 🐛 问题修复
+- **悬浮球无法拖动**：修复 [`UICore.js`](src/ui/modules/UICore.js:543) 中拖拽处理函数 `handlePointerMove` 引用了未定义变量 `scale`（应为 `uiScale`）导致拖拽时抛出 `ReferenceError`，使悬浮球完全无法拖动的问题。
+
+### 🎨 界面与动画
+- **Emoji 全面替换为 SVG 图标**：
+    - 新建 [`SVGIcons.js`](src/ui/SVGIcons.js) 集中管理图标常量映射，提供 `ICONS` 对象和 `getWeatherIcon()` 函数。
+    - 在 [`icons.js`](src/ui/icons.js) 中新增 15 个 FontAwesome 图标导入（faPalette、faBullseye、faFire、faMasksTheater、faTriangleExclamation、faSun、faCloudSun、faCloudRain、faCloudBolt、faSnowflake、faSmog、faWind、faLocationDot、faWandMagicSparkles、faBan）。
+    - 替换 18+ 个文件中的 UI emoji 为 FontAwesome `<i>` 标签 SVG 图标，涵盖设置面板、骰子、物品、面板、HUD、角色、战斗、地图、动态背景、预设切换、样式管理、配置等模块。
+    - 保留 Logger 调试 emoji（仅开发者控制台可见）、数据匹配字符串（如 `🎲 骰子池`）、Canvas 装饰符号数组，以避免功能性影响。
+    - CSS `content` 属性中的 emoji 变体选择符已移除，统一使用纯 Unicode 字符。
+
 ## [1.9.1] - 2026-02-09
 
 ### ✨ 新增功能

@@ -7,6 +7,7 @@ import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
 import { UITableManager } from './UITableManager.js';
 import UICore from './UICore.js';
+import { ICONS, getWeatherIcon } from '../SVGIcons.js';
 
 export default {
     renderHUD() {
@@ -33,8 +34,8 @@ export default {
 
         // 提取时间 (仅显示 HH:MM 或原始内容)
         const timeStr = gInfo['游戏时间'] && gInfo['游戏时间'].includes(' ') ? gInfo['游戏时间'].split(' ')[1] : gInfo['游戏时间'];
-        // 提取天气图标 (简单匹配)
-        const weatherIcon = weather ? (weather.match(/[🌤️☀️☁️🌧️⛈️🌩️🌨️❄️🌫️🌪️]/)?.[0] || '🌤️') : '';
+        // 提取天气图标 (使用 SVG 图标)
+        const weatherIcon = weather ? getWeatherIcon(weather) : '';
 
         // [修复] 恢复头部完整显示逻辑 - 优化布局和图标显示
         const statusIcon = isCombat ? '<i class="fa-solid fa-skull"></i>' : '<i class="fa-solid fa-compass"></i>';
@@ -250,8 +251,8 @@ export default {
         const html = `
             <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#161618;border:1px solid #9d8b6c;border-radius:8px;padding:15px;z-index:2147483650;box-shadow:0 10px 40px rgba(0,0,0,0.8);min-width:280px;">
                 <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid #444;padding-bottom:8px;">
-                    <span style="color:#ffdb85;font-weight:bold;">📍 悬浮球位置</span>
-                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;">✕</span>
+                    <span style="color:#ffdb85;font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
+                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;"><i class="fa-solid fa-times"></i></span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px;">${btnsHtml}</div>
                 <div style="font-size:11px;color:#666;text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
@@ -828,7 +829,7 @@ export default {
         const npcs = DataManager.getTable('NPC_Registry');
         
         if (!npcs || npcs.length === 0) {
-            this.showItemDetailPopup('<div style="text-align:center;color:#888;">👥 暂无NPC数据</div>', event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.USERS} 暂无NPC数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -836,7 +837,7 @@ export default {
         const statuses = [...new Set(npcs.map(n => n['当前状态'] || '未知'))].sort();
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-            <span>👥 NPC列表</span>
+            <span>${ICONS.USERS} NPC列表</span>
             <span style="font-size:11px;color:#888;">${npcs.length} 人</span>
         </div>`;
         

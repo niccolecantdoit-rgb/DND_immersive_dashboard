@@ -162,7 +162,7 @@ export const DiceManager = {
                         // 临时显示状态
                         const $status = $('#dnd-hud-status-text');
                         const originalHtml = $status.html();
-                        $status.html('<span style="color:var(--dnd-text-highlight);animation:dnd-pulse 1s infinite;">🎲 骰子池已自动补充</span>');
+                        $status.html('<span style="color:var(--dnd-text-highlight);animation:dnd-pulse 1s infinite;"><i class="fa-solid fa-dice-d20"></i> 骰子池已自动补充</span>');
                         setTimeout(() => {
                             // 只有当内容没变时才恢复，防止覆盖了新的状态更新
                             if ($status.text().includes('骰子池已自动补充')) {

@@ -5,6 +5,7 @@ import { DBAdapter } from '../../core/DBAdapter.js';
 import { DataManager } from '../../data/DataManager.js';
 import { DiceManager } from '../../data/DiceManager.js';
 import { NotificationSystem } from './UIUtils.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     // [改进] 显示快速投掷面板 + 骰子池可视化
@@ -18,7 +19,7 @@ export default {
         
         let html = `
             <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-                <span>🎲 快速投掷</span>
+                <span>${ICONS.DICE} 快速投掷</span>
                 <span style="font-size:11px;color:${statusColor};background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">
                     池: ${poolCount} (${statusText})
                 </span>
@@ -28,7 +29,7 @@ export default {
             <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;margin-bottom:12px;">
                 <div style="font-size:11px;color:#888;margin-bottom:6px;display:flex;justify-content:space-between;">
                     <span>预投骰子池</span>
-                    <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">🔄 补充</span>
+                    <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">${ICONS.SYNC} 补充</span>
                 </div>
                 <div style="display:flex;gap:3px;flex-wrap:wrap;max-height:60px;overflow-y:auto;">
                     ${poolData && poolData.length > 0 ? poolData.slice(0, 20).map((row, idx) => {
@@ -70,7 +71,7 @@ export default {
                 " onmouseover="this.style.background='rgba(155, 89, 182, 0.3)'" 
                 onmouseout="this.style.background='linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1))'"
                 onclick="window.DND_Dashboard_UI.rollDice(100, event)">
-                    🎯 D100 (百分骰)
+                    ${ICONS.TARGET} D100 (百分骰)
                 </button>
             </div>
             
@@ -134,7 +135,7 @@ export default {
         // 显示加载状态
         const $poolArea = $('#dnd-detail-popup-el').find('.dnd-dice-pool-visual');
         if ($poolArea.length) {
-            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;">🔄 补充中...</div>');
+            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
         }
         
         // 强制补充
@@ -172,18 +173,18 @@ export default {
         if (isNat20) {
             specialClass = 'dnd-nat20-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">✨ ${result} ✨</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-text-highlight);margin-top:8px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">大成功！NATURAL 20!</div>
             </div>`;
         } else if (isNat1) {
             specialClass = 'dnd-nat1-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">💀 ${result} 💀</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:#e74c3c;margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
             </div>`;
         } else {
             resultHtml = `<div style="text-align:center;padding:15px;">
-                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">🎲 ${result}</div>
+                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">${ICONS.DICE} ${result}</div>
                 <div style="font-size:12px;color:#888;margin-top:5px;">D${sides} 投掷结果</div>
             </div>`;
         }
@@ -251,7 +252,7 @@ export default {
             const modStr = modifier > 0 ? ` + ${modifier}` : (modifier < 0 ? ` - ${Math.abs(modifier)}` : '');
             
             const resultHtml = `<div style="text-align:center;padding:15px;">
-                <div style="font-size:32px;color:var(--dnd-text-highlight);">🎲 ${total}</div>
+                <div style="font-size:32px;color:var(--dnd-text-highlight);">${ICONS.DICE} ${total}</div>
                 <div style="font-size:11px;color:#888;margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
             </div>`;
             
@@ -316,7 +317,7 @@ export default {
                 html += `
                     <div class="dnd-quick-slot dnd-hover-lift" title="${name}" onclick="window.DND_Dashboard_UI.executeQuickSlot(${index})">
                         ${shortName}
-                        <div class="dnd-quick-slot-remove" onclick="event.stopPropagation(); window.DND_Dashboard_UI.removeQuickSlot(${index})">✕</div>
+                        <div class="dnd-quick-slot-remove" onclick="event.stopPropagation(); window.DND_Dashboard_UI.removeQuickSlot(${index})"><i class="fa-solid fa-times"></i></div>
                     </div>
                 `;
             });
@@ -381,9 +382,9 @@ export default {
             </div>
             
             <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.1);">
-                <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">🎒 物品</div>
-                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">✨ 技能</div>
-                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">📜 法书</div>
+                <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">${ICONS.BACKPACK} 物品</div>
+                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SPARKLES} 技能</div>
+                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SCROLL} 法书</div>
             </div>
             
             <div id="dnd-quick-tab-items" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
@@ -392,7 +393,7 @@ export default {
                     const id = i['物品ID'] || name;
                     // 使用 data 属性传递数据，避免 HTML 生成错误
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;"
-                            data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="🎒" data-level=""
+                            data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="backpack" data-level=""
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">${name}</div>`;
                 }).join('') || '<div style="text-align:center;color:#666">无物品</div>'}
             </div>
@@ -404,7 +405,7 @@ export default {
                     const levelLabel = (level && level !== '0' && level !== '戏法') ? `(${level}环)` : '';
                     
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
-                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="✨" data-level="${esc(level)}"
+                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="sparkles" data-level="${esc(level)}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
                             <span>${name}</span> <span style="font-size:11px;color:#888;">${levelLabel}</span>
                             </div>`;
@@ -416,7 +417,7 @@ export default {
                     const name = s['法术名称'];
                     const level = s['环阶'] === '0' || s['环阶'] === 0 ? '戏法' : (s['环阶']+'环');
                     return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
-                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="📜" data-level="${esc(s['环阶'])}"
+                            data-type="skill" data-name="${esc(name)}" data-id="" data-icon="scroll" data-level="${esc(s['环阶'])}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
                             <span>${name}</span><span style="color:#888;font-size:11px;">${level}</span>
                             </div>`;
@@ -456,7 +457,7 @@ export default {
     async addQuickSlot(type, name, id, icon, level) {
         name = name || '未命名';
         id = String(id || '');
-        icon = icon || '❓';
+        icon = icon || 'question';
         level = String(level || '');
 
         const data = { name, id, icon, level };
@@ -550,7 +551,7 @@ export default {
                     const winH = coreWin.innerHeight || $(coreWin).height();
                     
                     const isSpell = slot.type === 'spell';
-                    const title = isSpell ? `✨ 选择施法环阶 (${slot.data.name})` : `✨ 选择技能等级 (${slot.data.name})`;
+                    const title = isSpell ? `${ICONS.SPARKLES} 选择施法环阶 (${slot.data.name})` : `${ICONS.SPARKLES} 选择技能等级 (${slot.data.name})`;
                     
                     let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">${title}</div>`;
                     html += `<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;">`;

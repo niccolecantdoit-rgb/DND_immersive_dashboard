@@ -56,14 +56,14 @@ export const TavernSettingsSync = {
                 const pendingCount = Object.keys(queue).length;
                 if (pendingCount > 0) {
                     // Only notify if there is actual work to do
-                    this._notify('info', `正在同步 ${pendingCount} 项本地更改...`, '🔄 同步中');
+                    this._notify('info', `正在同步 ${pendingCount} 项本地更改...`, '<i class="fa-solid fa-sync fa-spin"></i> 同步中');
                     await this._processSyncQueue();
                 }
             } catch (e) {
                 Logger.error('[TavernSettingsSync] Initial sync failed:', e);
             }
         } else {
-            this._notify('warning', '数据仅保存在本地，连接酒馆后将自动同步', '📴 离线模式');
+            this._notify('warning', '数据仅保存在本地，连接酒馆后将自动同步', '<i class="fa-solid fa-ban"></i> 离线模式');
         }
         
         // Start background check
@@ -86,7 +86,7 @@ export const TavernSettingsSync = {
                 await this._processSyncQueue();
             } else if (!currentState && this._previousState) {
                 // Changed from online to offline
-                this._notify('warning', '数据将暂存本地，恢复连接后自动同步', '📴 酒馆连接已断开');
+                this._notify('warning', '数据将暂存本地，恢复连接后自动同步', '<i class="fa-solid fa-ban"></i> 酒馆连接已断开');
             }
             this._previousState = currentState;
         }
@@ -405,13 +405,13 @@ export const TavernSettingsSync = {
             const saved = await this._saveTavernSettings();
             if (saved) {
                 await DBAdapter.setSetting(this.SYNC_QUEUE_KEY, '{}');
-                this._notify('success', `${successCount} 项设置已同步到酒馆`, '✅ 同步完成');
+                this._notify('success', `${successCount} 项设置已同步到酒馆`, '<i class="fa-solid fa-check-circle"></i> 同步完成');
             } else {
                  Logger.warn('[TavernSettingsSync] Save triggered but returned false');
             }
         } catch(e) {
             Logger.error('[TavernSettingsSync] Sync processing failed:', e);
-            this._notify('error', '请检查网络连接', '❌ 同步失败');
+            this._notify('error', '请检查网络连接', '<i class="fa-solid fa-times-circle"></i> 同步失败');
         }
     },
     
@@ -437,9 +437,9 @@ export const TavernSettingsSync = {
         return {
             connected: this._tavernAvailable,
             pendingSync: pendingCount,
-            statusText: this._tavernAvailable 
-                ? (pendingCount > 0 ? `☁️ 在线 (${pendingCount} 待同步)` : '☁️ 在线同步')
-                : '📴 离线模式',
+            statusText: this._tavernAvailable
+                ? (pendingCount > 0 ? `<i class="fa-solid fa-cloud"></i> 在线 (${pendingCount} 待同步)` : '<i class="fa-solid fa-cloud"></i> 在线同步')
+                : '<i class="fa-solid fa-ban"></i> 离线模式',
             statusClass: this._tavernAvailable 
                 ? (pendingCount > 0 ? 'warning' : 'success')
                 : 'warning'

@@ -5,6 +5,7 @@ import { DataManager } from '../../data/DataManager.js';
 import { ItemManager } from '../../data/ItemManager.js';
 import { NotificationSystem } from './UIUtils.js';
 import UICharacter from './UICharacter.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     renderPanel(panelName) {
@@ -642,7 +643,7 @@ export default {
         $modal.html(`
             <div class="dnd-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-gold);padding-bottom:12px;">
                 <h3 style="margin:0;color:var(--dnd-text-highlight);font-size:18px;">${title}</h3>
-                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;">✕</span>
+                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
             </div>
             <div class="dnd-modal-body" style="max-height:60vh;overflow-y:auto;padding-right:5px;text-align: left;">${content}</div>
         `);
@@ -723,7 +724,7 @@ export default {
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             const charName = char['姓名'] || charId;
             const charClass = char['职业'] || '未知职业';
-            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
                 <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
@@ -865,7 +866,7 @@ export default {
             const charId = char['CHAR_ID'] || char['PC_ID'] || char['姓名'];
             const charName = char['姓名'] || charId;
             const charClass = char['职业'] || '未知职业';
-            const charType = char['成员类型'] === '主角' ? '🎭 主角' : '👤 同伴';
+            const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
                 <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
@@ -897,8 +898,8 @@ export default {
                     <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
                         <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
-                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">🔄 替换队伍</span>
-                            <span style="color:#e74c3c;font-size:12px;">⚠️ 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                            <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">${ICONS.SYNC} 替换队伍</span>
+                            <span style="color:#e74c3c;font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
                         </span>
                     </label>
                 </div>
@@ -962,7 +963,7 @@ export default {
                 
                 // 如果是替换模式，显示二次确认
                 if (mode === 'replace') {
-                    const confirmReplace = confirm('⚠️ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
+                    const confirmReplace = confirm('⚠ 确定要替换当前队伍吗？\n\n这将删除现有的所有队伍数据（包括角色、技能关联和专长关联），然后导入选中的角色。\n\n此操作不可撤销！');
                     if (!confirmReplace) return;
                 }
                 

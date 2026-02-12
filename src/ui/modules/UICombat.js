@@ -3,6 +3,7 @@ import { Logger } from '../../core/Logger.js';
 import { DataManager } from '../../data/DataManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { NotificationSystem } from './UIUtils.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     _resourceTracker: {
@@ -263,7 +264,7 @@ export default {
         const { $ } = getCore();
         const $popup = $('#dnd-detail-popup-el');
         if ($popup.length) {
-            let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">✨ 选择施法环阶 (${spellName})</div>`;
+            let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;text-align:center;">${ICONS.SPARKLES} 选择施法环阶 (${spellName})</div>`;
             html += `<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;">`;
             
             for (let i = baseLevel; i <= limit; i++) {
@@ -325,7 +326,7 @@ export default {
         if (type !== 'move' && costType) {
             const key = costType.toLowerCase();
             if (this._turnResources[key] <= 0) {
-                NotificationSystem.warning(`❌ 无法执行：${costType} 资源已耗尽！`);
+                NotificationSystem.warning(`<i class="fa-solid fa-times-circle"></i> 无法执行：${costType} 资源已耗尽！`);
                 return;
             }
         }
@@ -346,7 +347,7 @@ export default {
         // 显示提示
         const { window: coreWin } = getCore();
         const msg = type === 'move' ? '请选择移动目标点' : `请选择 ${skillName} 的目标`;
-        this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-accent-green);font-weight:bold;">🎯 ${msg}</div>`, coreWin.innerWidth/2, 100);
+        this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-accent-green);font-weight:bold;">${ICONS.TARGET} ${msg}</div>`, coreWin.innerWidth/2, 100);
     },
 
     // [新增] 结束瞄准模式

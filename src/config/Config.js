@@ -73,7 +73,7 @@ export const CONFIG = {
     THEMES: {
         dark: {
             name: '暗黑城堡',
-            icon: '🏰',
+            icon: '<i class="fa-solid fa-landmark"></i>',
             vars: {
                 '--dnd-bg-main': '#0f0b0a',
                 '--dnd-bg-panel-start': '#2b1b17',
@@ -125,7 +125,7 @@ export const CONFIG = {
         },
         crimson: {
             name: '血色深渊',
-            icon: '🔥',
+            icon: '<i class="fa-solid fa-fire"></i>',
             vars: {
                 '--dnd-bg-main': '#120808',
                 '--dnd-bg-panel-start': '#2b1717',
@@ -151,7 +151,7 @@ export const CONFIG = {
         },
         arcane: {
             name: '奥术塔楼',
-            icon: '🔮',
+            icon: '<i class="fa-solid fa-gem"></i>',
             vars: {
                 '--dnd-bg-main': '#0a0a14',
                 '--dnd-bg-panel-start': '#1a1a2e',

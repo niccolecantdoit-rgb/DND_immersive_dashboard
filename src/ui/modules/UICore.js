@@ -9,6 +9,7 @@ import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { NotificationSystem } from './UIUtils.js';
 import { DynamicBackground } from '../DynamicBackground.js';
 import { UITableManager } from './UITableManager.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     state: 'collapsed', // 'collapsed', 'mini', 'full'
@@ -347,7 +348,7 @@ export default {
             <div id="dnd-dashboard-root">
                 <div class="dnd-top-bar">
                     <div class="dnd-title">DND Adventure Log</div>
-                    <button class="dnd-close-btn" id="dnd-close">✕ 关闭面板</button>
+                    <button class="dnd-close-btn" id="dnd-close"><i class="fa-solid fa-times"></i> 关闭面板</button>
                 </div>
                 <div class="dnd-main-container">
                     <div class="dnd-nav-sidebar">
@@ -385,7 +386,7 @@ export default {
                     
                     <div style="display:flex;gap:5px;align-items:center;margin-left:10px;">
                         <button class="dnd-hud-expand-btn" id="dnd-hud-theme" title="切换主题">
-                            🎨
+                            <i class="fa-solid fa-palette"></i>
                         </button>
                     </div>
                 </div>
@@ -539,7 +540,7 @@ export default {
                 const winW = win.innerWidth;
                 const winH = win.innerHeight;
                 // 边界计算使用缩放后的按钮尺寸
-                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * scale;
+                const scaledBtnSize = CONFIG.SIZE.TOGGLE_BTN * uiScale;
                 
                 // 边界限制（确保按钮不会超出视口）
                 newLeft = Math.max(5, Math.min(newLeft, winW - scaledBtnSize - 5));
@@ -779,7 +780,7 @@ export default {
             // D - 快速投骰子 (按住 Alt 时)
             if (e.altKey && (key === 'd' || key === 'D')) {
                 const roll = Math.floor(Math.random() * 20) + 1;
-                NotificationSystem.info(`🎲 D20: ${roll}`, '快速投骰');
+                NotificationSystem.info(`<i class="fa-solid fa-dice-d20"></i> D20: ${roll}`, '快速投骰');
                 e.preventDefault();
                 return;
             }

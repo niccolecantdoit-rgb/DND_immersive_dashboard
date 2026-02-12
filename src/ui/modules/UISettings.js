@@ -11,6 +11,7 @@ import UICore from './UICore.js';
 import { DynamicBackground } from '../DynamicBackground.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
 import { StyleManager } from '../../features/StyleManager.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     async renderSettingsPanel($c) {
@@ -50,18 +51,18 @@ export default {
         const html = `
             <div style="padding:20px; max-width: 600px;">
                 <h2 style="color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:10px;margin-top:0;">
-                    ⚙️ 仪表盘设置
+                    ${ICONS.COG} 仪表盘设置
                 </h2>
 
                 <!-- 同步状态 -->
                 <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
                     <div>
-                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">☁️ 云同步状态</div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">${ICONS.CLOUD} 云同步状态</div>
                         <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
-                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">🔄</button>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
                     </div>
                 </div>
 
@@ -98,7 +99,7 @@ export default {
 
                 <!-- 配色模板设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎨 配色模板</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.PALETTE} 配色模板</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择预设主题或自定义配色，让界面风格更符合你的喜好。
                     </p>
@@ -106,7 +107,7 @@ export default {
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">预设主题</label>
                         <select id="dnd-theme-preset" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                            ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || '🎨'} ${t.name}</option>`).join('')}
+                            ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || ICONS.PALETTE} ${t.name}</option>`).join('')}
                         </select>
                     </div>
                     
@@ -140,7 +141,7 @@ export default {
                                 border-radius:4px;
                                 cursor:pointer;
                                 font-size:12px;
-                            ">🔄 重置为默认</button>
+                            ">${ICONS.SYNC} 重置为默认</button>
                             <button type="button" id="dnd-color-export" style="
                                 background:rgba(52, 152, 219, 0.2);
                                 border:1px solid #3498db;
@@ -180,7 +181,7 @@ export default {
 
                 <!-- 风格管理 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🎭 风格管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.MASK} 风格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择完整的视觉风格主题，包含颜色、尺寸、圆角、动画等全套配置。
                         风格是比配色更完整的视觉方案，能让界面看起来焕然一新。
@@ -189,7 +190,7 @@ export default {
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">当前风格</label>
                         <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                            <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || '🎨'}</span>
+                            <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || ICONS.PALETTE}</span>
                             <div style="flex:1;">
                                 <div style="font-weight:bold;color:var(--dnd-text-header);">${StyleManager.getCurrentStyle().name || '经典DND'}</div>
                                 <div style="font-size:11px;color:#888;">${StyleManager.getCurrentStyle().description || ''}</div>
@@ -203,7 +204,7 @@ export default {
                             ${StyleManager.getAvailableStyles().map(style => `
                                 <div class="dnd-style-card ${style.id === StyleManager.currentStyleId ? 'active' : ''}"
                                      data-style-id="${style.id}">
-                                    <div style="font-size:28px;margin-bottom:6px;">${style.icon || '🎨'}</div>
+                                    <div style="font-size:28px;margin-bottom:6px;">${style.icon || ICONS.PALETTE}</div>
                                     <div style="font-size:12px;font-weight:bold;color:${style.id === StyleManager.currentStyleId ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};">${style.name}</div>
                                     ${style.isCustom ? '<div style="font-size:9px;color:#888;margin-top:2px;">自定义</div>' : ''}
                                     ${style.id === StyleManager.currentStyleId ? '<div style="font-size:9px;color:var(--dnd-text-highlight);margin-top:2px;">✓ 当前</div>' : ''}
@@ -221,7 +222,7 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">📥 导入风格包</button>
+                        ">${ICONS.DOWNLOAD} 导入风格包</button>
                         <button type="button" id="dnd-style-export" style="
                             background:rgba(52, 152, 219, 0.2);
                             border:1px solid #3498db;
@@ -230,7 +231,7 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">📤 导出当前风格</button>
+                        ">${ICONS.UPLOAD} 导出当前风格</button>
                         <button type="button" id="dnd-style-reset" style="
                             background:rgba(231, 76, 60, 0.2);
                             border:1px solid #e74c3c;
@@ -239,13 +240,13 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:12px;
-                        ">🔄 恢复默认</button>
+                        ">${ICONS.SYNC} 恢复默认</button>
                     </div>
                     <input type="file" id="dnd-style-import-input" accept=".json" style="display:none;">
                     
                     <div style="padding:10px;background:rgba(52, 152, 219, 0.1);border:1px solid rgba(52, 152, 219, 0.3);border-radius:4px;">
                         <div style="font-size:11px;color:#888;">
-                            💡 <strong>提示:</strong> 风格包是完整的视觉主题配置。如果您只想微调颜色，可以使用上方的"配色模板"功能。
+                            ${ICONS.LIGHTBULB} <strong>提示:</strong> 风格包是完整的视觉主题配置。如果您只想微调颜色，可以使用上方的"配色模板"功能。
                             风格和配色可以叠加使用 —— 先选择喜欢的风格，再通过配色进行个性化调整。
                         </div>
                     </div>
@@ -253,7 +254,7 @@ export default {
 
                 <!-- 动态背景设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">✨ 动态背景</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.SPARKLES} 动态背景</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         为界面添加动态背景效果，类似游戏UI设计，让背景不再单调。
                     </p>
@@ -269,7 +270,7 @@ export default {
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">背景效果</label>
                             <select id="dnd-bg-type" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                                ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || '✨'} ${e.name}</option>`).join('')}
+                                ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || ICONS.SPARKLES} ${e.name}</option>`).join('')}
                             </select>
                         </div>
                         
@@ -289,7 +290,7 @@ export default {
 
                 <!-- API 配置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">🔌 API 连接配置</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-plug"></i> API 连接配置</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         配置 OpenAI 兼容 API，用于角色生成和地图绘制。
                     </p>
@@ -321,7 +322,7 @@ export default {
                 
                 <!-- 表格管理设置 -->
                 <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">📋 表格管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-clipboard-list"></i> 表格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         自定义表格管理模块的布局和显示内容。
                     </p>
@@ -369,7 +370,7 @@ export default {
                     
                     <div class="dnd-cfg-group" style="opacity:${config.ENABLED ? 1 : 0.5};pointer-events:${config.ENABLED ? 'auto' : 'none'};transition:all 0.3s;">
                         <div style="margin-bottom:15px;">
-                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">⚔️ 战斗状态预设</label>
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.SWORD} 战斗状态预设</label>
                             <div style="display:flex;gap:10px;">
                                 <select id="dnd-cfg-combat-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.COMBAT_PRESET)}
@@ -379,7 +380,7 @@ export default {
                         </div>
                         
                         <div style="margin-bottom:20px;">
-                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">🧭 探索状态预设</label>
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.COMPASS} 探索状态预设</label>
                             <div style="display:flex;gap:10px;">
                                 <select id="dnd-cfg-explore-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.EXPLORE_PRESET)}
@@ -398,7 +399,7 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🔄 刷新预设列表</button>
+                        ">${ICONS.SYNC} 刷新预设列表</button>
                         <button type="button" id="dnd-cfg-save" style="
                             background:linear-gradient(135deg, var(--dnd-accent-green), #27ae60);
                             border:none;
@@ -409,13 +410,13 @@ export default {
                             font-weight:bold;
                             font-size:14px;
                             display:flex;align-items:center;gap:5px;
-                        ">💾 保存设置</button>
+                        "><i class="fa-solid fa-save"></i> 保存设置</button>
                     </div>
                 </div>
 
                 <!-- 存储诊断工具 -->
                 <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
-                    <h3 style="color:var(--dnd-text-header);margin-top:0;">💾 存储空间管理</h3>
+                    <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-database"></i> 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
                     </p>
@@ -430,7 +431,7 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🔍 检查存储使用量</button>
+                        ">${ICONS.SEARCH} 检查存储使用量</button>
                         
                         <button type="button" id="dnd-clear-avatars" class="dnd-clickable" style="
                             background:rgba(231, 76, 60, 0.2);
@@ -440,7 +441,7 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🗑️ 清理头像缓存</button>
+                        "><i class="fa-solid fa-trash"></i> 清理头像缓存</button>
                         
                         <button type="button" id="dnd-clear-maps" class="dnd-clickable" style="
                             background:rgba(231, 76, 60, 0.2);
@@ -450,12 +451,12 @@ export default {
                             border-radius:4px;
                             cursor:pointer;
                             font-size:13px;
-                        ">🗺️ 清理地图缓存</button>
+                        ">${ICONS.MAP} 清理地图缓存</button>
                     </div>
                 </div>
                 
                 <div style="margin-top:20px;padding:15px;background:rgba(197, 160, 89, 0.1);border-left:3px solid var(--dnd-border-gold);border-radius:4px;">
-                    <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:5px;">💡 提示</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:5px;">${ICONS.LIGHTBULB} 提示</div>
                     <div style="font-size:12px;color:#ccc;line-height:1.5;">
                         预设名称必须与酒馆 World Info 界面中的 Plot 预设名称完全一致。<br>
                         如未找到预设，将会在控制台输出警告且不执行切换。
@@ -524,7 +525,7 @@ export default {
         $c.find('#dnd-sync-force').on('click', async function() {
             const $btn = $(this);
             $btn.prop('disabled', true).css('opacity', 0.5);
-            $c.find('#dnd-sync-badge').text('🔄 同步中...');
+            $c.find('#dnd-sync-badge').html('<i class="fa-solid fa-sync fa-spin"></i> 同步中...');
             
             await SettingsManager.forceSync();
             
@@ -605,7 +606,7 @@ export default {
             updateSelect($c.find('#dnd-cfg-explore-sel'), $c.find('#dnd-cfg-explore-input').val());
             
             setTimeout(() => {
-                $btn.text('🔄 刷新预设列表').prop('disabled', false);
+                $btn.html('<i class="fa-solid fa-sync"></i> 刷新预设列表').prop('disabled', false);
             }, 500);
         });
         
@@ -812,7 +813,7 @@ export default {
                 
                 // 更新当前风格显示
                 const currentStyle = StyleManager.getCurrentStyle();
-                $c.find('.dnd-style-card.active').closest('div').prev().find('span:first').text(currentStyle.icon || '🎨');
+                $c.find('.dnd-style-card.active').closest('div').prev().find('span:first').html(currentStyle.icon || ICONS.PALETTE);
                 
                 NotificationSystem.success(`已切换至 "${currentStyle.name}" 风格`);
                 
@@ -1019,7 +1020,7 @@ export default {
             // 视觉反馈
             const $btn = $(this);
             const originalText = $btn.html();
-            $btn.html('✅ 已保存').prop('disabled', true);
+            $btn.html('<i class="fa-solid fa-check"></i> 已保存').prop('disabled', true);
             setTimeout(() => {
                 $btn.html(originalText).prop('disabled', false);
             }, 1500);

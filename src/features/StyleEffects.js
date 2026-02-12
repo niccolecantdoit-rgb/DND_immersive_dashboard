@@ -430,7 +430,7 @@ export const StyleEffects = {
                         100% { transform: rotate(360deg); }
                     }
                     .dnd-char-card::before {
-                        content: "⚙️" !important;
+                        content: "⚙" !important;
                         position: absolute !important;
                         font-size: 100px !important;
                         opacity: 0.05 !important;
@@ -591,7 +591,7 @@ export const StyleEffects = {
                 rules.push(`
                     .dnd-card-header::before,
                     .dnd-card-header::after {
-                        content: "⚙️" !important;
+                        content: "⚙" !important;
                         position: absolute !important;
                         font-size: 14px !important;
                         color: ${borderColor} !important;

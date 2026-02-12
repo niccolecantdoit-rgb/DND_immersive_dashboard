@@ -4,6 +4,7 @@ import { DBAdapter } from '../../core/DBAdapter.js';
 import { DataManager } from '../../data/DataManager.js';
 import { ExplorationMapManager } from '../../features/ExplorationMapManager.js';
 import { NotificationSystem } from './UIUtils.js';
+import { ICONS } from '../SVGIcons.js';
 
 export default {
     // [新增] 地图缩放状态
@@ -344,7 +345,7 @@ export default {
                     if ($el.find('.dnd-map-controls').length === 0) {
                         const overlayHtml = `
                             <div class="dnd-map-controls" style="position:absolute;top:5px;right:5px;display:flex;gap:5px;opacity:0;transition:opacity 0.2s;z-index:10;">
-                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;">🎨 重绘</button>
+                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
                             </div>
                         `;
                         $el.append(overlayHtml);
@@ -359,7 +360,7 @@ export default {
                     // 尚未生成
                         $innerMap.html(`
                         <div style="text-align:center;color:#888;">
-                            <div style="font-size:24px;margin-bottom:5px;">🗺️</div>
+                            <div style="font-size:24px;margin-bottom:5px;">${ICONS.MAP}</div>
                             <div style="font-size:10px;margin-bottom:10px;">${mapResult.message}</div>
                         </div>
                     `);
@@ -519,7 +520,7 @@ export default {
                     
                     <!-- Battle Map Controls -->
                     <div class="dnd-map-controls" style="position:absolute;top:2px;right:2px;display:flex;gap:2px;pointer-events:auto;opacity:0.8;">
-                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;">🎨 AI底图</button>
+                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
                     </div>
                 </div>
             `);
@@ -827,7 +828,7 @@ export default {
         // 显示简易菜单: "移动到这里"
         const menuHtml = `
             <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
-                📍 位置: ${String.fromCharCode(64 + gridX)}${gridY}
+                <i class="fa-solid fa-location-dot"></i> 位置: ${String.fromCharCode(64 + gridX)}${gridY}
             </div>
             <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:rgba(46, 204, 113, 0.2);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;"
                 onclick="window.DND_Dashboard_UI.executeAction('move', { x: ${gridX}, y: ${gridY} }); window.DND_Dashboard_UI.hideDetailPopup();">

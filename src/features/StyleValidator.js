@@ -281,7 +281,7 @@ export const StyleValidator = {
             version: String(meta.version || '1.0.0').substring(0, 20),
             author: String(meta.author || '').substring(0, 100),
             description: String(meta.description || '').substring(0, 500),
-            icon: this._sanitizeEmoji(meta.icon) || '🎨',
+            icon: this._sanitizeEmoji(meta.icon) || '<i class="fa-solid fa-palette"></i>',
             preview: this._sanitizePreview(meta.preview)
         };
     },

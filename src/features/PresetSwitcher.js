@@ -99,7 +99,7 @@ export const PresetSwitcher = {
         const $status = $('#dnd-hud-status-text');
         if (!$status.length) return;
         
-        const icon = isCombat ? '⚔️' : '🧭';
+        const icon = isCombat ? '<i class="fa-solid fa-gavel"></i>' : '<i class="fa-solid fa-compass"></i>';
         const color = isCombat ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)';
         const originalHtml = $status.html();
         

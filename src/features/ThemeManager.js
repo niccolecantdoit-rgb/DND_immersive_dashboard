@@ -201,7 +201,7 @@ export const ThemeManager = {
         const list = Object.keys(CONFIG.THEMES).map(id => ({ id, ...CONFIG.THEMES[id] }));
         // 如果有自定义配色，添加到列表
         if (ThemeManager.customTheme) {
-            list.push({ id: 'custom', name: '自定义配色', icon: '🎨' });
+            list.push({ id: 'custom', name: '自定义配色', icon: '<i class="fa-solid fa-palette"></i>' });
         }
         return list;
     }

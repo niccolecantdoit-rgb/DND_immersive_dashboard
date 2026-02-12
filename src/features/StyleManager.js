@@ -214,7 +214,7 @@ export const StyleManager = {
         const customList = Object.values(this.customStyles).map(style => ({
             id: style.meta.id,
             name: style.meta.name,
-            icon: style.meta.icon || '🎨',
+            icon: style.meta.icon || '<i class="fa-solid fa-palette"></i>',
             description: style.meta.description || '',
             author: style.meta.author || '用户',
             isCustom: true
