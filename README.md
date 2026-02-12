@@ -44,14 +44,16 @@
 
 *   [SillyTavern](https://github.com/SillyTavern/SillyTavern) - AI 角色扮演前端
 *   [酒馆助手 (JS-Slash-Runner)](https://github.com/N0VI028/JS-Slash-Runner) - 类脑社区开发的 SillyTavern 扩展插件，提供 JS 脚本运行环境
+*   [神数据库 (AutoCardUpdaterExtension)](https://github.com/1830488003/AutoCardUpdaterExtension) - 角色卡自动更新扩展，通过 AI 自动分析对话并动态更新角色世界书，本插件通过其 API 读取角色数据和切换预设
 
 ## 安装说明 (Installation)
 
 1.  **安装酒馆助手**: 确保您的 SillyTavern 已安装 [酒馆助手 (JS-Slash-Runner)](https://github.com/N0VI028/JS-Slash-Runner) 插件。
-2.  **安装 Userscript 管理器**: 确保您的浏览器（推荐 Chrome 或 Firefox）已安装 Userscript 管理器扩展，例如 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/get-it/)。
-3.  **下载脚本**: 前往 [Releases](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/releases) 页面下载最新版本的 `DND_Dashboard_Immersive.user.js` 文件。
-4.  **安装脚本**: 将下载的 `.user.js` 文件拖拽到您的 Userscript 管理器扩展图标上，或通过管理器界面选择"从本地文件安装"。
-5.  **打开 SillyTavern**: 确保 Userscript 和酒馆助手插件均已启用，然后打开您的 SillyTavern 页面。脚本应会自动加载并显示仪表盘。
+2.  **安装神数据库**: 安装 [神数据库 (AutoCardUpdaterExtension)](https://github.com/1830488003/AutoCardUpdaterExtension) 扩展，本插件依赖其提供的 `AutoCardUpdaterAPI` 来读取和管理角色数据。
+3.  **安装 Userscript 管理器**: 确保您的浏览器（推荐 Chrome 或 Firefox）已安装 Userscript 管理器扩展，例如 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/get-it/)。
+4.  **下载脚本**: 前往 [Releases](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/releases) 页面下载最新版本的 `DND_Dashboard_Immersive.user.js` 文件。
+5.  **安装脚本**: 将下载的 `.user.js` 文件拖拽到您的 Userscript 管理器扩展图标上，或通过管理器界面选择"从本地文件安装"。
+6.  **打开 SillyTavern**: 确保 Userscript、酒馆助手和神数据库插件均已启用，然后打开您的 SillyTavern 页面。脚本应会自动加载并显示仪表盘。
 
 ## 使用指南 (Usage)
 
