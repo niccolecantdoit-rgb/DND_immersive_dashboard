@@ -47,7 +47,14 @@ export const CONFIG = {
         CURRENT_STYLE: 'dnd_current_style',
         CUSTOM_STYLES: 'dnd_custom_styles',
         // 选项换行设置
-        OPTION_WRAP: 'dnd_option_wrap'
+        OPTION_WRAP: 'dnd_option_wrap',
+        // 模板同步相关
+        TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version'
+    },
+    // 模板同步配置
+    TEMPLATE_SYNC: {
+        REMOTE_URL: 'https://raw.githubusercontent.com/niccolecantdoit-rgb/DND_immersive_dashboard/master/dist/DND%E4%BB%AA%E8%A1%A8%E7%9B%98%E9%85%8D%E5%A5%97%E6%A8%A1%E6%9D%BF.json',
+        CURRENT_VERSION: '1.9.2'  // 与 package.json 保持同步
     },
     // 界面缩放配置
     UI_SCALE: {

@@ -14,6 +14,7 @@ import { PresetSwitcher } from './features/PresetSwitcher.js';
 import { DataManager } from './data/DataManager.js';
 import { TavernSettingsSync } from './core/TavernSettingsSync.js';
 import { NotificationSystem } from './ui/modules/UIUtils.js';
+import { TemplateSync } from './features/TemplateSync.js';
 
 (function () {
     'use strict';
@@ -112,6 +113,9 @@ import { NotificationSystem } from './ui/modules/UIUtils.js';
                         // 初始渲染一次 HUD
                         setTimeout(UIRenderer.renderHUD, 1000);
                     }
+
+                    // [新增] 延迟检查模板同步 (等待 UI 和通知系统就绪)
+                    setTimeout(() => TemplateSync.init(), 3000);
                 } else if (initAttempts < MAX_ATTEMPTS) {
                     initAttempts++;
                     setTimeout(tryInit, 1000);
