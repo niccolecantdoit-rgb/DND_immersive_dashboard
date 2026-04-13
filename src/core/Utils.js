@@ -4,15 +4,34 @@ import { TavernSettingsSync } from './TavernSettingsSync.js';
 
 export const getCore = () => {
     try {
-        const w = window.parent || window;
+        let topWin = null;
+        try {
+            topWin = window.top && window.top !== window ? window.top : null;
+        } catch (e) {
+            topWin = null;
+        }
+
+        const w = topWin || window.parent || window;
         const localJQuery = window.jQuery;
-        const parentJQuery = w.jQuery;
-        const $ = localJQuery || parentJQuery;
+        const parentJQuery = window.parent?.jQuery;
+        const topJQuery = topWin?.jQuery;
+        const coreJQuery = w.jQuery;
+        const $ = coreJQuery || topJQuery || parentJQuery || localJQuery;
+        const getDB = () => {
+            try {
+                return window.AutoCardUpdaterAPI
+                    || w.AutoCardUpdaterAPI
+                    || (window.top && window.top.AutoCardUpdaterAPI)
+                    || null;
+            } catch (e) {
+                return window.AutoCardUpdaterAPI || w.AutoCardUpdaterAPI || null;
+            }
+        };
         
         return {
             window: w,
             $: $,
-            getDB: () => w.AutoCardUpdaterAPI || window.AutoCardUpdaterAPI
+            getDB
         };
     } catch (e) {
         console.error('[DND Dashboard] getCore Error:', e);

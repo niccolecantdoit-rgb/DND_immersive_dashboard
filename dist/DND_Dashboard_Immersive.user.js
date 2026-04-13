@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DND 沉浸式仪表盘
 // @namespace    http://tampermonkey.net/
-// @version      1.9.2
+// @version      2.0.1
 // @description  专为 DND 模板设计的游戏风格仪表盘
 // @author       Niccole
 // @match        */*
@@ -438,6 +438,50 @@ const TavernSettingsSync = {
             return false;
         }
     },
+
+    /**
+     * Get SillyTavern context safely
+     */
+    _getTavernContext: function() {
+        try {
+            const win = window.parent || window;
+            if (!win.SillyTavern?.getContext) return null;
+            return win.SillyTavern.getContext();
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Get current chat id for chat-scoped storage
+     */
+    getCurrentChatId: function() {
+        try {
+            const win = window.parent || window;
+            const ctx = this._getTavernContext();
+            const directChatId = win.SillyTavern?.chatId;
+            const fallbackChatId = typeof win.SillyTavern?.getCurrentChatId === 'function'
+                ? win.SillyTavern.getCurrentChatId()
+                : null;
+            const candidates = [
+                ctx?.chatId,
+                ctx?.chat_id,
+                ctx?.chat?.chat_id,
+                ctx?.chat?.id,
+                directChatId,
+                fallbackChatId,
+                win.chat?.chat_id,
+                win.chat?.id,
+                ctx?.groupId ? `group:${ctx.groupId}` : null,
+                ctx?.group_id ? `group:${ctx.group_id}` : null
+            ];
+
+            const match = candidates.find(value => value !== undefined && value !== null && String(value).trim());
+            return match ? String(match) : null;
+        } catch (e) {
+            return null;
+        }
+    },
     
     /**
      * Get reference to Tavern's extension_settings
@@ -775,15 +819,34 @@ const TavernSettingsSync = {
 
 const getCore = () => {
     try {
-        const w = window.parent || window;
+        let topWin = null;
+        try {
+            topWin = window.top && window.top !== window ? window.top : null;
+        } catch (e) {
+            topWin = null;
+        }
+
+        const w = topWin || window.parent || window;
         const localJQuery = window.jQuery;
-        const parentJQuery = w.jQuery;
-        const $ = localJQuery || parentJQuery;
+        const parentJQuery = window.parent?.jQuery;
+        const topJQuery = topWin?.jQuery;
+        const coreJQuery = w.jQuery;
+        const $ = coreJQuery || topJQuery || parentJQuery || localJQuery;
+        const getDB = () => {
+            try {
+                return window.AutoCardUpdaterAPI
+                    || w.AutoCardUpdaterAPI
+                    || (window.top && window.top.AutoCardUpdaterAPI)
+                    || null;
+            } catch (e) {
+                return window.AutoCardUpdaterAPI || w.AutoCardUpdaterAPI || null;
+            }
+        };
         
         return {
             window: w,
             $: $,
-            getDB: () => w.AutoCardUpdaterAPI || window.AutoCardUpdaterAPI
+            getDB
         };
     } catch (e) {
         console.error('[DND Dashboard] getCore Error:', e);
@@ -847,13 +910,14 @@ const CONFIG = {
         CUSTOM_STYLES: 'dnd_custom_styles',
         // 选项换行设置
         OPTION_WRAP: 'dnd_option_wrap',
-        // 模板同步相关
+        // 迷你地图显示开关
+        SHOW_MINI_MAP: 'dnd_show_mini_map',
+        // 隐藏浮动球开关
+        HIDE_FLOATING_BALL: 'dnd_hide_floating_ball',
+        // Mini HUD 独立位置 (隐藏球模式下)
+        MINI_HUD_POS: 'dnd_mini_hud_pos',
+        // 已同步的模板版本
         TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version'
-    },
-    // 模板同步配置
-    TEMPLATE_SYNC: {
-        REMOTE_URL: 'https://raw.githubusercontent.com/niccolecantdoit-rgb/DND_immersive_dashboard/master/dist/DND%E4%BB%AA%E8%A1%A8%E7%9B%98%E9%85%8D%E5%A5%97%E6%A8%A1%E6%9D%BF.json',
-        CURRENT_VERSION: '1.9.2'  // 与 package.json 保持同步
     },
     // 界面缩放配置
     UI_SCALE: {
@@ -867,6 +931,10 @@ const CONFIG = {
         enabled: true,          // 是否启用动态背景
         type: 'particles',      // 默认效果类型: particles, gears, ripples, runes, starfield, gradient, grid, dna
         intensity: 1.0          // 效果强度 (0.5 - 2.0)
+    },
+    // 模板同步配置
+    TEMPLATE_SYNC: {
+        CURRENT_VERSION: '2.0.1'
     },
     // 地图缩放配置
     MAP_ZOOM: {
@@ -890,9 +958,11 @@ const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #242424 0%, #1a1a1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99))',
+                '--dnd-bg-input': 'rgba(26, 26, 28, 0.95)',
                 '--dnd-bg-item': 'rgba(255,255,255,0.03)',
                 '--dnd-border-gold': '#9d8b6c',
                 '--dnd-border-inner': '#5c4b35',
+                '--dnd-border-subtle': '#444',
                 '--dnd-text-main': '#dcd0c0',
                 '--dnd-text-header': '#e6dcca',
                 '--dnd-text-highlight': '#ffdb85',
@@ -916,9 +986,11 @@ const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c2e24 0%, #0f1c16 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 32, 26, 0.99), rgba(10, 20, 16, 0.99))',
+                '--dnd-bg-input': 'rgba(20, 32, 26, 0.95)',
                 '--dnd-bg-item': 'rgba(255,255,255,0.05)',
                 '--dnd-border-gold': '#5a8a6a',
                 '--dnd-border-inner': '#2c4a3a',
+                '--dnd-border-subtle': '#3a5a4a',
                 '--dnd-text-main': '#c0dcd0',
                 '--dnd-text-header': '#cae6da',
                 '--dnd-text-highlight': '#85ffb5',
@@ -942,9 +1014,11 @@ const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #2e1c1c 0%, #1c0f0f 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(32, 20, 20, 0.99), rgba(20, 10, 10, 0.99))',
+                '--dnd-bg-input': 'rgba(32, 20, 20, 0.95)',
                 '--dnd-bg-item': 'rgba(255,200,200,0.03)',
                 '--dnd-border-gold': '#8a5a5a',
                 '--dnd-border-inner': '#4a2c2c',
+                '--dnd-border-subtle': '#5a3a3a',
                 '--dnd-text-main': '#dcc0c0',
                 '--dnd-text-header': '#e6cada',
                 '--dnd-text-highlight': '#ff8585',
@@ -968,9 +1042,11 @@ const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c1c2e 0%, #0f0f1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 20, 36, 0.99), rgba(10, 10, 20, 0.99))',
+                '--dnd-bg-input': 'rgba(20, 20, 36, 0.95)',
                 '--dnd-bg-item': 'rgba(200,200,255,0.03)',
                 '--dnd-border-gold': '#6a6a9d',
                 '--dnd-border-inner': '#3a3a5a',
+                '--dnd-border-subtle': '#4a4a6a',
                 '--dnd-text-main': '#c0c0dc',
                 '--dnd-text-header': '#cacaE6',
                 '--dnd-text-highlight': '#b585ff',
@@ -997,9 +1073,11 @@ const CONFIG = {
 const SCRIPT_ID = 'dnd_immersive_dashboard';
 
 const addStyles = () => {
-    const { $ } = getCore();
+    const { $, window: coreWin } = getCore();
     if (!$) return;
-    if ($(`#${SCRIPT_ID}-styles`).length) return;
+    const doc = coreWin?.document || document;
+    const $root = coreWin?.jQuery || $;
+    if ($root(doc).find(`#${SCRIPT_ID}-styles`).length) return;
     
     const css = `
         :root {
@@ -1269,7 +1347,7 @@ const addStyles = () => {
         /* 风格选择卡片 - 支持 Morphology */
         .dnd-style-card {
             padding: 12px !important;
-            background: rgba(0,0,0,0.3) !important;
+            background: var(--dnd-bg-card) !important;
             /* Morphology Support */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-subtle) !important;
             border-radius: var(--dnd-radius-md, 6px) !important;
@@ -1297,7 +1375,7 @@ const addStyles = () => {
         }
         
         .dnd-style-card.active {
-            background: rgba(157, 139, 108, 0.2) !important;
+            background: var(--dnd-selected-bg) !important;
             border-color: var(--dnd-border-gold) !important;
         }
         
@@ -1452,7 +1530,7 @@ const addStyles = () => {
             flex: 1 !important;
             overflow-y: auto !important;
             padding: 20px !important;
-            background: radial-gradient(circle at center, rgba(30,30,35,0.8) 0%, rgba(10,10,12,0.9) 100%) !important;
+            background: var(--dnd-bg-main) !important;
         }
 
         /* 滚动条美化 */
@@ -1961,14 +2039,14 @@ const addStyles = () => {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            box-shadow: 0 0 10px rgba(157, 139, 108, 0.3) !important;
+            box-shadow: 0 0 10px rgba(var(--dnd-border-gold-rgb, 157, 139, 108), 0.3) !important;
             cursor: pointer !important;
             transition: all 0.3s ease !important;
             flex-shrink: 0 !important;
         }
         #dnd-logo-container:hover {
             transform: scale(1.05) rotate(5deg) !important;
-            box-shadow: 0 0 15px rgba(157, 139, 108, 0.6) !important;
+            box-shadow: 0 0 15px rgba(var(--dnd-border-gold-rgb, 157, 139, 108), 0.6) !important;
             border-color: var(--dnd-text-highlight) !important;
         }
         #dnd-logo-container:active {
@@ -2044,8 +2122,8 @@ const addStyles = () => {
         /* HUD 底部常驻资源栏 */
         .dnd-hud-footer {
             padding: 8px 10px !important;
-            background: rgba(0,0,0,0.4) !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            background: var(--dnd-bg-secondary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
             font-size: 11px !important;
             display: flex !important;
             flex-wrap: wrap !important;
@@ -2058,8 +2136,8 @@ const addStyles = () => {
         
         /* 队伍折叠面板 */
         .dnd-hud-party-collapse {
-            background: rgba(0,0,0,0.2) !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            background: var(--dnd-bg-tertiary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
         }
         .dnd-party-header {
             padding: 5px 10px !important;
@@ -2104,11 +2182,13 @@ const addStyles = () => {
         
         /* [新增] 地图内部容器样式 */
         .dnd-minimap-inner {
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.9);
+            /* [修复] 减少内阴影强度，使战斗地图不再过暗 */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
             transition: transform 0.2s ease-out;
         }
+        /* [修复] 网格使用更低的透明度和更明亮的边框色，呈现透明线条效果 */
         .dnd-minimap-grid {
-            opacity: 0.3;
+            opacity: 0.6;
             pointer-events: none;
         }
 
@@ -2189,7 +2269,7 @@ const addStyles = () => {
             position: absolute;
             border-radius: 50%;
             border: 2px solid var(--dnd-text-highlight);
-            background: rgba(255, 255, 255, 0.1);
+            background: transparent;
             pointer-events: none;
             z-index: 50;
             animation: dnd-map-ripple 0.6s ease-out forwards;
@@ -2199,7 +2279,7 @@ const addStyles = () => {
         /* 探索模式布局 */
         .dnd-hud-explore-layout { display: flex !important; flex-direction: column !important; width: 100% !important; gap: 10px !important; }
         .dnd-hud-quests {
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.2), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), transparent) !important;
             padding: 8px !important;
             border-radius: 4px !important;
             border-left: 2px solid var(--dnd-border-gold) !important;
@@ -2209,11 +2289,11 @@ const addStyles = () => {
             padding: 4px 0 !important; border-bottom: 1px dashed var(--dnd-border-inner) !important;
             cursor: pointer !important;
         }
-        .dnd-hud-quest-item:hover { color: var(--dnd-text-highlight) !important; background: rgba(157, 139, 108, 0.1) !important; }
+        .dnd-hud-quest-item:hover { color: var(--dnd-text-highlight) !important; background: var(--dnd-selected-bg) !important; }
 
         /* 行动按钮样式覆盖 */
         .dnd-action-btn {
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.4), rgba(40, 30, 20, 0.4)) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             color: var(--dnd-text-header) !important;
             border-left: 3px solid var(--dnd-border-gold) !important;
@@ -2238,11 +2318,11 @@ const addStyles = () => {
         }
 
         .dnd-action-btn:hover {
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.3), rgba(60, 50, 40, 0.3)) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), var(--dnd-bg-tertiary)) !important;
             border-color: var(--dnd-text-highlight) !important;
             transform: translateX(4px) scale(1.02) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 10px rgba(157, 139, 108, 0.2) !important;
-            text-shadow: 0 0 5px rgba(255, 219, 133, 0.5) !important;
+            box-shadow: 0 4px 12px var(--dnd-border-inner), 0 0 10px var(--dnd-accent) !important;
+            text-shadow: 0 0 5px var(--dnd-accent-hover) !important;
         }
         
         .dnd-action-btn:active {
@@ -2255,7 +2335,7 @@ const addStyles = () => {
         /* 迷你角色条 */
         .dnd-mini-char {
             display: flex !important; align-items: center !important; gap: 10px !important;
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.3), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), transparent) !important;
             padding: 5px 10px !important; border-radius: 4px !important;
             border-left: 3px solid transparent !important;
             cursor: pointer !important;
@@ -2264,12 +2344,12 @@ const addStyles = () => {
             border: 1px solid transparent !important;
         }
         .dnd-mini-char:hover {
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.2), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), transparent) !important;
             border-color: var(--dnd-border-gold) !important;
         }
         .dnd-mini-char.active {
             border-left-color: var(--dnd-text-highlight) !important;
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.4), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), transparent) !important;
         }
         
         .dnd-mini-char-avatar {
@@ -2298,7 +2378,7 @@ const addStyles = () => {
             align-items: center !important;
             padding: 0 20px !important;
             justify-content: space-between !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+            box-shadow: var(--dnd-shadow-md) !important;
         }
         .dnd-title {
             font-family: var(--dnd-font-serif) !important;
@@ -2306,7 +2386,7 @@ const addStyles = () => {
             color: var(--dnd-text-highlight) !important;
             text-transform: uppercase !important;
             letter-spacing: 2px !important;
-            text-shadow: 0 0 5px rgba(255, 219, 133, 0.3) !important;
+            text-shadow: 0 0 5px var(--dnd-text-highlight) !important;
         }
         .dnd-close-btn {
             background: transparent !important;
@@ -2340,7 +2420,7 @@ const addStyles = () => {
                     justify-content: center !important;
                     cursor: pointer !important;
                     z-index: 2147483641 !important;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.5) !important;
+                    box-shadow: var(--dnd-shadow-lg), inset 0 0 10px var(--dnd-bg-tertiary) !important;
                     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
                     font-size: 22px !important;
                     
@@ -2355,12 +2435,32 @@ const addStyles = () => {
                 background: var(--dnd-border-gold) !important;
                 color: var(--dnd-text-inverse-dark) !important;
                 transform: scale(1.1) rotate(90deg) !important;
-                box-shadow: 0 0 20px rgba(157, 139, 108, 0.6) !important;
+                box-shadow: var(--dnd-selected-glow) !important;
             }
         #dnd-toggle-btn.dnd-hidden {
             opacity: 0 !important;
             transform: scale(0) !important;
             pointer-events: none !important;
+        }
+        #dnd-toggle-btn.dnd-force-hidden {
+            opacity: 0 !important;
+            transform: scale(0) !important;
+            pointer-events: none !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode {
+            right: auto !important;
+            bottom: auto !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-header {
+            cursor: move !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            touch-action: none !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode #dnd-logo-container,
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-expand-btn,
+        #dnd-mini-hud.dnd-independent-mode #dnd-hud-toggle-bar {
+            cursor: pointer !important;
         }
 
         /* 移动端角色卡片入场动画 */
@@ -2410,9 +2510,9 @@ const addStyles = () => {
         
         /* 呼吸光环 (用于当前行动者) */
         @keyframes dnd-pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(255, 219, 133, 0.4); border-color: rgba(255, 219, 133, 0.6); }
-            70% { box-shadow: 0 0 0 6px rgba(255, 219, 133, 0); border-color: rgba(255, 219, 133, 1); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 219, 133, 0); border-color: rgba(255, 219, 133, 0.6); }
+            0% { box-shadow: 0 0 0 0 var(--dnd-selected-glow); border-color: var(--dnd-border-gold); }
+            70% { box-shadow: 0 0 0 6px transparent; border-color: var(--dnd-text-highlight); }
+            100% { box-shadow: 0 0 0 0 transparent; border-color: var(--dnd-border-gold); }
         }
         .dnd-active-turn {
             animation: dnd-pulse-border 2s infinite !important;
@@ -2434,7 +2534,7 @@ const addStyles = () => {
             content: "";
             position: absolute;
             top: 0; left: 0; width: 200%; height: 100%;
-            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0) 100%);
+            background: linear-gradient(90deg, transparent 0%, var(--dnd-selected-bg) 50%, transparent 100%);
             animation: dnd-shimmer 10s infinite linear;
             transform: skewX(-20deg);
         }
@@ -2527,7 +2627,7 @@ const addStyles = () => {
             }
             .dnd-nav-item.active {
                 border-bottom-color: var(--dnd-border-gold) !important;
-                background: rgba(197, 160, 89, 0.1) !important;
+                background: var(--dnd-selected-bg) !important;
             }
             .dnd-content-area {
                 padding: 15px !important;
@@ -2584,7 +2684,7 @@ const addStyles = () => {
         }
         .dnd-quick-trigger:hover {
             background: var(--dnd-border-gold);
-            color: #000;
+            color: var(--dnd-text-inverse);
         }
 
         .dnd-quick-bar {
@@ -2651,8 +2751,8 @@ const addStyles = () => {
             gap: 15px !important;
             overflow-x: auto !important;
             padding: 12px 10px !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
-            background: rgba(0,0,0,0.2) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
+            background: var(--dnd-bg-secondary) !important;
         }
         .party-bar-item {
             display: flex !important;
@@ -2693,7 +2793,7 @@ const addStyles = () => {
             left: -5px;
             width: 18px;
             height: 18px;
-            background: rgba(0,0,0,0.7);
+            background: var(--dnd-bg-tertiary);
             border: 1px solid var(--dnd-border-subtle);
             border-radius: 50%;
             font-size: 10px;
@@ -2711,7 +2811,7 @@ const addStyles = () => {
         .party-control-btn.active {
             opacity: 1;
             border-color: var(--dnd-border-gold);
-            background: rgba(197, 160, 89, 0.3);
+            background: var(--dnd-selected-bg);
         }
 
         .dnd-item-damage {
@@ -2757,7 +2857,7 @@ const addStyles = () => {
             left: -5px;
             width: 18px;
             height: 18px;
-            background: rgba(0,0,0,0.7);
+            background: var(--dnd-bg-tertiary);
             border: 1px solid var(--dnd-border-subtle);
             border-radius: 50%;
             font-size: 10px;
@@ -2775,7 +2875,7 @@ const addStyles = () => {
         .party-control-btn.active {
             opacity: 1;
             border-color: var(--dnd-border-gold);
-            background: rgba(197, 160, 89, 0.3);
+            background: var(--dnd-selected-bg);
         }
 
         /* Dice Grid */
@@ -2785,10 +2885,10 @@ const addStyles = () => {
             gap: var(--dnd-spacing-sm, 6px) !important;
         }
         .dnd-dice-btn {
-            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)) !important;
+            background: var(--dnd-bg-tertiary) !important;
             /* Morphology: Border */
-            border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) #444 !important;
-            color: #ccc !important;
+            border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-subtle) !important;
+            color: var(--dnd-text-main) !important;
             padding: 10px 5px !important;
             /* Morphology: Radius */
             border-radius: var(--dnd-radius-sm, 4px) !important;
@@ -2824,7 +2924,7 @@ const addStyles = () => {
         .dnd-quick-slot {
             width: 48px;
             height: 48px;
-            background: rgba(0,0,0,0.5);
+            background: var(--dnd-bg-tertiary);
             /* Morphology: Border */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-inner);
             /* Morphology: Radius */
@@ -2861,11 +2961,11 @@ const addStyles = () => {
         
         .dnd-quick-slot:hover {
             border-color: var(--dnd-text-highlight);
-            background: rgba(255,255,255,0.1);
+            background: var(--dnd-selected-bg);
         }
         .dnd-quick-slot.add-btn {
-            border: 1px dashed rgba(255,255,255,0.3) !important;
-            color: rgba(255,255,255,0.6) !important;
+            border: 1px dashed var(--dnd-border-inner) !important;
+            color: var(--dnd-text-dim) !important;
             font-weight: bold;
             font-size: 24px;
         }
@@ -3035,7 +3135,7 @@ const addStyles = () => {
             pointer-events: none !important;
         }
 
-        /* 对话框背景遮罩 */
+        /* 对话框背景遮罩 - Flex 居中容器 */
         .dnd-dialog-backdrop {
             position: fixed !important;
             top: 0 !important;
@@ -3047,35 +3147,43 @@ const addStyles = () => {
             opacity: 0 !important;
             transition: opacity 0.2s ease !important;
             pointer-events: auto !important;
+            /* Flex 居中 - 最暴力的居中方式 */
+            display: none !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 20px !important;
+            box-sizing: border-box !important;
         }
         .dnd-dialog-backdrop-visible {
             opacity: 1 !important;
+            display: flex !important;
         }
 
-        /* 对话框主体 */
+        /* 对话框主体 - 由 backdrop flex 容器居中，不再依赖 fixed/top/transform */
         .dnd-dialog {
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) scale(0.9) !important;
-            min-width: 320px !important;
-            max-width: 90vw !important;
+            position: relative !important;
+            min-width: 280px !important;
+            max-width: min(90vw, 450px) !important;
             max-height: 80vh !important;
             background: var(--dnd-bg-popup) !important;
             /* Morphology: Border */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-gold) !important;
             /* Morphology: Radius */
             border-radius: var(--dnd-radius-lg, 10px) !important;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(157, 139, 108, 0.1), var(--dnd-effect-border-glow, none) !important;
+            box-shadow: var(--dnd-shadow-lg), var(--dnd-selected-glow), var(--dnd-effect-border-glow, none) !important;
             color: var(--dnd-text-main) !important;
             font-family: var(--dnd-font-sans) !important;
             opacity: 0 !important;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transform: scale(0.9) !important;
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
             pointer-events: auto !important;
-            overflow: hidden !important;
             
-            /* Morphology: Shape */
-            clip-path: var(--dnd-card-clip-path, none) !important;
+            /* 三段式 Flex 布局 - 确保内容正确滚动 */
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            /* 禁止主题的 clip-path 裁切对话框 */
+            clip-path: none !important;
         }
         
         /* 对话框纹理层 */
@@ -3089,9 +3197,10 @@ const addStyles = () => {
             z-index: 0 !important;
             mix-blend-mode: overlay !important;
         }
+        /* 可见状态 */
         .dnd-dialog-visible {
-            transform: translate(-50%, -50%) scale(1) !important;
             opacity: 1 !important;
+            transform: scale(1) !important;
         }
 
         /* 对话框类型 */
@@ -3102,7 +3211,7 @@ const addStyles = () => {
             border-bottom-color: var(--dnd-toast-error) !important;
         }
         .dnd-dialog-danger .dnd-dialog-btn-confirm {
-            background: linear-gradient(135deg, var(--dnd-toast-error), #c0392b) !important;
+            background: linear-gradient(135deg, var(--dnd-toast-error), var(--dnd-accent-red)) !important;
         }
 
         /* 对话框头部 */
@@ -3111,8 +3220,11 @@ const addStyles = () => {
             justify-content: space-between !important;
             align-items: center !important;
             padding: 16px 20px !important;
-            background: rgba(0, 0, 0, 0.3) !important;
+            background: var(--dnd-bg-secondary) !important;
             border-bottom: 1px solid var(--dnd-border-gold) !important;
+            /* 三段式布局：头部固定高度，不参与滚动 */
+            flex-shrink: 0 !important;
+            min-height: 0 !important;
         }
 
         .dnd-dialog-title {
@@ -3139,6 +3251,11 @@ const addStyles = () => {
         /* 对话框内容 */
         .dnd-dialog-body {
             padding: 20px !important;
+            /* 三段式布局：body 占据剩余空间，内容超出时滚动 */
+            flex: 1 !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
         }
 
         .dnd-dialog-message {
@@ -3146,13 +3263,17 @@ const addStyles = () => {
             line-height: 1.6 !important;
             color: var(--dnd-text-main) !important;
             margin: 0 0 15px 0 !important;
+            /* 使 TemplateSync 的 \n\n 换行符可读 */
+            white-space: pre-line !important;
+            word-break: break-word !important;
         }
 
         /* 对话框输入框 */
         .dnd-dialog-input {
             width: 100% !important;
+            box-sizing: border-box !important;
             padding: 10px 14px !important;
-            background: rgba(0, 0, 0, 0.4) !important;
+            background: var(--dnd-bg-input) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 6px !important;
             color: var(--dnd-text-main) !important;
@@ -3163,7 +3284,7 @@ const addStyles = () => {
         }
         .dnd-dialog-input:focus {
             border-color: var(--dnd-border-gold) !important;
-            box-shadow: 0 0 0 3px rgba(157, 139, 108, 0.2) !important;
+            box-shadow: var(--dnd-focus-shadow) !important;
         }
         .dnd-dialog-input::placeholder {
             color: var(--dnd-text-dim) !important;
@@ -3173,10 +3294,14 @@ const addStyles = () => {
         .dnd-dialog-footer {
             display: flex !important;
             justify-content: flex-end !important;
+            flex-wrap: wrap !important;
             gap: 10px !important;
             padding: 16px 20px !important;
-            background: rgba(0, 0, 0, 0.2) !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+            background: var(--dnd-bg-secondary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
+            /* 三段式布局：底部固定高度，不参与滚动 */
+            flex-shrink: 0 !important;
+            min-height: 0 !important;
         }
 
         /* 对话框按钮 */
@@ -3191,23 +3316,23 @@ const addStyles = () => {
         }
 
         .dnd-dialog-btn-cancel {
-            background: rgba(255, 255, 255, 0.08) !important;
+            background: var(--dnd-bg-tertiary) !important;
             color: var(--dnd-text-main) !important;
-            border: 1px solid var(--dnd-border-inner) !important;
+            border: 1px solid var(--dnd-border-subtle) !important;
         }
         .dnd-dialog-btn-cancel:hover {
-            background: rgba(255, 255, 255, 0.15) !important;
+            background: var(--dnd-selected-bg) !important;
             border-color: var(--dnd-border-gold) !important;
         }
 
         .dnd-dialog-btn-confirm {
-            background: linear-gradient(135deg, var(--dnd-border-gold), #7a6b52) !important;
-            color: var(--dnd-text-inverse) !important;
+            background: var(--dnd-btn-primary) !important;
+            color: var(--dnd-btn-text) !important;
         }
         .dnd-dialog-btn-confirm:hover {
             filter: brightness(1.1) !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(157, 139, 108, 0.4) !important;
+            box-shadow: var(--dnd-hover-shadow) !important;
         }
         .dnd-dialog-btn-confirm:active {
             transform: translateY(0) !important;
@@ -3231,25 +3356,22 @@ const addStyles = () => {
                 transform: translateY(-100%) !important;
             }
             
+            /* 对话框移动端适配：由 backdrop flex 居中，此处仅设置尺寸约束 */
             .dnd-dialog {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
                 max-width: 400px !important;
-                /* 修复移动端对话框被截断到顶部的问题 */
-                /* 使用 inset + margin auto 实现稳定居中 */
-                top: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
-                margin: auto !important;
-                height: fit-content !important;
                 max-height: calc(100vh - 40px) !important;
                 max-height: calc(100dvh - 40px) !important; /* 动态视口高度，更适合移动端 */
-                overflow-y: auto !important;
-                transform: scale(0.9) !important;
             }
-            .dnd-dialog-visible {
-                transform: scale(1) !important;
+            
+            /* 移动端对话框按钮可堆叠 */
+            .dnd-dialog-footer {
+                flex-direction: column !important;
+            }
+            
+            .dnd-dialog-btn {
+                width: 100% !important;
             }
         }
 
@@ -3385,7 +3507,7 @@ const addStyles = () => {
         
         /* 特定颜色的图标光晕增强 */
         .dnd-text-highlight .svg-inline--fa {
-            filter: drop-shadow(0 0 2px rgba(255, 219, 133, 0.3));
+            filter: drop-shadow(0 0 2px var(--dnd-text-highlight));
         }
 
         /* 状态提示特效 */
@@ -3399,9 +3521,9 @@ const addStyles = () => {
         }
 
         @keyframes dnd-icon-pulse-gold {
-            0% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
-            50% { filter: drop-shadow(0 0 8px rgba(255, 219, 133, 0.8)); }
-            100% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
+            0% { filter: drop-shadow(0 0 0 transparent); }
+            50% { filter: drop-shadow(0 0 8px var(--dnd-text-highlight)); }
+            100% { filter: drop-shadow(0 0 0 transparent); }
         }
         .dnd-icon-notify {
             animation: dnd-icon-pulse-gold 2s infinite !important;
@@ -3419,7 +3541,7 @@ const addStyles = () => {
         }
         .dnd-hover-lift:hover {
             transform: translateY(-3px) scale(1.02) !important;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+            box-shadow: var(--dnd-shadow-md) !important;
             filter: brightness(1.1) !important;
             z-index: 10 !important;
         }
@@ -3433,16 +3555,16 @@ const addStyles = () => {
         /* 呼吸光环动画 */
         @keyframes dnd-breathe-glow {
             0%, 100% {
-                box-shadow: 0 0 15px rgba(0,0,0,0.9),
-                            inset 0 0 10px rgba(0,0,0,0.5),
-                            0 0 20px rgba(157, 139, 108, 0.2),
-                            0 0 40px rgba(157, 139, 108, 0.1);
+                box-shadow: var(--dnd-shadow-md),
+                            inset 0 0 10px var(--dnd-bg-tertiary),
+                            0 0 20px var(--dnd-selected-glow),
+                            0 0 40px var(--dnd-selected-bg);
             }
             50% {
-                box-shadow: 0 0 15px rgba(0,0,0,0.9),
-                            inset 0 0 10px rgba(0,0,0,0.5),
-                            0 0 30px rgba(157, 139, 108, 0.4),
-                            0 0 60px rgba(157, 139, 108, 0.2);
+                box-shadow: var(--dnd-shadow-md),
+                            inset 0 0 10px var(--dnd-bg-tertiary),
+                            0 0 30px var(--dnd-selected-glow),
+                            0 0 60px var(--dnd-selected-bg);
             }
         }
         
@@ -3459,9 +3581,9 @@ const addStyles = () => {
         
         /* 悬浮球悬停增强 - 增强原有效果 */
         #dnd-toggle-btn:hover {
-            box-shadow: 0 0 20px rgba(157, 139, 108, 0.6),
-                        0 0 40px rgba(157, 139, 108, 0.3),
-                        inset 0 0 10px rgba(255, 219, 133, 0.15) !important;
+            box-shadow: 0 0 20px var(--dnd-selected-glow),
+                        0 0 40px var(--dnd-selected-bg),
+                        inset 0 0 10px var(--dnd-bg-panel-start) !important;
         }
 
         /* === 2. HUD 面板增强效果 === */
@@ -3496,22 +3618,20 @@ const addStyles = () => {
         }
         
         .dnd-char-card:hover {
-            transform: translateY(-8px) rotateX(3deg) rotateY(-2deg) scale(1.02) !important;
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.5),
-                0 0 20px rgba(157, 139, 108, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+            transform: var(--dnd-card-hover-transform) !important;
+            box-shadow: var(--dnd-card-hover-shadow),
+                        inset 0 1px 0 var(--dnd-bg-panel-start) !important;
         }
         
         /* 卡片边框发光呼吸 */
         @keyframes dnd-card-glow {
             0%, 100% {
                 border-color: var(--dnd-border-inner);
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                box-shadow: var(--dnd-shadow-sm);
             }
             50% {
-                border-color: rgba(157, 139, 108, 0.6);
-                box-shadow: 0 4px 20px rgba(157, 139, 108, 0.15);
+                border-color: var(--dnd-border-gold);
+                box-shadow: var(--dnd-selected-glow);
             }
         }
         
@@ -3536,9 +3656,9 @@ const addStyles = () => {
             background: conic-gradient(
                 from 0deg,
                 transparent,
-                rgba(157, 139, 108, 0.5),
+                var(--dnd-border-gold),
                 transparent,
-                rgba(255, 219, 133, 0.3),
+                var(--dnd-text-highlight),
                 transparent
             );
             opacity: 0;
@@ -3553,7 +3673,7 @@ const addStyles = () => {
         
         .dnd-avatar-container:hover {
             transform: scale(1.1) !important;
-            box-shadow: 0 0 15px rgba(157, 139, 108, 0.5) !important;
+            box-shadow: var(--dnd-selected-glow) !important;
         }
 
         /* === 4. 骰子按钮 3D 翻转效果 === */
@@ -3572,7 +3692,7 @@ const addStyles = () => {
             left: 50%;
             width: 0;
             height: 0;
-            background: radial-gradient(circle, rgba(255, 219, 133, 0.4) 0%, transparent 70%);
+            background: radial-gradient(circle, var(--dnd-selected-bg) 0%, transparent 70%);
             transition: all 0.4s ease;
             transform: translate(-50%, -50%);
             border-radius: 50%;
@@ -3585,8 +3705,7 @@ const addStyles = () => {
         
         .dnd-dice-btn:hover {
             transform: translateY(-3px) rotateX(-10deg) scale(1.08) !important;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4),
-                        0 0 15px rgba(255, 219, 133, 0.3) !important;
+            box-shadow: var(--dnd-shadow-md), var(--dnd-selected-glow) !important;
         }
         
         .dnd-dice-btn:active {
@@ -3610,14 +3729,14 @@ const addStyles = () => {
         /* 骰子结果特效 - NAT20 发光脉冲 */
         @keyframes dnd-nat20-glow {
             0% {
-                text-shadow: 0 0 30px rgba(46, 204, 113, 0.8),
-                             0 0 60px rgba(46, 204, 113, 0.4);
+                text-shadow: 0 0 30px var(--dnd-accent-green),
+                             0 0 60px var(--dnd-accent-green);
                 transform: scale(1);
             }
             100% {
-                text-shadow: 0 0 50px rgba(46, 204, 113, 1),
-                             0 0 100px rgba(46, 204, 113, 0.6),
-                             0 0 150px rgba(46, 204, 113, 0.3);
+                text-shadow: 0 0 50px var(--dnd-accent-green),
+                             0 0 100px var(--dnd-accent-green),
+                             0 0 150px var(--dnd-accent-green);
                 transform: scale(1.05);
             }
         }
@@ -3637,13 +3756,13 @@ const addStyles = () => {
         }
         
         .dnd-nat20-result {
-            background: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(39, 174, 96, 0.1)) !important;
-            border-color: rgba(46, 204, 113, 0.6) !important;
+            background: linear-gradient(135deg, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
+            border-color: var(--dnd-accent-green) !important;
         }
         
         .dnd-nat1-result {
-            background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.1)) !important;
-            border-color: rgba(231, 76, 60, 0.6) !important;
+            background: linear-gradient(135deg, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
+            border-color: var(--dnd-accent-red) !important;
         }
         
         /* 骰子结果数字弹跳入场 */
@@ -3742,7 +3861,7 @@ const addStyles = () => {
         .dnd-btn-ripple .dnd-ripple-effect {
             position: absolute;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 219, 133, 0.6) 0%, rgba(255, 219, 133, 0) 70%); /* 更柔和的径向渐变 */
+            background: radial-gradient(circle, var(--dnd-selected-bg) 0%, transparent 70%); /* 更柔和的径向渐变 */
             pointer-events: none;
             animation: dnd-ripple 0.6s ease-out forwards;
             mix-blend-mode: screen; /* 混合模式让光效更亮 */
@@ -4393,8 +4512,26 @@ const addStyles = () => {
             color: var(--dnd-text-highlight) !important;
             background: rgba(255, 255, 255, 0.05) !important;
         }
+        
+        /* ============================================
+           浮动球隐藏模式样式
+           ============================================ */
+        
+        /* 强制隐藏浮动球 */
+        #dnd-toggle-btn.dnd-force-hidden {
+            display: none !important;
+        }
+        
+        /* 隐藏球模式下 Mini HUD 可拖拽 */
+        #dnd-mini-hud.dnd-independent-mode {
+            cursor: move !important;
+        }
+        
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-header {
+            cursor: move !important;
+        }
     `;
-    $('head').append(`<style id="${SCRIPT_ID}-styles">${css}</style>`);
+    $root(doc.head || doc.documentElement).append(`<style id="${SCRIPT_ID}-styles">${css}</style>`);
 };
 
 ;// ./node_modules/@fortawesome/fontawesome-svg-core/index.mjs
@@ -18857,15 +18994,43 @@ const NotificationSystem = {
 
     // 初始化容器
     _ensureContainer() {
-        const { $ } = getCore();
-        if (!this._container) {
-            this._container = $('<div id="dnd-notification-container"></div>');
-            $('body').append(this._container);
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
+        const $body = $root('body').first();
+        const bodyEl = $body?.[0] || document.body;
+        const doc = bodyEl?.ownerDocument || document;
+        const $dialogHost = $root('#dnd-dashboard-root.visible');
+        const $dialogMount = $dialogHost.length ? $dialogHost : $body;
+        const dialogMountEl = $dialogMount?.[0] || bodyEl;
+
+        if (!this._container || !this._container[0] || !bodyEl.contains(this._container[0])) {
+            this._container = $root('<div id="dnd-notification-container"></div>');
+            $body.append(this._container);
+        } else if (this._container[0].parentNode !== bodyEl) {
+            $body.append(this._container);
         }
-        if (!this._dialogContainer) {
-            this._dialogContainer = $('<div id="dnd-dialog-container"></div>');
-            $('body').append(this._dialogContainer);
+
+        if (!this._dialogContainer || !this._dialogContainer[0] || !doc.body.contains(this._dialogContainer[0])) {
+            this._dialogContainer = $root('<div id="dnd-dialog-container"></div>');
+            $dialogMount.append(this._dialogContainer);
+        } else if (this._dialogContainer[0].parentNode !== dialogMountEl) {
+            $dialogMount.append(this._dialogContainer);
         }
+    },
+
+    /**
+     * 检测是否应该使用 modal overlay 路径
+     * 条件：full dashboard 可见 + modal overlay 存在
+     * @returns {boolean}
+     */
+    _shouldUseModalOverlay() {
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
+        const $dashboard = $root('#dnd-dashboard-root.visible');
+        const $overlay = $root('#dnd-modal-overlay');
+        const $modal = $root('#dnd-modal-content');
+        // full dashboard 可见 且 overlay/content 都存在
+        return $dashboard.length > 0 && $overlay.length > 0 && $modal.length > 0;
     },
 
     /**
@@ -18946,8 +19111,21 @@ const NotificationSystem = {
      * @returns {Promise<boolean>}
      */
     confirm(message, options = {}) {
-        const { $ } = getCore();
-        this._ensureContainer();
+        // 检测是否应该使用 modal overlay 路径
+        if (this._shouldUseModalOverlay()) {
+            return this._confirmViaModalOverlay(message, options);
+        }
+        // Fallback: 使用自建 dialog
+        return this._confirmViaDialog(message, options);
+    },
+
+    /**
+     * 通过 modal overlay 显示确认对话框
+     * @private
+     */
+    _confirmViaModalOverlay(message, options = {}) {
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
 
         const {
             title = '确认',
@@ -18957,8 +19135,101 @@ const NotificationSystem = {
         } = options;
 
         return new Promise((resolve) => {
-            const $backdrop = $('<div class="dnd-dialog-backdrop"></div>');
-            const $dialog = $(`
+            const $overlay = $root('#dnd-modal-overlay');
+            const $modal = $root('#dnd-modal-content');
+            const doc = $overlay[0]?.ownerDocument || coreWin?.document || document;
+            
+            // 构建对话框内容（复用现有 .dnd-dialog 视觉风格）
+            const $content = $root(`
+                <div class="dnd-dialog dnd-dialog-${type}" style="position:relative;max-width:min(90vw,450px);max-height:80vh;">
+                    <div class="dnd-dialog-header">
+                        <span class="dnd-dialog-title">${title}</span>
+                        <button class="dnd-dialog-close">×</button>
+                    </div>
+                    <div class="dnd-dialog-body">
+                        <p class="dnd-dialog-message">${message}</p>
+                    </div>
+                    <div class="dnd-dialog-footer">
+                        <button class="dnd-dialog-btn dnd-dialog-btn-cancel">${cancelText}</button>
+                        <button class="dnd-dialog-btn dnd-dialog-btn-confirm">${confirmText}</button>
+                    </div>
+                </div>
+            `);
+
+            let closed = false;
+            const handlers = {
+                confirm: null,
+                cancel: null,
+                close: null,
+                overlayClick: null,
+                esc: null
+            };
+
+            const cleanup = () => {
+                if (closed) return;
+                closed = true;
+                // 解绑所有事件
+                $content.find('.dnd-dialog-btn-confirm').off('click', handlers.confirm);
+                $content.find('.dnd-dialog-btn-cancel').off('click', handlers.cancel);
+                $content.find('.dnd-dialog-close').off('click', handlers.close);
+                $overlay.off('click.dnd-confirm', handlers.overlayClick);
+                doc.removeEventListener('keydown', handlers.esc);
+                // 清空 modal 内容并关闭 overlay
+                $modal.empty();
+                $overlay.removeClass('active');
+            };
+
+            // 绑定事件
+            handlers.confirm = () => { cleanup(); resolve(true); };
+            handlers.cancel = () => { cleanup(); resolve(false); };
+            handlers.close = () => { cleanup(); resolve(false); };
+            handlers.overlayClick = (e) => {
+                if (e.target === $overlay[0]) { cleanup(); resolve(false); }
+            };
+            handlers.esc = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup();
+                    resolve(false);
+                }
+            };
+
+            $content.find('.dnd-dialog-btn-confirm').on('click', handlers.confirm);
+            $content.find('.dnd-dialog-btn-cancel').on('click', handlers.cancel);
+            $content.find('.dnd-dialog-close').on('click', handlers.close);
+            $overlay.on('click.dnd-confirm', handlers.overlayClick);
+            doc.addEventListener('keydown', handlers.esc);
+
+            // 渲染到 modal content
+            $modal.empty().append($content);
+            $overlay.addClass('active');
+            requestAnimationFrame(() => {
+                $content.addClass('dnd-dialog-visible');
+            });
+        });
+    },
+
+    /**
+     * 通过自建 dialog 显示确认对话框 (fallback)
+     * @private
+     */
+    _confirmViaDialog(message, options = {}) {
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
+        this._ensureContainer();
+        const doc = this._dialogContainer?.[0]?.ownerDocument || coreWin?.document || document;
+
+        const {
+            title = '确认',
+            confirmText = '确定',
+            cancelText = '取消',
+            type = 'info'
+        } = options;
+
+        return new Promise((resolve) => {
+            const $backdrop = $root('<div class="dnd-dialog-backdrop"></div>');
+            const $dialog = $root(`
                 <div class="dnd-dialog dnd-dialog-${type}">
                     <div class="dnd-dialog-header">
                         <span class="dnd-dialog-title">${title}</span>
@@ -18974,12 +19245,15 @@ const NotificationSystem = {
                 </div>
             `);
 
+            let closed = false;
             const closeDialog = (result) => {
+                if (closed) return;
+                closed = true;
+                doc.removeEventListener('keydown', escHandler);
                 $dialog.removeClass('dnd-dialog-visible');
                 $backdrop.removeClass('dnd-dialog-backdrop-visible');
                 setTimeout(() => {
                     $backdrop.remove();
-                    $dialog.remove();
                 }, 200);
                 resolve(result);
             };
@@ -18987,18 +19261,24 @@ const NotificationSystem = {
             $dialog.find('.dnd-dialog-btn-confirm').on('click', () => closeDialog(true));
             $dialog.find('.dnd-dialog-btn-cancel').on('click', () => closeDialog(false));
             $dialog.find('.dnd-dialog-close').on('click', () => closeDialog(false));
-            $backdrop.on('click', () => closeDialog(false));
+            $backdrop.on('click', (e) => {
+                // 只有点击 backdrop 本身（不是 dialog）才关闭
+                if (e.target === $backdrop[0]) {
+                    closeDialog(false);
+                }
+            });
 
             // ESC 键关闭
             const escHandler = (e) => {
                 if (e.key === 'Escape') {
                     closeDialog(false);
-                    document.removeEventListener('keydown', escHandler);
                 }
             };
-            document.addEventListener('keydown', escHandler);
+            doc.addEventListener('keydown', escHandler);
 
-            this._dialogContainer.append($backdrop).append($dialog);
+            // dialog append 到 backdrop 内部
+            $backdrop.append($dialog);
+            this._dialogContainer.append($backdrop);
 
             requestAnimationFrame(() => {
                 $backdrop.addClass('dnd-dialog-backdrop-visible');
@@ -19019,8 +19299,21 @@ const NotificationSystem = {
      * @returns {Promise<string|null>}
      */
     prompt(message, options = {}) {
-        const { $ } = getCore();
-        this._ensureContainer();
+        // 检测是否应该使用 modal overlay 路径
+        if (this._shouldUseModalOverlay()) {
+            return this._promptViaModalOverlay(message, options);
+        }
+        // Fallback: 使用自建 dialog
+        return this._promptViaDialog(message, options);
+    },
+
+    /**
+     * 通过 modal overlay 显示输入对话框
+     * @private
+     */
+    _promptViaModalOverlay(message, options = {}) {
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
 
         const {
             title = '请输入',
@@ -19031,8 +19324,122 @@ const NotificationSystem = {
         } = options;
 
         return new Promise((resolve) => {
-            const $backdrop = $('<div class="dnd-dialog-backdrop"></div>');
-            const $dialog = $(`
+            const $overlay = $root('#dnd-modal-overlay');
+            const $modal = $root('#dnd-modal-content');
+            const doc = $overlay[0]?.ownerDocument || coreWin?.document || document;
+            
+            // 构建对话框内容
+            const $content = $root(`
+                <div class="dnd-dialog dnd-dialog-prompt" style="position:relative;max-width:min(90vw,450px);max-height:80vh;">
+                    <div class="dnd-dialog-header">
+                        <span class="dnd-dialog-title">${title}</span>
+                        <button class="dnd-dialog-close">×</button>
+                    </div>
+                    <div class="dnd-dialog-body">
+                        <p class="dnd-dialog-message">${message}</p>
+                        <input type="text" class="dnd-dialog-input" value="${defaultValue}" placeholder="${placeholder}" />
+                    </div>
+                    <div class="dnd-dialog-footer">
+                        <button class="dnd-dialog-btn dnd-dialog-btn-cancel">${cancelText}</button>
+                        <button class="dnd-dialog-btn dnd-dialog-btn-confirm">${confirmText}</button>
+                    </div>
+                </div>
+            `);
+
+            const $input = $content.find('.dnd-dialog-input');
+
+            let closed = false;
+            const handlers = {
+                confirm: null,
+                cancel: null,
+                close: null,
+                overlayClick: null,
+                esc: null,
+                inputKeydown: null
+            };
+
+            const cleanup = (confirmed) => {
+                if (closed) return;
+                closed = true;
+                const value = confirmed ? $input.val() : null;
+                // 解绑所有事件
+                $content.find('.dnd-dialog-btn-confirm').off('click', handlers.confirm);
+                $content.find('.dnd-dialog-btn-cancel').off('click', handlers.cancel);
+                $content.find('.dnd-dialog-close').off('click', handlers.close);
+                $overlay.off('click.dnd-prompt', handlers.overlayClick);
+                doc.removeEventListener('keydown', handlers.esc);
+                $input.off('keydown', handlers.inputKeydown);
+                // 清空 modal 内容并关闭 overlay
+                $modal.empty();
+                $overlay.removeClass('active');
+                resolve(value);
+            };
+
+            // 绑定事件
+            handlers.confirm = () => cleanup(true);
+            handlers.cancel = () => cleanup(false);
+            handlers.close = () => cleanup(false);
+            handlers.overlayClick = (e) => {
+                if (e.target === $overlay[0]) { cleanup(false); }
+            };
+            handlers.esc = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(false);
+                }
+            };
+            handlers.inputKeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    cleanup(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cleanup(false);
+                }
+            };
+
+            $content.find('.dnd-dialog-btn-confirm').on('click', handlers.confirm);
+            $content.find('.dnd-dialog-btn-cancel').on('click', handlers.cancel);
+            $content.find('.dnd-dialog-close').on('click', handlers.close);
+            $overlay.on('click.dnd-prompt', handlers.overlayClick);
+            doc.addEventListener('keydown', handlers.esc);
+            $input.on('keydown', handlers.inputKeydown);
+
+            // 渲染到 modal content
+            $modal.empty().append($content);
+            $overlay.addClass('active');
+
+            // 聚焦输入框
+            requestAnimationFrame(() => {
+                $content.addClass('dnd-dialog-visible');
+                $input.focus().select();
+            });
+        });
+    },
+
+    /**
+     * 通过自建 dialog 显示输入对话框 (fallback)
+     * @private
+     */
+    _promptViaDialog(message, options = {}) {
+        const { $, window: coreWin } = getCore();
+        const $root = coreWin?.jQuery || $;
+        this._ensureContainer();
+        const doc = this._dialogContainer?.[0]?.ownerDocument || coreWin?.document || document;
+
+        const {
+            title = '请输入',
+            defaultValue = '',
+            placeholder = '',
+            confirmText = '确定',
+            cancelText = '取消'
+        } = options;
+
+        return new Promise((resolve) => {
+            const $backdrop = $root('<div class="dnd-dialog-backdrop"></div>');
+            const $dialog = $root(`
                 <div class="dnd-dialog dnd-dialog-prompt">
                     <div class="dnd-dialog-header">
                         <span class="dnd-dialog-title">${title}</span>
@@ -19051,13 +19458,16 @@ const NotificationSystem = {
 
             const $input = $dialog.find('.dnd-dialog-input');
 
+            let closed = false;
             const closeDialog = (confirmed) => {
+                if (closed) return;
+                closed = true;
                 const value = confirmed ? $input.val() : null;
+                doc.removeEventListener('keydown', escHandler);
                 $dialog.removeClass('dnd-dialog-visible');
                 $backdrop.removeClass('dnd-dialog-backdrop-visible');
                 setTimeout(() => {
                     $backdrop.remove();
-                    $dialog.remove();
                 }, 200);
                 resolve(value);
             };
@@ -19065,7 +19475,19 @@ const NotificationSystem = {
             $dialog.find('.dnd-dialog-btn-confirm').on('click', () => closeDialog(true));
             $dialog.find('.dnd-dialog-btn-cancel').on('click', () => closeDialog(false));
             $dialog.find('.dnd-dialog-close').on('click', () => closeDialog(false));
-            $backdrop.on('click', () => closeDialog(false));
+            $backdrop.on('click', (e) => {
+                // 只有点击 backdrop 本身（不是 dialog）才关闭
+                if (e.target === $backdrop[0]) {
+                    closeDialog(false);
+                }
+            });
+
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    closeDialog(false);
+                }
+            };
+            doc.addEventListener('keydown', escHandler);
 
             // Enter 确认, ESC 取消
             $input.on('keydown', (e) => {
@@ -19073,11 +19495,15 @@ const NotificationSystem = {
                     e.preventDefault();
                     closeDialog(true);
                 } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    e.stopPropagation();
                     closeDialog(false);
                 }
             });
 
-            this._dialogContainer.append($backdrop).append($dialog);
+            // dialog append 到 backdrop 内部
+            $backdrop.append($dialog);
+            this._dialogContainer.append($backdrop);
 
             requestAnimationFrame(() => {
                 $backdrop.addClass('dnd-dialog-backdrop-visible');
@@ -19431,8 +19857,10 @@ const ThemeManager = {
         '--dnd-bg-panel-end': { label: '面板背景(下)', type: 'color', default: '#1a100e' },
         '--dnd-bg-card-start': { label: '卡片背景(亮)', type: 'color', default: '#242424' },
         '--dnd-bg-card-end': { label: '卡片背景(暗)', type: 'color', default: '#1a1a1c' },
+        '--dnd-bg-input': { label: '输入框背景', type: 'color', default: 'rgba(26, 26, 28, 0.95)' },
         '--dnd-border-gold': { label: '主边框', type: 'color', default: '#9d8b6c' },
         '--dnd-border-inner': { label: '内边框', type: 'color', default: '#5c4b35' },
+        '--dnd-border-subtle': { label: '次要边框', type: 'color', default: '#444' },
         '--dnd-text-main': { label: '主文本', type: 'color', default: '#dcd0c0' },
         '--dnd-text-header': { label: '标题文本', type: 'color', default: '#e6dcca' },
         '--dnd-text-highlight': { label: '高亮文本', type: 'color', default: '#ffdb85' },
@@ -20449,8 +20877,7 @@ const StyleEffects = {
                 // 切角效果
                 rules.push(`
                     .dnd-char-card,
-                    .dnd-panel,
-                    .dnd-dialog {
+                    .dnd-panel {
                         clip-path: ${clipPath || 'polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px)'} !important;
                         border-radius: 0 !important;
                     }
@@ -20518,8 +20945,7 @@ const StyleEffects = {
                 // 切角 (Cyberpunk style)
                 rules.push(`
                     .dnd-char-card,
-                    .dnd-panel,
-                    .dnd-dialog {
+                    .dnd-panel {
                         clip-path: ${clipPath || 'polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px)'} !important;
                         border-radius: 0 !important;
                     }
@@ -22306,11 +22732,17 @@ const STYLE_PRESETS = {
                 'letter-spacing': '0.25em',
                 'font-family': '"Orbitron", monospace'
             },
-            /* ====== 面板/弹窗 - 全息投影面板 ====== */
-            '.dnd-panel, .dnd-dialog': {
+            /* ====== 面板 - 全息投影面板 ====== */
+            '.dnd-panel': {
                 'border': '2px solid #00f3ff',
                 'border-radius': '0',
                 'clip-path': 'polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px)',
+                'box-shadow': '0 0 40px rgba(0, 243, 255, 0.3), 0 0 80px rgba(255, 0, 255, 0.15), inset 0 0 50px rgba(0, 243, 255, 0.05)'
+            },
+            /* ====== 对话框 - 不使用 clip-path 裁切 ====== */
+            '.dnd-dialog': {
+                'border': '2px solid #00f3ff',
+                'border-radius': '8px',
                 'box-shadow': '0 0 40px rgba(0, 243, 255, 0.3), 0 0 80px rgba(255, 0, 255, 0.15), inset 0 0 50px rgba(0, 243, 255, 0.05)'
             },
             /* ====== 输入框 - 终端输入 ====== */
@@ -26066,6 +26498,1281 @@ const STYLE_PRESETS = {
             size: { min: 40, max: 100 },
             animated: true
         }
+    },
+
+    // 9. 玫瑰庭院 (优雅、浪漫) - 玫瑰粉、深色背景、成熟优雅
+    'rose-garden': {
+        meta: {
+            id: 'rose-garden',
+            name: '玫瑰庭院',
+            icon: '<i class="fa-solid fa-heart"></i>',
+            description: '优雅成熟的玫瑰粉色风格，深色背景上的浪漫气息',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#1a0f14',
+            '--dnd-bg-panel-start': '#2a1520',
+            '--dnd-bg-panel-end': '#1a0f14',
+            '--dnd-text-main': '#f0e0e6',
+            '--dnd-text-header': '#ffb6c1',
+            '--dnd-text-highlight': '#ffd1dc',
+            '--dnd-text-dim': '#b08090',
+            '--dnd-accent': '#e8508f',
+            '--dnd-accent-hover': '#ff6b9d',
+            '--dnd-border-gold': '#c07080',
+            '--dnd-border-inner': '#8a4050',
+            '--dnd-bg-card-start': 'rgba(42, 21, 32, 0.95)',
+            '--dnd-bg-card-end': 'rgba(26, 15, 20, 0.98)',
+            '--dnd-btn-primary': '#b04060',
+            '--dnd-btn-primary-hover': '#d05080',
+            '--dnd-btn-text': '#f0e0e6'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'soft', clipPath: 'none' },
+            card: { shape: 'elegant', decoration: 'roses' },
+            effects: { texture: 'silk', innerGlow: 'rose', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'normal' },
+            decorations: { corners: 'flourish', dividers: 'ornate', headers: 'banner' },
+            buttons: { style: 'elegant', shape: 'rounded' },
+            progressBars: { style: 'rose', animated: true }
+        },
+        typography: {
+            '--dnd-font-serif': '"Cinzel", "Palatino Linotype", "Book Antiqua", serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-font-size-header': '1.15rem',
+            '--dnd-font-weight-header': '600',
+            '--dnd-letter-spacing': '0.04em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            '--dnd-animation-bloom': 'rose-bloom 4s ease-in-out infinite'
+        },
+        interactiveStates: {
+            hover: {
+                brightness: 1.1,
+                scale: 1.02,
+                lift: '-4px',
+                shadow: '0 10px 30px rgba(232, 80, 143, 0.25), 0 0 15px rgba(255, 182, 193, 0.15)',
+                borderColor: '#c07080',
+                glow: 'drop-shadow(0 0 6px rgba(232, 80, 143, 0.4))',
+                transition: '0.3s ease-out'
+            },
+            cardHover: {
+                transform: 'translateY(-6px) scale(1.015)',
+                shadow: '0 18px 40px rgba(26, 15, 20, 0.6), 0 0 25px rgba(232, 80, 143, 0.2), inset 0 0 20px rgba(255, 182, 193, 0.05)',
+                borderColor: '#e8508f'
+            },
+            buttonHover: {
+                brightness: 1.18,
+                transform: 'translateY(-2px) scale(1.03)',
+                shadow: '0 6px 20px rgba(176, 64, 96, 0.5), 0 0 12px rgba(232, 80, 143, 0.3)'
+            },
+            active: {
+                scale: 0.97,
+                brightness: 0.92,
+                transform: 'translateY(1px) scale(0.97)',
+                shadow: '0 2px 8px rgba(0,0,0,0.4), inset 0 1px 3px rgba(0,0,0,0.2)'
+            },
+            buttonActive: {
+                transform: 'translateY(2px) scale(0.98)',
+                shadow: '0 1px 4px rgba(0,0,0,0.4), inset 0 2px 5px rgba(0,0,0,0.3)'
+            },
+            selected: {
+                background: 'linear-gradient(90deg, rgba(232, 80, 143, 0.25), rgba(192, 112, 128, 0.15), transparent)',
+                borderColor: '#ffd1dc',
+                borderWidth: '2px',
+                glow: '0 0 15px rgba(232, 80, 143, 0.35)',
+                textColor: '#ffd1dc'
+            },
+            navActive: {
+                background: 'linear-gradient(90deg, rgba(232, 80, 143, 0.3), rgba(192, 112, 128, 0.2), transparent)',
+                border: '3px solid #c07080',
+                indicator: '#e8508f'
+            },
+            focus: {
+                borderColor: '#e8508f',
+                shadow: '0 0 0 3px rgba(232, 80, 143, 0.3)',
+                outline: 'none'
+            },
+            disabled: {
+                opacity: 0.45,
+                cursor: 'not-allowed',
+                filter: 'grayscale(0.5) brightness(0.7)'
+            },
+            iconHover: {
+                glow: 'drop-shadow(0 0 8px rgba(232, 80, 143, 0.7)) drop-shadow(0 0 15px rgba(255, 182, 193, 0.4))',
+                scale: 1.15
+            },
+            inputFocus: {
+                border: '#c07080',
+                shadow: '0 0 12px rgba(232, 80, 143, 0.3), inset 0 0 8px rgba(192, 112, 128, 0.1)'
+            }
+        },
+        overrides: {
+            /* ====== 卡片 - 玫瑰花瓣形态 ====== */
+            '.dnd-char-card': {
+                'box-shadow': '0 8px 30px rgba(26, 15, 20, 0.6), inset 0 0 40px rgba(232, 80, 143, 0.08), 0 0 20px rgba(255, 182, 193, 0.1)',
+                'border': '2px solid #8a4050',
+                'border-radius': '16px',
+                'background': 'linear-gradient(135deg, rgba(42, 21, 32, 0.95) 0%, rgba(35, 18, 26, 0.97) 50%, rgba(26, 15, 20, 0.98) 100%)'
+            },
+            '.dnd-card-header': {
+                'border-bottom': '2px solid #8a4050',
+                'background': 'linear-gradient(to right, rgba(232, 80, 143, 0.2), rgba(138, 64, 80, 0.15), rgba(255, 182, 193, 0.15))',
+                'border-radius': '14px 14px 0 0',
+                'padding': '14px 18px',
+                'position': 'relative'
+            },
+            '.dnd-card-body': {
+                'background': 'radial-gradient(ellipse at bottom right, rgba(232, 80, 143, 0.05), transparent 70%)',
+                'padding': '16px'
+            },
+            /* ====== 导航栏 - 玫瑰藤蔓 ====== */
+            '.dnd-nav-sidebar': {
+                'background': 'linear-gradient(180deg, #2a1520 0%, #1a0f14 100%)',
+                'border-right': '3px solid #8a4050',
+                'box-shadow': '3px 0 15px rgba(26, 15, 20, 0.5)'
+            },
+            '.dnd-nav-item': {
+                'border-radius': '0 12px 12px 0',
+                'margin': '4px 0',
+                'padding': '12px 20px',
+                'border-left': '4px solid transparent',
+                'background': 'rgba(232, 80, 143, 0.03)',
+                'transition': 'all 0.3s ease-out'
+            },
+            '.dnd-nav-item:hover': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.2), rgba(192, 112, 128, 0.1), transparent)',
+                'border-left-color': '#c07080',
+                'padding-left': '24px'
+            },
+            '.dnd-nav-item.active': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.3), rgba(192, 112, 128, 0.15), transparent)',
+                'box-shadow': 'inset 4px 0 0 #e8508f, 0 0 20px rgba(232, 80, 143, 0.2)',
+                'border-left-color': '#e8508f'
+            },
+            /* ====== 进度条 - 玫瑰花茎 ====== */
+            '.dnd-bar-container': {
+                'background': 'linear-gradient(180deg, rgba(26, 15, 20, 0.8), rgba(42, 21, 32, 0.6))',
+                'border': '1px solid #8a4050',
+                'border-radius': '10px',
+                'height': '10px',
+                'box-shadow': 'inset 0 1px 4px rgba(0,0,0,0.4)'
+            },
+            '.dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #8a4050 0%, #b04060 40%, #e8508f 70%, #ff6b9d 100%)',
+                'box-shadow': '0 0 10px rgba(232, 80, 143, 0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+                'border-radius': '8px'
+            },
+            '.dnd-bar-hp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #6a3040 0%, #903050 40%, #c04060 70%, #903050 100%)'
+            },
+            '.dnd-bar-exp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #5a3050 0%, #804070 40%, #b050a0 70%, #804070 100%)'
+            },
+            /* ====== 按钮 - 玫瑰花蕾 ====== */
+            '.dnd-btn, .dnd-action-btn': {
+                'border': '2px solid #8a4050',
+                'background': 'linear-gradient(135deg, #3a1a24 0%, #2a1520 100%)',
+                'box-shadow': 'inset 0 1px 0 rgba(255,255,255,0.1), 0 3px 8px rgba(0,0,0,0.4)',
+                'border-radius': '12px',
+                'font-family': '"Cinzel", serif',
+                'position': 'relative',
+                'overflow': 'hidden'
+            },
+            '.dnd-btn:hover, .dnd-action-btn:hover': {
+                'background': 'linear-gradient(135deg, #4a2a34 0%, #3a1a24 100%)',
+                'border-color': '#c07080',
+                'box-shadow': '0 0 15px rgba(232, 80, 143, 0.3), 0 5px 12px rgba(0,0,0,0.4)'
+            },
+            '.dnd-btn:active, .dnd-action-btn:active': {
+                'background': 'linear-gradient(135deg, #2a1520 0%, #1a0f14 100%)',
+                'box-shadow': 'inset 0 2px 4px rgba(0,0,0,0.4)'
+            },
+            /* ====== 属性行 - 玫瑰花瓣纹理 ====== */
+            '.dnd-stat-row': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.1), rgba(138, 64, 80, 0.1), rgba(232, 80, 143, 0.05))',
+                'border': '1px solid rgba(138, 64, 80, 0.3)',
+                'border-radius': '8px',
+                'padding': '8px 12px',
+                'margin': '4px 0'
+            },
+            '.dnd-stat-row:hover': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.15), rgba(138, 64, 80, 0.15), rgba(232, 80, 143, 0.1))'
+            },
+            /* ====== 标题样式 - 玫瑰铭文 ====== */
+            '.dnd-title, .dnd-char-name': {
+                'text-shadow': '0 2px 10px rgba(232, 80, 143, 0.4), 0 0 20px rgba(255, 182, 193, 0.2)',
+                'font-family': '"Cinzel", "Palatino Linotype", serif',
+                'letter-spacing': '0.05em'
+            },
+            /* ====== 面板/弹窗 - 玫瑰窗格 ====== */
+            '.dnd-panel, .dnd-dialog': {
+                'border': '2px solid #8a4050',
+                'border-radius': '20px',
+                'box-shadow': '0 10px 40px rgba(26, 15, 20, 0.6), inset 0 0 50px rgba(232, 80, 143, 0.05)'
+            },
+            '#dnd-mini-hud': {
+                'border': '2px solid #8a4050',
+                'border-radius': '14px',
+                'background': 'linear-gradient(180deg, rgba(42, 21, 32, 0.98), rgba(26, 15, 20, 0.99))'
+            },
+            /* ====== 输入框 ====== */
+            '.dnd-input, .dnd-select, .dnd-textarea': {
+                'background': 'rgba(26, 15, 20, 0.8)',
+                'border': '1px solid #8a4050',
+                'border-radius': '8px',
+                'color': '#f0e0e6'
+            },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': {
+                'border-color': '#c07080',
+                'box-shadow': '0 0 12px rgba(232, 80, 143, 0.3), inset 0 0 6px rgba(192, 112, 128, 0.1)'
+            },
+            /* ====== 表格 ====== */
+            '.dnd-table th': {
+                'background': 'linear-gradient(180deg, #3a1a24, #2a1520)',
+                'border-bottom': '2px solid #c07080',
+                'color': '#ffb6c1'
+            },
+            '.dnd-table td': {
+                'border-bottom': '1px solid rgba(138, 64, 80, 0.3)'
+            },
+            '.dnd-table tr:hover td': {
+                'background': 'rgba(232, 80, 143, 0.1)'
+            },
+            /* ====== 徽章 ====== */
+            '.dnd-badge': {
+                'background': 'linear-gradient(135deg, #8a4050, #5a3040)',
+                'border': '1px solid #c07080',
+                'border-radius': '8px'
+            }
+        },
+        customCSS: `
+            /* ====== 玫瑰庭院皮肤 - 浪漫优雅动画与装饰 ====== */
+            
+            /* 玫瑰绽放光效 */
+            @keyframes rose-bloom {
+                0%, 100% {
+                    box-shadow: 0 8px 30px rgba(26, 15, 20, 0.6), inset 0 0 40px rgba(232, 80, 143, 0.08), 0 0 20px rgba(255, 182, 193, 0.1);
+                    filter: brightness(1);
+                }
+                50% {
+                    box-shadow: 0 8px 35px rgba(26, 15, 20, 0.65), inset 0 0 50px rgba(232, 80, 143, 0.12), 0 0 30px rgba(255, 182, 193, 0.18);
+                    filter: brightness(1.02);
+                }
+            }
+            
+            /* 花瓣飘落动画 */
+            @keyframes petal-fall {
+                0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+                10% { opacity: 0.8; }
+                100% { transform: translateY(100px) rotate(180deg); opacity: 0; }
+            }
+            
+            /* 玫瑰脉动 */
+            @keyframes rose-pulse {
+                0%, 100% { opacity: 0.6; transform: scale(1); }
+                50% { opacity: 0.9; transform: scale(1.05); }
+            }
+            
+            /* 丝绸光泽流动 */
+            @keyframes silk-shimmer {
+                0% { transform: translateX(-100%); }
+                50%, 100% { transform: translateX(100%); }
+            }
+            
+            /* 卡片 - 玫瑰花瓣形态 */
+            .dnd-char-card {
+                position: relative;
+                animation: rose-bloom 5s ease-in-out infinite;
+            }
+            
+            /* 外发光边框 - 玫瑰光晕 */
+            .dnd-char-card::before {
+                content: "";
+                position: absolute;
+                top: -3px; left: -3px; right: -3px; bottom: -3px;
+                background: linear-gradient(135deg, rgba(232, 80, 143, 0.3) 0%, transparent 25%, transparent 75%, rgba(255, 182, 193, 0.2) 100%);
+                border-radius: 18px;
+                pointer-events: none;
+                z-index: -1;
+                filter: blur(3px);
+            }
+            
+            /* 丝绸纹理叠加 */
+            .dnd-char-card::after {
+                content: "";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='silk'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23silk)' opacity='0.03'/%3E%3C/svg%3E");
+                pointer-events: none;
+                border-radius: inherit;
+                z-index: 0;
+            }
+            
+            /* 卡片头部 - 玫瑰装饰 */
+            .dnd-card-header::before {
+                content: "❀";
+                position: absolute;
+                left: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #e8508f;
+                font-size: 14px;
+                opacity: 0.7;
+                animation: rose-pulse 3s ease-in-out infinite;
+            }
+            
+            .dnd-card-header::after {
+                content: "❀";
+                position: absolute;
+                right: 12px; top: 50%;
+                transform: translateY(-50%) scaleX(-1);
+                color: #c07080;
+                font-size: 14px;
+                opacity: 0.7;
+                animation: rose-pulse 3s ease-in-out infinite 0.5s;
+            }
+            
+            /* 导航项 - 玫瑰藤蔓效果 */
+            .dnd-nav-item::before {
+                content: "";
+                position: absolute;
+                left: 0; top: 50%;
+                transform: translateY(-50%);
+                width: 0; height: 3px;
+                background: linear-gradient(90deg, #e8508f, #ff6b9d);
+                transition: width 0.3s ease-out;
+                border-radius: 0 3px 3px 0;
+            }
+            
+            .dnd-nav-item:hover::before {
+                width: 20px;
+            }
+            
+            .dnd-nav-item.active::before {
+                width: 30px;
+                box-shadow: 0 0 10px rgba(232, 80, 143, 0.5);
+            }
+            
+            .dnd-nav-item.active::after {
+                content: "❧";
+                position: absolute;
+                right: 12px;
+                color: #e8508f;
+                font-size: 12px;
+            }
+            
+            /* 按钮 - 丝绸光泽效果 */
+            .dnd-btn::before,
+            .dnd-action-btn::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -100%;
+                width: 50%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+                transition: left 0.5s ease;
+            }
+            
+            .dnd-btn:hover::before,
+            .dnd-action-btn:hover::before {
+                left: 100%;
+            }
+            
+            /* 进度条 - 玫瑰流动效果 */
+            .dnd-bar-fill {
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .dnd-bar-fill::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -50%; width: 50%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+                animation: silk-shimmer 2.5s ease-in-out infinite;
+            }
+            
+            /* 分隔线 - 玫瑰藤 */
+            .dnd-divider {
+                height: 2px;
+                background: linear-gradient(90deg, transparent, #8a4050, #c07080, #8a4050, transparent);
+                position: relative;
+                margin: 12px 0;
+            }
+            
+            .dnd-divider::before {
+                content: "✿";
+                position: absolute;
+                left: 50%; top: 50%;
+                transform: translate(-50%, -50%);
+                background: #1a0f14;
+                padding: 0 10px;
+                color: #e8508f;
+                font-size: 12px;
+            }
+            
+            /* 面板角落 - 玫瑰花纹装饰 */
+            .dnd-panel::before,
+            .dnd-dialog::before {
+                content: "❧";
+                position: absolute;
+                top: 8px; left: 10px;
+                color: #c07080;
+                font-size: 16px;
+                opacity: 0.6;
+            }
+            
+            .dnd-panel::after,
+            .dnd-dialog::after {
+                content: "❧";
+                position: absolute;
+                bottom: 8px; right: 10px;
+                color: #c07080;
+                font-size: 16px;
+                opacity: 0.6;
+                transform: rotate(180deg);
+            }
+            
+            /* 滚动条 - 玫瑰风格 */
+            .dnd-content-area::-webkit-scrollbar {
+                width: 10px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-track {
+                background: rgba(26, 15, 20, 0.5);
+                border-left: 1px solid #8a4050;
+                border-radius: 5px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb {
+                background: linear-gradient(to bottom, #8a4050, #b04060, #8a4050);
+                border-radius: 5px;
+                border: 1px solid #5a3040;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(to bottom, #b04060, #e8508f, #b04060);
+            }
+            
+            /* 图标容器 - 玫瑰徽章 */
+            .dnd-icon-circle {
+                border-radius: 50%;
+                border: 2px solid #c07080;
+                background: radial-gradient(circle at 30% 30%, #3a1a24, #1a0f14);
+                box-shadow: 0 0 15px rgba(232, 80, 143, 0.3);
+            }
+            
+            /* 头像框 - 椭圆玫瑰框 */
+            .dnd-avatar {
+                border-radius: 60% 40% 50% 50% / 50% 50% 40% 60%;
+                border: 2px solid #c07080;
+                box-shadow: 0 0 15px rgba(232, 80, 143, 0.3), 0 0 30px rgba(255, 182, 193, 0.15);
+            }
+            
+            /* 工具提示 */
+            .dnd-tooltip {
+                background: linear-gradient(135deg, #2a1520, #1a0f14);
+                border: 1px solid #c07080;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(26, 15, 20, 0.6);
+            }
+            
+            /* 悬浮光效 */
+            .dnd-char-card:hover {
+                box-shadow: 0 12px 40px rgba(26, 15, 20, 0.7), inset 0 0 50px rgba(232, 80, 143, 0.1), 0 0 30px rgba(255, 182, 193, 0.2);
+            }
+        `,
+        background: {
+            type: 'particles',
+            colors: ['rgba(232, 80, 143, 0.6)', 'rgba(255, 182, 193, 0.5)', 'rgba(192, 112, 128, 0.4)', 'rgba(255, 255, 255, 0.3)'],
+            minSize: 2,
+            maxSize: 6,
+            count: 25,
+            speed: 0.04,
+            shape: 'circle',
+            glow: true
+        }
+    },
+
+    // 10. 可爱童话 (童趣、温馨) - 柔和圆润、温馨可爱
+    'kawaii-dreams': {
+        meta: {
+            id: 'kawaii-dreams',
+            name: '可爱童话',
+            icon: '<i class="fa-solid fa-star"></i>',
+            description: '温馨可爱的童话风格，柔和圆润的视觉效果',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#FDF2F8',
+            '--dnd-bg-panel-start': '#FDF2F8',
+            '--dnd-bg-panel-end': '#FCE7F3',
+            '--dnd-text-main': '#9D174D',
+            '--dnd-text-header': '#BE185D',
+            '--dnd-text-highlight': '#DB2777',
+            '--dnd-text-dim': '#9F1239',
+            '--dnd-accent': '#F472B6',
+            '--dnd-accent-hover': '#F9A8D4',
+            '--dnd-border-gold': '#FBCFE8',
+            '--dnd-border-inner': '#F9A8D4',
+            '--dnd-border-subtle': '#FBCFE8',
+            '--dnd-bg-card-start': 'rgba(255, 255, 255, 0.95)',
+            '--dnd-bg-card-end': 'rgba(253, 242, 248, 0.98)',
+            '--dnd-bg-input': '#FFF7FB',
+            '--dnd-bg-secondary': '#FFF7FB',
+            '--dnd-bg-tertiary': '#FCE7F3',
+            '--dnd-btn-primary': '#F472B6',
+            '--dnd-btn-primary-hover': '#F9A8D4',
+            '--dnd-btn-text': '#FFFFFF',
+            '--dnd-accent-blue': '#EC4899',
+            '--dnd-accent-red': '#BE123C',
+            '--dnd-accent-green': '#059669',
+            '--dnd-selected-glow': '0 0 10px rgba(244, 114, 182, 0.4)',
+            // Logo/进度条/HUD 相关浅色变量
+            '--dnd-logo-bg-start': '#F9A8D4',
+            '--dnd-logo-bg-end': '#F472B6',
+            '--dnd-bar-bg': 'rgba(251, 207, 232, 0.6)',
+            '--dnd-bar-hp-start': '#DB2777',
+            '--dnd-bar-hp-end': '#EC4899',
+            '--dnd-bar-exp-start': '#BE185D',
+            '--dnd-bar-exp-end': '#DB2777'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'bubbly', decoration: 'stars' },
+            effects: { texture: 'soft', innerGlow: 'candy', borderGlow: 'pastel', overlay: 'gradient' },
+            layout: { density: 'normal' },
+            decorations: { corners: 'sparkles', dividers: 'dots', headers: 'ribbon' },
+            buttons: { style: 'candy', shape: 'pill' },
+            progressBars: { style: 'bubble', animated: true }
+        },
+        typography: {
+            '--dnd-font-serif': '"Nunito", "Comic Sans MS", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-font-size-header': '1.1rem',
+            '--dnd-font-weight-header': '600',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            '--dnd-animation-float': 'kawaii-float 4s ease-in-out infinite',
+            '--dnd-animation-sparkle': 'sparkle 2s ease-in-out infinite'
+        },
+        interactiveStates: {
+            hover: {
+                brightness: 1.05,
+                scale: 1.03,
+                lift: '-5px',
+                shadow: '0 12px 35px rgba(244, 114, 182, 0.25), 0 0 20px rgba(251, 207, 232, 0.3)',
+                borderColor: '#F472B6',
+                glow: 'drop-shadow(0 0 8px rgba(244, 114, 182, 0.5))',
+                transition: '0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            },
+            cardHover: {
+                transform: 'translateY(-8px) scale(1.02) rotate(-1deg)',
+                shadow: '0 20px 50px rgba(244, 114, 182, 0.2), 0 0 30px rgba(251, 207, 232, 0.3), inset 0 0 25px rgba(255, 255, 255, 0.3)',
+                borderColor: '#F472B6'
+            },
+            buttonHover: {
+                brightness: 1.1,
+                transform: 'translateY(-3px) scale(1.05)',
+                shadow: '0 8px 25px rgba(244, 114, 182, 0.4), 0 0 15px rgba(249, 168, 212, 0.3)'
+            },
+            active: {
+                scale: 0.95,
+                brightness: 0.95,
+                transform: 'translateY(2px) scale(0.95)',
+                shadow: '0 2px 8px rgba(159, 18, 57, 0.15), inset 0 2px 6px rgba(159, 18, 57, 0.1)'
+            },
+            buttonActive: {
+                transform: 'translateY(3px) scale(0.97)',
+                shadow: '0 1px 4px rgba(159, 18, 57, 0.15), inset 0 3px 8px rgba(159, 18, 57, 0.1)'
+            },
+            selected: {
+                background: 'linear-gradient(90deg, rgba(244, 114, 182, 0.25), rgba(251, 207, 232, 0.2), transparent)',
+                borderColor: '#F472B6',
+                borderWidth: '2px',
+                glow: '0 0 20px rgba(244, 114, 182, 0.3)',
+                textColor: '#BE185D'
+            },
+            navActive: {
+                background: 'linear-gradient(90deg, rgba(244, 114, 182, 0.3), rgba(251, 207, 232, 0.2), transparent)',
+                border: '3px solid #F472B6',
+                indicator: '#DB2777'
+            },
+            focus: {
+                borderColor: '#F472B6',
+                shadow: '0 0 0 4px rgba(244, 114, 182, 0.25)',
+                outline: 'none'
+            },
+            disabled: {
+                opacity: 0.5,
+                cursor: 'not-allowed',
+                filter: 'grayscale(0.3) brightness(0.9)'
+            },
+            iconHover: {
+                glow: 'drop-shadow(0 0 10px rgba(244, 114, 182, 0.7)) drop-shadow(0 0 20px rgba(251, 207, 232, 0.5))',
+                scale: 1.2
+            },
+            inputFocus: {
+                border: '#F472B6',
+                shadow: '0 0 15px rgba(244, 114, 182, 0.25), inset 0 0 10px rgba(251, 207, 232, 0.15)'
+            }
+        },
+        overrides: {
+            /* ====== 卡片 - 气泡形态 ====== */
+            '.dnd-char-card': {
+                'box-shadow': '0 10px 40px rgba(244, 114, 182, 0.15), inset 0 0 50px rgba(255, 255, 255, 0.3), 0 0 25px rgba(251, 207, 232, 0.2)',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '24px',
+                'background': 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(253, 242, 248, 0.97) 50%, rgba(252, 231, 243, 0.98) 100%)'
+            },
+            '.dnd-card-header': {
+                'border-bottom': '2px solid #F9A8D4',
+                'background': 'linear-gradient(to right, rgba(244, 114, 182, 0.2), rgba(251, 207, 232, 0.15), rgba(249, 168, 212, 0.2))',
+                'border-radius': '22px 22px 0 0',
+                'padding': '14px 18px',
+                'position': 'relative'
+            },
+            '.dnd-card-body': {
+                'background': 'radial-gradient(ellipse at bottom right, rgba(244, 114, 182, 0.08), transparent 70%)',
+                'padding': '16px'
+            },
+            /* ====== 导航栏 - 糖果条纹 ====== */
+            '.dnd-nav-sidebar': {
+                'background': 'linear-gradient(180deg, #FDF2F8 0%, #FCE7F3 100%)',
+                'border-right': '3px solid #F9A8D4',
+                'box-shadow': '3px 0 20px rgba(244, 114, 182, 0.1)'
+            },
+            '.dnd-nav-item': {
+                'border-radius': '0 16px 16px 0',
+                'margin': '4px 0',
+                'padding': '12px 20px',
+                'border-left': '4px solid transparent',
+                'background': 'rgba(244, 114, 182, 0.05)',
+                'transition': 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            },
+            '.dnd-nav-item:hover': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.15), rgba(251, 207, 232, 0.1), transparent)',
+                'border-left-color': '#F472B6',
+                'transform': 'translateX(5px)'
+            },
+            '.dnd-nav-item.active': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.25), rgba(251, 207, 232, 0.15), transparent)',
+                'box-shadow': 'inset 4px 0 0 #DB2777, 0 0 25px rgba(244, 114, 182, 0.15)',
+                'border-left-color': '#DB2777',
+                'transform': 'translateX(8px)'
+            },
+            /* ====== 进度条 - 气泡糖 ====== */
+            '.dnd-bar-container': {
+                'background': 'linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(253, 242, 248, 0.7))',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '12px',
+                'height': '14px',
+                'box-shadow': 'inset 0 2px 6px rgba(244, 114, 182, 0.1)'
+            },
+            '.dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #EC4899 0%, #F472B6 30%, #F9A8D4 60%, #FBCFE8 100%)',
+                'box-shadow': '0 0 15px rgba(244, 114, 182, 0.4), inset 0 2px 0 rgba(255,255,255,0.4)',
+                'border-radius': '10px'
+            },
+            '.dnd-bar-hp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #DB2777 0%, #EC4899 30%, #F472B6 60%, #EC4899 100%)'
+            },
+            '.dnd-bar-exp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #BE185D 0%, #DB2777 30%, #EC4899 60%, #DB2777 100%)'
+            },
+            /* ====== 按钮 - 糖果按钮 ====== */
+            '.dnd-btn, .dnd-action-btn': {
+                'border': '2px solid #F472B6',
+                'background': 'linear-gradient(135deg, #FDF2F8 0%, #FCE7F3 100%)',
+                'box-shadow': 'inset 0 2px 0 rgba(255,255,255,0.5), 0 4px 12px rgba(244, 114, 182, 0.2)',
+                'border-radius': '20px',
+                'font-family': '"Nunito", sans-serif',
+                'position': 'relative',
+                'overflow': 'hidden',
+                'color': '#9D174D'
+            },
+            '.dnd-btn:hover, .dnd-action-btn:hover': {
+                'background': 'linear-gradient(135deg, #FFFFFF 0%, #FDF2F8 100%)',
+                'border-color': '#DB2777',
+                'box-shadow': '0 0 20px rgba(244, 114, 182, 0.25), 0 6px 18px rgba(244, 114, 182, 0.15)'
+            },
+            '.dnd-btn:active, .dnd-action-btn:active': {
+                'background': 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)',
+                'box-shadow': 'inset 0 3px 8px rgba(244, 114, 182, 0.2)'
+            },
+            /* ====== 属性行 - 点点糖 ====== */
+            '.dnd-stat-row': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.1), rgba(251, 207, 232, 0.1), rgba(244, 114, 182, 0.05))',
+                'border': '1px solid rgba(249, 168, 212, 0.4)',
+                'border-radius': '12px',
+                'padding': '8px 12px',
+                'margin': '4px 0'
+            },
+            '.dnd-stat-row:hover': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.15), rgba(251, 207, 232, 0.12), rgba(244, 114, 182, 0.08))',
+                'transform': 'scale(1.01)'
+            },
+            /* ====== 标题样式 - 可爱字体 ====== */
+            '.dnd-title, .dnd-char-name': {
+                'text-shadow': '0 2px 12px rgba(244, 114, 182, 0.3), 0 0 25px rgba(251, 207, 232, 0.2)',
+                'font-family': '"Nunito", sans-serif',
+                'letter-spacing': '0.03em'
+            },
+            /* ====== 面板/弹窗 - 糖果盒 ====== */
+            '.dnd-panel, .dnd-dialog': {
+                'border': '2px solid #F9A8D4',
+                'border-radius': '28px',
+                'box-shadow': '0 12px 50px rgba(244, 114, 182, 0.15), inset 0 0 60px rgba(255, 255, 255, 0.2)'
+            },
+            '#dnd-mini-hud': {
+                'border': '2px solid #F9A8D4',
+                'border-radius': '18px',
+                'background': 'linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(253, 242, 248, 0.99))'
+            },
+            /* ====== 输入框 ====== */
+            '.dnd-input, .dnd-select, .dnd-textarea': {
+                'background': 'rgba(255, 255, 255, 0.9)',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '12px',
+                'color': '#9D174D'
+            },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': {
+                'border-color': '#F472B6',
+                'box-shadow': '0 0 15px rgba(244, 114, 182, 0.2), inset 0 0 8px rgba(251, 207, 232, 0.15)'
+            },
+            /* ====== 表格 ====== */
+            '.dnd-table th': {
+                'background': 'linear-gradient(180deg, #FCE7F3, #FBCFE8)',
+                'border-bottom': '2px solid #F472B6',
+                'color': '#BE185D'
+            },
+            '.dnd-table td': {
+                'border-bottom': '1px solid rgba(249, 168, 212, 0.4)'
+            },
+            '.dnd-table tr:hover td': {
+                'background': 'rgba(244, 114, 182, 0.1)'
+            },
+            /* ====== 徽章 ====== */
+            '.dnd-badge': {
+                'background': 'linear-gradient(135deg, #F472B6, #EC4899)',
+                'border': '2px solid #FBCFE8',
+                'border-radius': '12px',
+                'box-shadow': '0 2px 8px rgba(244, 114, 182, 0.25)'
+            }
+        },
+        customCSS: `
+            /* ====== 可爱童话皮肤 - 温馨可爱动画与装饰 ====== */
+            
+            /* 可爱浮动动画 */
+            @keyframes kawaii-float {
+                0%, 100% { transform: translateY(0) rotate(0deg); }
+                25% { transform: translateY(-3px) rotate(0.5deg); }
+                50% { transform: translateY(0) rotate(0deg); }
+                75% { transform: translateY(-2px) rotate(-0.5deg); }
+            }
+            
+            /* 星星闪烁 */
+            @keyframes sparkle {
+                0%, 100% { opacity: 0.5; transform: scale(0.8); }
+                50% { opacity: 1; transform: scale(1.2); }
+            }
+            
+            /* 气泡弹跳 */
+            @keyframes bubble-bounce {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            
+            /* 糖果光泽流动 */
+            @keyframes candy-shimmer {
+                0% { left: -100%; }
+                50%, 100% { left: 100%; }
+            }
+            
+            /* 彩虹渐变 */
+            @keyframes rainbow-shift {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            /* 卡片 - 气泡形态 */
+            .dnd-char-card {
+                position: relative;
+                animation: kawaii-float 5s ease-in-out infinite;
+            }
+            
+            /* 外发光边框 - 糖果光晕 */
+            .dnd-char-card::before {
+                content: "";
+                position: absolute;
+                top: -4px; left: -4px; right: -4px; bottom: -4px;
+                background: linear-gradient(135deg, rgba(244, 114, 182, 0.3) 0%, rgba(251, 207, 232, 0.25) 25%, rgba(236, 72, 153, 0.25) 50%, rgba(244, 114, 182, 0.2) 75%, rgba(251, 207, 232, 0.3) 100%);
+                border-radius: 27px;
+                pointer-events: none;
+                z-index: -1;
+                filter: blur(4px);
+                animation: bubble-bounce 4s ease-in-out infinite;
+            }
+            
+            /* 星星纹理叠加 */
+            .dnd-char-card::after {
+                content: "";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: radial-gradient(circle at 20% 20%, rgba(219, 39, 119, 0.08) 1px, transparent 1px),
+                            radial-gradient(circle at 80% 40%, rgba(244, 114, 182, 0.06) 1px, transparent 1px),
+                            radial-gradient(circle at 40% 70%, rgba(219, 39, 119, 0.08) 1px, transparent 1px),
+                            radial-gradient(circle at 70% 80%, rgba(244, 114, 182, 0.06) 1px, transparent 1px);
+                background-size: 60px 60px;
+                pointer-events: none;
+                border-radius: inherit;
+                z-index: 0;
+            }
+            
+            /* 卡片头部 - 星星装饰 */
+            .dnd-card-header::before {
+                content: "✦";
+                position: absolute;
+                left: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #DB2777;
+                font-size: 14px;
+                animation: sparkle 2s ease-in-out infinite;
+            }
+            
+            .dnd-card-header::after {
+                content: "✦";
+                position: absolute;
+                right: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #F472B6;
+                font-size: 14px;
+                animation: sparkle 2s ease-in-out infinite 0.5s;
+            }
+            
+            /* 导航项 - 星星效果 */
+            .dnd-nav-item::before {
+                content: "";
+                position: absolute;
+                left: 0; top: 50%;
+                transform: translateY(-50%);
+                width: 0; height: 4px;
+                background: linear-gradient(90deg, #F472B6, #F9A8D4, #EC4899);
+                transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                border-radius: 0 4px 4px 0;
+            }
+            
+            .dnd-nav-item:hover::before {
+                width: 25px;
+            }
+            
+            .dnd-nav-item.active::before {
+                width: 35px;
+                box-shadow: 0 0 12px rgba(244, 114, 182, 0.4);
+            }
+            
+            .dnd-nav-item.active::after {
+                content: "★";
+                position: absolute;
+                right: 12px;
+                color: #DB2777;
+                font-size: 14px;
+                animation: sparkle 1.5s ease-in-out infinite;
+            }
+            
+            /* 按钮 - 糖果光泽效果 */
+            .dnd-btn::before,
+            .dnd-action-btn::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -100%;
+                width: 60%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                transition: left 0.6s ease;
+            }
+            
+            .dnd-btn:hover::before,
+            .dnd-action-btn:hover::before {
+                left: 120%;
+            }
+            
+            /* 进度条 - 气泡流动效果 */
+            .dnd-bar-fill {
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .dnd-bar-fill::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -60%; width: 60%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                animation: candy-shimmer 2s ease-in-out infinite;
+            }
+            
+            /* 进度条气泡装饰 */
+            .dnd-bar-container::after {
+                content: "";
+                position: absolute;
+                top: 2px; left: 2px;
+                width: 8px; height: 8px;
+                background: radial-gradient(circle, rgba(255,255,255,0.5), transparent);
+                border-radius: 50%;
+                animation: bubble-bounce 2s ease-in-out infinite;
+            }
+            
+            /* 分隔线 - 点点线 */
+            .dnd-divider {
+                height: 4px;
+                background: repeating-linear-gradient(90deg, #F9A8D4, #F9A8D4 8px, transparent 8px, transparent 16px);
+                position: relative;
+                margin: 15px 0;
+                border-radius: 2px;
+            }
+            
+            .dnd-divider::before {
+                content: "★";
+                position: absolute;
+                left: 50%; top: 50%;
+                transform: translate(-50%, -50%);
+                background: #FDF2F8;
+                padding: 0 12px;
+                color: #DB2777;
+                font-size: 14px;
+            }
+            
+            /* 面板角落 - 星星装饰 */
+            .dnd-panel::before,
+            .dnd-dialog::before {
+                content: "✦";
+                position: absolute;
+                top: 10px; left: 12px;
+                color: #F472B6;
+                font-size: 18px;
+                animation: sparkle 3s ease-in-out infinite;
+            }
+            
+            .dnd-panel::after,
+            .dnd-dialog::after {
+                content: "✦";
+                position: absolute;
+                bottom: 10px; right: 12px;
+                color: #F472B6;
+                font-size: 18px;
+                animation: sparkle 3s ease-in-out infinite 0.75s;
+            }
+            
+            /* 滚动条 - 糖果风格 */
+            .dnd-content-area::-webkit-scrollbar {
+                width: 12px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-track {
+                background: rgba(253, 242, 248, 0.8);
+                border-left: 2px solid #F9A8D4;
+                border-radius: 6px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb {
+                background: linear-gradient(to bottom, #F472B6, #F9A8D4, #F472B6);
+                border-radius: 6px;
+                border: 2px solid #FDF2F8;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(to bottom, #EC4899, #F472B6, #EC4899);
+            }
+            
+            /* 图标容器 - 糖果徽章 */
+            .dnd-icon-circle {
+                border-radius: 50%;
+                border: 3px solid #F9A8D4;
+                background: radial-gradient(circle at 30% 30%, #FCE7F3, #FDF2F8);
+                box-shadow: 0 0 18px rgba(244, 114, 182, 0.25), inset 0 0 10px rgba(251, 207, 232, 0.2);
+            }
+            
+            /* 头像框 - 圆润气泡形 */
+            .dnd-avatar {
+                border-radius: 50%;
+                border: 3px solid #F9A8D4;
+                box-shadow: 0 0 20px rgba(244, 114, 182, 0.25), 0 0 40px rgba(251, 207, 232, 0.15);
+            }
+            
+            /* 工具提示 */
+            .dnd-tooltip {
+                background: linear-gradient(135deg, #FFFFFF, #FDF2F8);
+                border: 2px solid #F9A8D4;
+                border-radius: 14px;
+                box-shadow: 0 6px 25px rgba(244, 114, 182, 0.15);
+                color: #9D174D;
+            }
+            
+            .dnd-tooltip::before {
+                content: "✦";
+                position: absolute;
+                top: 6px; left: 10px;
+                color: #DB2777;
+                font-size: 12px;
+            }
+            
+            /* 悬浮弹跳效果 */
+            .dnd-char-card:hover {
+                animation: kawaii-float 2s ease-in-out infinite, bubble-bounce 1s ease-in-out;
+            }
+            
+            /* 可爱的微动效果 */
+            .dnd-btn:hover {
+                animation: bubble-bounce 0.5s ease-in-out;
+            }
+        `,
+        background: {
+            type: 'particles',
+            colors: ['rgba(244, 114, 182, 0.6)', 'rgba(251, 207, 232, 0.5)', 'rgba(236, 72, 153, 0.4)', 'rgba(255, 255, 255, 0.7)'],
+            minSize: 2,
+            maxSize: 8,
+            count: 30,
+            speed: 0.06,
+            shape: 'circle',
+            glow: true
+        }
+    },
+
+    // 11. 草莓毛毡 - 温暖草莓红毛毡风格，手工缝线质感
+    'strawberry-felt': {
+        meta: {
+            id: 'strawberry-felt',
+            name: '草莓毛毡',
+            icon: '<i class="fa-solid fa-heart"></i>',
+            description: '温暖的草莓红毛毡风格，带有手工缝线和软糯质感',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#2a1a1a',
+            '--dnd-bg-panel-start': '#3a2828',
+            '--dnd-bg-panel-end': '#2a1a1a',
+            '--dnd-text-main': '#f5e6e0',
+            '--dnd-text-header': '#ffcdd2',
+            '--dnd-text-highlight': '#ffb4ab',
+            '--dnd-text-dim': '#b08888',
+            '--dnd-accent': '#e85a71',
+            '--dnd-accent-hover': '#f48fb1',
+            '--dnd-border-gold': '#d4a373',
+            '--dnd-border-inner': '#8b6f6f',
+            '--dnd-bg-card-start': 'rgba(58, 40, 40, 0.95)',
+            '--dnd-bg-card-end': 'rgba(42, 26, 26, 0.97)',
+            '--dnd-btn-primary': '#c06c6c',
+            '--dnd-btn-primary-hover': '#e07a7a',
+            '--dnd-btn-text': '#fff0f0'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'rectangle', decoration: 'simple' },
+            effects: { texture: 'fabric', innerGlow: 'subtle', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'spacious' },
+            decorations: { dividers: 'dashed', corners: 'none' },
+            buttons: { style: 'filled', shape: 'pill' },
+            progressBars: { shape: 'rounded', style: 'solid' }
+        },
+        typography: {
+            '--dnd-font-serif': '"Quicksand", "Nunito", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+        },
+        interactiveStates: {
+            hover: { brightness: 1.1, scale: 1.02, lift: '-4px', shadow: '0 10px 30px rgba(232, 90, 113, 0.25)', borderColor: '#d4a373', glow: 'drop-shadow(0 0 6px rgba(232, 90, 113, 0.4))', transition: '0.35s ease-out' },
+            cardHover: { transform: 'translateY(-6px) scale(1.015)', shadow: '0 18px 45px rgba(42, 26, 26, 0.55)', borderColor: '#ffb4ab' },
+            buttonHover: { brightness: 1.18, transform: 'translateY(-2px) scale(1.03)', shadow: '0 6px 20px rgba(232, 90, 113, 0.4)' },
+            active: { scale: 0.97, brightness: 0.92, transform: 'translateY(1px) scale(0.97)', shadow: '0 2px 8px rgba(42, 26, 26, 0.4)' },
+            buttonActive: { transform: 'translateY(2px) scale(0.98)', shadow: '0 1px 4px rgba(42, 26, 26, 0.3)' },
+            selected: { background: 'linear-gradient(90deg, rgba(232, 90, 113, 0.3), transparent)', borderColor: '#ffb4ab', borderWidth: '2px', glow: '0 0 18px rgba(232, 90, 113, 0.35)', textColor: '#ffb4ab' },
+            navActive: { background: 'linear-gradient(90deg, rgba(232, 90, 113, 0.35), transparent)', border: '3px solid #d4a373', indicator: '#e85a71' },
+            focus: { borderColor: '#e85a71', shadow: '0 0 0 3px rgba(232, 90, 113, 0.25)', outline: 'none' },
+            disabled: { opacity: 0.45, cursor: 'not-allowed', filter: 'grayscale(0.5) brightness(0.7)' },
+            iconHover: { glow: 'drop-shadow(0 0 8px rgba(232, 90, 113, 0.7))', scale: 1.15 },
+            inputFocus: { border: '#e85a71', shadow: '0 0 12px rgba(232, 90, 113, 0.35)' }
+        },
+        overrides: {
+            '.dnd-char-card': { 'border-radius': '20px', 'border': '2px solid #8b6f6f', 'box-shadow': '0 8px 30px rgba(42, 26, 26, 0.5), inset 0 0 40px rgba(232, 90, 113, 0.08)', 'background': 'linear-gradient(135deg, rgba(58, 40, 40, 0.95), rgba(42, 26, 26, 0.98))' },
+            '.dnd-card-header': { 'border-bottom': '2px dashed #8b6f6f', 'background': 'linear-gradient(to right, rgba(232, 90, 113, 0.15), rgba(212, 163, 115, 0.1))', 'border-radius': '18px 18px 0 0', 'padding': '14px 18px', 'position': 'relative' },
+            '.dnd-card-body': { 'background': 'radial-gradient(ellipse at bottom right, rgba(232, 90, 113, 0.06), transparent 70%)', 'padding': '16px' },
+            '.dnd-nav-sidebar': { 'background': 'linear-gradient(180deg, #3a2828, #2a1a1a)', 'border-right': '2px solid #8b6f6f' },
+            '.dnd-nav-item': { 'border-radius': '0 16px 16px 0', 'margin': '4px 0', 'padding': '12px 20px', 'border-left': '4px solid transparent', 'background': 'rgba(232, 90, 113, 0.03)', 'transition': 'all 0.35s ease-out' },
+            '.dnd-nav-item:hover': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.18), transparent)', 'border-left-color': '#d4a373', 'padding-left': '24px' },
+            '.dnd-nav-item.active': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.28), transparent)', 'border-left-color': '#e85a71', 'box-shadow': 'inset 4px 0 0 #ffb4ab' },
+            '.dnd-bar-container': { 'background': 'linear-gradient(180deg, rgba(42, 26, 26, 0.8), rgba(58, 40, 40, 0.6))', 'border': '1px solid #8b6f6f', 'border-radius': '12px', 'height': '10px' },
+            '.dnd-bar-fill': { 'background': 'linear-gradient(90deg, #c06c6c, #e85a71 40%, #f48fb1 70%, #e85a71)', 'box-shadow': '0 0 10px rgba(232, 90, 113, 0.5)', 'border-radius': '10px' },
+            '.dnd-bar-hp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #a05050, #c06c6c 40%, #e07a7a 70%, #c06c6c)' },
+            '.dnd-bar-exp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #b08060, #d4a373 40%, #e6c9a8 70%, #d4a373)' },
+            '.dnd-btn, .dnd-action-btn': { 'border': '2px solid #8b6f6f', 'background': 'linear-gradient(135deg, #4a3535, #3a2828)', 'box-shadow': '0 3px 8px rgba(42, 26, 26, 0.4)', 'border-radius': '16px', 'font-family': '"Quicksand", sans-serif', 'position': 'relative', 'overflow': 'hidden' },
+            '.dnd-btn:hover, .dnd-action-btn:hover': { 'background': 'linear-gradient(135deg, #5a4040, #4a3535)', 'border-color': '#d4a373', 'box-shadow': '0 0 15px rgba(232, 90, 113, 0.3)' },
+            '.dnd-btn:active, .dnd-action-btn:active': { 'background': 'linear-gradient(135deg, #3a2828, #2a1a1a)', 'box-shadow': 'inset 0 2px 4px rgba(42, 26, 26, 0.4)' },
+            '.dnd-stat-row': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.1), rgba(139, 111, 111, 0.15))', 'border': '1px solid rgba(139, 111, 111, 0.35)', 'border-radius': '10px', 'padding': '8px 12px', 'margin': '4px 0' },
+            '.dnd-title, .dnd-char-name': { 'text-shadow': '0 2px 10px rgba(232, 90, 113, 0.35)', 'font-family': '"Quicksand", sans-serif', 'letter-spacing': '0.04em' },
+            '.dnd-panel, .dnd-dialog': { 'border': '2px solid #8b6f6f', 'border-radius': '24px', 'box-shadow': '0 12px 45px rgba(42, 26, 26, 0.6)' },
+            '#dnd-mini-hud': { 'border': '2px solid #8b6f6f', 'border-radius': '18px', 'background': 'linear-gradient(180deg, rgba(58, 40, 40, 0.98), rgba(42, 26, 26, 0.99))' },
+            '.dnd-input, .dnd-select, .dnd-textarea': { 'background': 'rgba(42, 26, 26, 0.8)', 'border': '2px solid #8b6f6f', 'border-radius': '12px', 'color': '#f5e6e0' },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': { 'border-color': '#e85a71', 'box-shadow': '0 0 12px rgba(232, 90, 113, 0.4)' },
+            '.dnd-table th': { 'background': 'linear-gradient(180deg, #4a3535, #3a2828)', 'border-bottom': '2px solid #e85a71', 'color': '#ffcdd2' },
+            '.dnd-table td': { 'border-bottom': '1px solid rgba(139, 111, 111, 0.35)' },
+            '.dnd-table tr:hover td': { 'background': 'rgba(232, 90, 113, 0.1)' },
+            '.dnd-badge': { 'background': 'linear-gradient(135deg, #8b6f6f, #6b5050)', 'border': '2px solid #d4a373', 'border-radius': '10px' }
+        },
+        customCSS: `
+            @keyframes felt-pulse {
+                0%, 100% { box-shadow: 0 8px 30px rgba(42, 26, 26, 0.5), inset 0 0 40px rgba(232, 90, 113, 0.08); filter: brightness(1); }
+                50% { box-shadow: 0 8px 35px rgba(42, 26, 26, 0.55), inset 0 0 50px rgba(232, 90, 113, 0.12); filter: brightness(1.02); }
+            }
+            @keyframes stitch-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+            @keyframes soft-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+            .dnd-char-card { position: relative; animation: felt-pulse 5s ease-in-out infinite; }
+            .dnd-char-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='felt'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.08' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23felt)' opacity='0.06'/%3E%3C/svg%3E"); pointer-events: none; border-radius: inherit; z-index: 0; }
+            .dnd-char-card::after { content: ""; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px; border: 1px dashed rgba(212, 163, 115, 0.35); border-radius: 14px; pointer-events: none; z-index: 1; animation: stitch-glow 3s ease-in-out infinite; }
+            .dnd-card-header::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); }
+            .dnd-card-header::after { content: ""; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #d4a373; border-radius: 50%; opacity: 0.6; }
+            .dnd-nav-item::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 0; height: 3px; background: linear-gradient(90deg, #e85a71, #d4a373); transition: width 0.35s ease-out; border-radius: 0 3px 3px 0; }
+            .dnd-nav-item:hover::before { width: 20px; }
+            .dnd-nav-item.active::before { width: 28px; box-shadow: 0 0 10px rgba(232, 90, 113, 0.4); }
+            .dnd-nav-item.active::after { content: ""; position: absolute; right: 12px; width: 8px; height: 8px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); animation: soft-float 2s ease-in-out infinite; }
+            .dnd-btn::before, .dnd-action-btn::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 1px dashed rgba(212, 163, 115, 0.25); border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+            .dnd-btn:hover::before, .dnd-action-btn:hover::before { opacity: 1; }
+            .dnd-bar-fill::before { content: ""; position: absolute; top: 0; left: -50%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: stitch-glow 2.5s ease-in-out infinite; }
+            .dnd-divider { height: 0; border-top: 2px dashed #8b6f6f; position: relative; margin: 12px 0; }
+            .dnd-divider::before { content: ""; position: absolute; left: 50%; top: -4px; transform: translateX(-50%); width: 12px; height: 12px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); }
+            .dnd-panel::before, .dnd-dialog::before { content: ""; position: absolute; top: 10px; left: 12px; width: 12px; height: 12px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.4); }
+            .dnd-panel::after, .dnd-dialog::after { content: ""; position: absolute; bottom: 10px; right: 12px; width: 12px; height: 12px; background: #d4a373; border-radius: 50%; opacity: 0.6; }
+            .dnd-icon-circle { border-radius: 50%; border: 2px solid #d4a373; background: radial-gradient(circle at 30% 30%, #4a3535, #2a1a1a); box-shadow: 0 0 15px rgba(232, 90, 113, 0.3); }
+            .dnd-avatar { border-radius: 50%; border: 3px solid #d4a373; box-shadow: 0 0 18px rgba(232, 90, 113, 0.3); }
+            .dnd-tooltip { background: linear-gradient(135deg, #3a2828, #2a1a1a); border: 2px solid #d4a373; border-radius: 14px; }
+            .dnd-char-card:hover { box-shadow: 0 12px 40px rgba(42, 26, 26, 0.6), inset 0 0 50px rgba(232, 90, 113, 0.1), 0 0 30px rgba(212, 163, 115, 0.25); }
+        `,
+        background: { type: 'particles', colors: ['rgba(232, 90, 113, 0.6)', 'rgba(212, 163, 115, 0.5)', 'rgba(255, 180, 171, 0.4)'], minSize: 2, maxSize: 7, count: 25, speed: 0.04, shape: 'circle', glow: true }
+    },
+
+    // 12. 桃粉手作 - 棉麻布艺风格，蜜桃粉温暖质感
+    'peach-craft': {
+        meta: {
+            id: 'peach-craft',
+            name: '桃粉手作',
+            icon: '<i class="fa-solid fa-gem"></i>',
+            description: '棉麻布艺风格的蜜桃粉主题，带有编织纹理和温暖质感',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#2d1f1a',
+            '--dnd-bg-panel-start': '#3d2a22',
+            '--dnd-bg-panel-end': '#2d1f1a',
+            '--dnd-text-main': '#fff0e6',
+            '--dnd-text-header': '#ffe4d6',
+            '--dnd-text-highlight': '#ffab91',
+            '--dnd-text-dim': '#b89a8a',
+            '--dnd-accent': '#ff8a65',
+            '--dnd-accent-hover': '#ffab91',
+            '--dnd-border-gold': '#d7a87a',
+            '--dnd-border-inner': '#8a7060',
+            '--dnd-bg-card-start': 'rgba(61, 42, 34, 0.95)',
+            '--dnd-bg-card-end': 'rgba(45, 31, 26, 0.97)',
+            '--dnd-btn-primary': '#d4836a',
+            '--dnd-btn-primary-hover': '#e89b82',
+            '--dnd-btn-text': '#fff8f0'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'rectangle', decoration: 'simple' },
+            effects: { texture: 'fabric', innerGlow: 'subtle', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'spacious' },
+            decorations: { dividers: 'dashed', corners: 'none' },
+            buttons: { style: 'filled', shape: 'pill' },
+            progressBars: { shape: 'rounded', style: 'solid' }
+        },
+        typography: {
+            '--dnd-font-serif': '"Nunito Sans", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+        },
+        interactiveStates: {
+            hover: { brightness: 1.1, scale: 1.02, lift: '-4px', shadow: '0 10px 30px rgba(255, 138, 101, 0.25)', borderColor: '#d7a87a', glow: 'drop-shadow(0 0 6px rgba(255, 138, 101, 0.4))', transition: '0.35s ease-out' },
+            cardHover: { transform: 'translateY(-6px) scale(1.015)', shadow: '0 18px 45px rgba(45, 31, 26, 0.55)', borderColor: '#ffab91' },
+            buttonHover: { brightness: 1.18, transform: 'translateY(-2px) scale(1.03)', shadow: '0 6px 20px rgba(255, 138, 101, 0.4)' },
+            active: { scale: 0.97, brightness: 0.92, transform: 'translateY(1px) scale(0.97)', shadow: '0 2px 8px rgba(45, 31, 26, 0.4)' },
+            buttonActive: { transform: 'translateY(2px) scale(0.98)', shadow: '0 1px 4px rgba(45, 31, 26, 0.3)' },
+            selected: { background: 'linear-gradient(90deg, rgba(255, 138, 101, 0.3), transparent)', borderColor: '#ffab91', borderWidth: '2px', glow: '0 0 18px rgba(255, 138, 101, 0.35)', textColor: '#ffab91' },
+            navActive: { background: 'linear-gradient(90deg, rgba(255, 138, 101, 0.35), transparent)', border: '3px solid #d7a87a', indicator: '#ff8a65' },
+            focus: { borderColor: '#ff8a65', shadow: '0 0 0 3px rgba(255, 138, 101, 0.25)', outline: 'none' },
+            disabled: { opacity: 0.45, cursor: 'not-allowed', filter: 'grayscale(0.5) brightness(0.7)' },
+            iconHover: { glow: 'drop-shadow(0 0 8px rgba(255, 138, 101, 0.7))', scale: 1.15 },
+            inputFocus: { border: '#ff8a65', shadow: '0 0 12px rgba(255, 138, 101, 0.35)' }
+        },
+        overrides: {
+            '.dnd-char-card': { 'border-radius': '18px', 'border': '2px solid #8a7060', 'box-shadow': '0 8px 30px rgba(45, 31, 26, 0.5), inset 0 0 40px rgba(255, 138, 101, 0.08)', 'background': 'linear-gradient(135deg, rgba(61, 42, 34, 0.95), rgba(45, 31, 26, 0.98))' },
+            '.dnd-card-header': { 'border-bottom': '2px solid #8a7060', 'background': 'linear-gradient(to right, rgba(255, 138, 101, 0.12), rgba(215, 168, 122, 0.1))', 'border-radius': '16px 16px 0 0', 'padding': '14px 18px', 'position': 'relative' },
+            '.dnd-card-body': { 'background': 'radial-gradient(ellipse at bottom right, rgba(255, 138, 101, 0.06), transparent 70%)', 'padding': '16px' },
+            '.dnd-nav-sidebar': { 'background': 'linear-gradient(180deg, #3d2a22, #2d1f1a)', 'border-right': '2px solid #8a7060' },
+            '.dnd-nav-item': { 'border-radius': '0 14px 14px 0', 'margin': '4px 0', 'padding': '12px 20px', 'border-left': '4px solid transparent', 'background': 'rgba(255, 138, 101, 0.03)', 'transition': 'all 0.35s ease-out' },
+            '.dnd-nav-item:hover': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.15), transparent)', 'border-left-color': '#d7a87a', 'padding-left': '24px' },
+            '.dnd-nav-item.active': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.25), transparent)', 'border-left-color': '#ff8a65', 'box-shadow': 'inset 4px 0 0 #ffab91' },
+            '.dnd-bar-container': { 'background': 'linear-gradient(180deg, rgba(45, 31, 26, 0.8), rgba(61, 42, 34, 0.6))', 'border': '1px solid #8a7060', 'border-radius': '10px', 'height': '10px' },
+            '.dnd-bar-fill': { 'background': 'linear-gradient(90deg, #d4836a, #ff8a65 40%, #ffab91 70%, #ff8a65)', 'box-shadow': '0 0 10px rgba(255, 138, 101, 0.5)', 'border-radius': '8px' },
+            '.dnd-bar-hp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #b06050, #d4836a 40%, #e89b82 70%, #d4836a)' },
+            '.dnd-bar-exp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #a07050, #d7a87a 40%, #e8c8a8 70%, #d7a87a)' },
+            '.dnd-btn, .dnd-action-btn': { 'border': '2px solid #8a7060', 'background': 'linear-gradient(135deg, #4a3530, #3d2a22)', 'box-shadow': '0 3px 8px rgba(45, 31, 26, 0.4)', 'border-radius': '14px', 'font-family': '"Nunito Sans", sans-serif', 'position': 'relative', 'overflow': 'hidden' },
+            '.dnd-btn:hover, .dnd-action-btn:hover': { 'background': 'linear-gradient(135deg, #5a4538, #4a3530)', 'border-color': '#d7a87a', 'box-shadow': '0 0 15px rgba(255, 138, 101, 0.3)' },
+            '.dnd-btn:active, .dnd-action-btn:active': { 'background': 'linear-gradient(135deg, #3d2a22, #2d1f1a)', 'box-shadow': 'inset 0 2px 4px rgba(45, 31, 26, 0.4)' },
+            '.dnd-stat-row': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.1), rgba(138, 112, 96, 0.15))', 'border': '1px solid rgba(138, 112, 96, 0.35)', 'border-radius': '10px', 'padding': '8px 12px', 'margin': '4px 0' },
+            '.dnd-title, .dnd-char-name': { 'text-shadow': '0 2px 10px rgba(255, 138, 101, 0.35)', 'font-family': '"Nunito Sans", sans-serif', 'letter-spacing': '0.04em' },
+            '.dnd-panel, .dnd-dialog': { 'border': '2px solid #8a7060', 'border-radius': '22px', 'box-shadow': '0 12px 45px rgba(45, 31, 26, 0.6)' },
+            '#dnd-mini-hud': { 'border': '2px solid #8a7060', 'border-radius': '16px', 'background': 'linear-gradient(180deg, rgba(61, 42, 34, 0.98), rgba(45, 31, 26, 0.99))' },
+            '.dnd-input, .dnd-select, .dnd-textarea': { 'background': 'rgba(45, 31, 26, 0.8)', 'border': '2px solid #8a7060', 'border-radius': '10px', 'color': '#fff0e6' },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': { 'border-color': '#ff8a65', 'box-shadow': '0 0 12px rgba(255, 138, 101, 0.4)' },
+            '.dnd-table th': { 'background': 'linear-gradient(180deg, #4a3530, #3d2a22)', 'border-bottom': '2px solid #ff8a65', 'color': '#ffe4d6' },
+            '.dnd-table td': { 'border-bottom': '1px solid rgba(138, 112, 96, 0.35)' },
+            '.dnd-table tr:hover td': { 'background': 'rgba(255, 138, 101, 0.1)' },
+            '.dnd-badge': { 'background': 'linear-gradient(135deg, #8a7060, #6a5545)', 'border': '2px solid #d7a87a', 'border-radius': '10px' }
+        },
+        customCSS: `
+            @keyframes linen-wave {
+                0%, 100% { box-shadow: 0 8px 30px rgba(45, 31, 26, 0.5), inset 0 0 40px rgba(255, 138, 101, 0.08); filter: brightness(1); }
+                50% { box-shadow: 0 8px 35px rgba(45, 31, 26, 0.55), inset 0 0 50px rgba(255, 138, 101, 0.1); filter: brightness(1.02); }
+            }
+            @keyframes weave-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+            @keyframes soft-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+            .dnd-char-card { position: relative; animation: linen-wave 5s ease-in-out infinite; }
+            .dnd-char-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(215, 168, 122, 0.03) 2px, rgba(215, 168, 122, 0.03) 4px), repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(215, 168, 122, 0.03) 2px, rgba(215, 168, 122, 0.03) 4px); pointer-events: none; border-radius: inherit; z-index: 0; }
+            .dnd-char-card::after { content: ""; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border: 1px solid rgba(215, 168, 122, 0.2); border-radius: 14px; pointer-events: none; z-index: 1; }
+            .dnd-card-header::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 12px; height: 14px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); }
+            .dnd-card-header::after { content: ""; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 12px; height: 14px; background: #d7a87a; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; opacity: 0.6; }
+            .dnd-nav-item::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 0; height: 3px; background: repeating-linear-gradient(90deg, #ff8a65, #ff8a65 4px, #d7a87a 4px, #d7a87a 8px); transition: width 0.35s ease-out; border-radius: 0 3px 3px 0; }
+            .dnd-nav-item:hover::before { width: 22px; }
+            .dnd-nav-item.active::before { width: 30px; box-shadow: 0 0 10px rgba(255, 138, 101, 0.4); }
+            .dnd-nav-item.active::after { content: ""; position: absolute; right: 12px; width: 10px; height: 12px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); animation: soft-bob 2s ease-in-out infinite; }
+            .dnd-btn::before, .dnd-action-btn::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(215, 168, 122, 0.1) 2px, rgba(215, 168, 122, 0.1) 4px); border-radius: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+            .dnd-btn:hover::before, .dnd-action-btn:hover::before { opacity: 1; }
+            .dnd-bar-fill::before { content: ""; position: absolute; top: 0; left: -50%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: weave-shimmer 3s ease-in-out infinite; }
+            .dnd-divider { height: 3px; background: repeating-linear-gradient(90deg, #8a7060, #8a7060 6px, transparent 6px, transparent 12px); position: relative; margin: 12px 0; }
+            .dnd-divider::before { content: ""; position: absolute; left: 50%; top: -4px; transform: translateX(-50%); width: 14px; height: 14px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); }
+            .dnd-panel::before, .dnd-dialog::before { content: ""; position: absolute; top: 10px; left: 12px; width: 14px; height: 16px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.4); }
+            .dnd-panel::after, .dnd-dialog::after { content: ""; position: absolute; bottom: 10px; right: 12px; width: 14px; height: 16px; background: #d7a87a; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; opacity: 0.6; }
+            .dnd-icon-circle { border-radius: 50%; border: 2px solid #d7a87a; background: radial-gradient(circle at 30% 30%, #4a3530, #2d1f1a); box-shadow: 0 0 15px rgba(255, 138, 101, 0.3); }
+            .dnd-avatar { border-radius: 50%; border: 3px solid #d7a87a; box-shadow: 0 0 18px rgba(255, 138, 101, 0.3); }
+            .dnd-tooltip { background: linear-gradient(135deg, #3d2a22, #2d1f1a); border: 2px solid #d7a87a; border-radius: 14px; }
+        `,
+        background: { type: 'particles', colors: ['rgba(255, 138, 101, 0.6)', 'rgba(215, 168, 122, 0.5)', 'rgba(255, 171, 145, 0.4)'], minSize: 2, maxSize: 7, count: 25, speed: 0.04, shape: 'circle', glow: true }
     }
 };
 
@@ -26176,6 +27883,15 @@ const StyleManager = {
     // 动态注入的样式元素ID
     STYLE_ELEMENT_ID: 'dnd-style-manager-overrides',
     
+    // 记录上次样式包设置的 CSS 变量键（用于清理残留）
+    _lastAppliedVars: new Set(),
+    
+    // 需要保留的运行时变量前缀（不被清理）
+    _preservedVarPrefixes: [
+        '--dnd-ui-scale',  // UI 缩放
+        '--dnd-scale',     // 缩放相关
+    ],
+    
     /**
      * 初始化样式管理器
      */
@@ -26222,7 +27938,17 @@ const StyleManager = {
                 return false;
             }
             
-            // 1. 应用颜色变量（复用ThemeManager）
+            // 0. [修复] 清除上次样式包设置的 CSS 变量，避免残留污染
+            this._clearPreviousStyleVars();
+            
+            // 0.5 [修复] 恢复当前主题/自定义主题的颜色基准
+            // 确保样式包未定义的变量回退到主题值而非 CSS 默认值
+            this._restoreThemeBaseline();
+            
+            // 重置变量记录集合
+            this._lastAppliedVars = new Set();
+            
+            // 1. 应用颜色变量（覆盖主题基准）
             if (stylePack.colors) {
                 this._applyColorVars(stylePack.colors);
             }
@@ -26436,6 +28162,75 @@ const StyleManager = {
     // ==================== 内部方法 ====================
     
     /**
+     * 清除上次样式包设置的 CSS 变量
+     * 仅清除 StyleManager 管理的变量，保留：
+     * - 运行时变量（如 UI scale）
+     */
+    _clearPreviousStyleVars() {
+        if (this._lastAppliedVars.size === 0) return;
+        
+        const { window: coreWin } = getCore();
+        let root;
+        try {
+            root = coreWin?.document?.documentElement || document.documentElement;
+        } catch (e) {
+            root = document.documentElement;
+        }
+        
+        if (!root) return;
+        
+        // 清除记录的变量
+        this._lastAppliedVars.forEach(key => {
+            // 检查是否为需要保留的运行时变量
+            const isPreserved = this._preservedVarPrefixes.some(prefix => key.startsWith(prefix));
+            if (!isPreserved) {
+                root.style.removeProperty(key);
+            }
+        });
+        
+        Logger.debug('已清除', this._lastAppliedVars.size, '个样式变量');
+    },
+    
+    /**
+     * 恢复当前主题/自定义主题的颜色基准
+     * 在清除样式包变量后调用，确保未定义的变量回退到主题值而非 CSS 默认值
+     * 注意：此方法应用的变量不记录到 _lastAppliedVars，因为它们是主题基准
+     */
+    _restoreThemeBaseline() {
+        const { window: coreWin } = getCore();
+        let root;
+        try {
+            root = coreWin?.document?.documentElement || document.documentElement;
+        } catch (e) {
+            root = document.documentElement;
+        }
+        
+        if (!root) return;
+        
+        // 获取当前主题的颜色变量（已合并：基础主题 + 自定义覆盖）
+        const themeVars = ThemeManager.getCurrentVars();
+        
+        // 应用主题变量（不记录到 _lastAppliedVars，这些是主题基准）
+        Object.entries(themeVars).forEach(([key, value]) => {
+            root.style.setProperty(key, value);
+        });
+        
+        // 从有效的主题变量中读取颜色值，生成渐变背景
+        // 注意：themeVars 不包含渐变变量，需要从基础颜色变量动态生成
+        const panelStart = themeVars['--dnd-bg-panel-start'] || ThemeManager.COLOR_VARS['--dnd-bg-panel-start'].default;
+        const panelEnd = themeVars['--dnd-bg-panel-end'] || ThemeManager.COLOR_VARS['--dnd-bg-panel-end'].default;
+        const cardStart = themeVars['--dnd-bg-card-start'] || ThemeManager.COLOR_VARS['--dnd-bg-card-start'].default;
+        const cardEnd = themeVars['--dnd-bg-card-end'] || ThemeManager.COLOR_VARS['--dnd-bg-card-end'].default;
+        
+        root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
+        root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
+        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${StyleManager_ensureOpaqueColor(cardStart, 0.98)} 0%, ${StyleManager_ensureOpaqueColor(cardEnd, 0.98)} 100%)`);
+        root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${StyleManager_ensureOpaqueColor(cardStart)}, ${StyleManager_ensureOpaqueColor(cardEnd)})`);
+        
+        Logger.debug('已恢复主题基准:', ThemeManager.currentTheme);
+    },
+    
+    /**
      * 应用颜色变量（包含渐变生成）
      */
     _applyColorVars(colors) {
@@ -26452,13 +28247,22 @@ const StyleManager = {
         // 直接应用颜色变量
         Object.entries(colors).forEach(([key, value]) => {
             root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);  // 记录变量键
         });
         
-        // 生成渐变背景（复用ThemeManager的逻辑）
-        const panelStart = colors['--dnd-bg-panel-start'] || '#2b1b17';
-        const panelEnd = colors['--dnd-bg-panel-end'] || '#1a100e';
-        const cardStart = colors['--dnd-bg-card-start'] || '#242424';
-        const cardEnd = colors['--dnd-bg-card-end'] || '#1a1a1c';
+        // 获取当前已设置的主题基准值作为回退（而非硬编码默认值）
+        const computedStyle = getComputedStyle(root);
+        const getThemeVar = (varName) => computedStyle.getPropertyValue(varName).trim();
+        
+        // 生成渐变背景：优先使用样式包提供的值，否则继承当前主题基准
+        const panelStart = colors['--dnd-bg-panel-start'] || getThemeVar('--dnd-bg-panel-start') || '#2b1b17';
+        const panelEnd = colors['--dnd-bg-panel-end'] || getThemeVar('--dnd-bg-panel-end') || '#1a100e';
+        const cardStart = colors['--dnd-bg-card-start'] || getThemeVar('--dnd-bg-card-start') || '#242424';
+        const cardEnd = colors['--dnd-bg-card-end'] || getThemeVar('--dnd-bg-card-end') || '#1a1a1c';
+        
+        // 记录生成的渐变变量
+        const gradientVars = ['--dnd-bg-panel', '--dnd-bg-hud', '--dnd-bg-card', '--dnd-bg-popup'];
+        gradientVars.forEach(v => this._lastAppliedVars.add(v));
         
         root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
@@ -26483,6 +28287,7 @@ const StyleManager = {
         
         Object.entries(vars).forEach(([key, value]) => {
             root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);  // 记录变量键
         });
     },
     
@@ -26506,9 +28311,9 @@ const StyleManager = {
         // 边框形态
         if (morphology.border) {
             const { style, width, outerStyle } = morphology.border;
-            if (style) root.style.setProperty('--dnd-border-style', style);
-            if (width) root.style.setProperty('--dnd-border-width', width);
-            if (outerStyle) root.style.setProperty('--dnd-border-outer-style', outerStyle);
+            if (style) { root.style.setProperty('--dnd-border-style', style); this._lastAppliedVars.add('--dnd-border-style'); }
+            if (width) { root.style.setProperty('--dnd-border-width', width); this._lastAppliedVars.add('--dnd-border-width'); }
+            if (outerStyle) { root.style.setProperty('--dnd-border-outer-style', outerStyle); this._lastAppliedVars.add('--dnd-border-outer-style'); }
         }
         
         // 角部形态
@@ -26516,42 +28321,46 @@ const StyleManager = {
             const { style, clipPath } = morphology.corners;
             if (clipPath && clipPath !== 'none') {
                 root.style.setProperty('--dnd-card-clip-path', clipPath);
+                this._lastAppliedVars.add('--dnd-card-clip-path');
             } else {
                 root.style.setProperty('--dnd-card-clip-path', 'none');
+                this._lastAppliedVars.add('--dnd-card-clip-path');
             }
             // 根据角部样式设置特殊的裁剪路径
             if (style) {
                 root.style.setProperty('--dnd-corner-style', style);
+                this._lastAppliedVars.add('--dnd-corner-style');
             }
         }
         
         // 卡片形态
         if (morphology.card) {
             const { shape, aspectRatio, transform, decoration } = morphology.card;
-            if (shape) root.style.setProperty('--dnd-card-shape', shape);
-            if (aspectRatio) root.style.setProperty('--dnd-card-aspect-ratio', aspectRatio);
+            if (shape) { root.style.setProperty('--dnd-card-shape', shape); this._lastAppliedVars.add('--dnd-card-shape'); }
+            if (aspectRatio) { root.style.setProperty('--dnd-card-aspect-ratio', aspectRatio); this._lastAppliedVars.add('--dnd-card-aspect-ratio'); }
             if (transform && transform !== 'none') {
                 root.style.setProperty('--dnd-card-transform', transform);
+                this._lastAppliedVars.add('--dnd-card-transform');
             }
-            if (decoration) root.style.setProperty('--dnd-card-decoration', decoration);
+            if (decoration) { root.style.setProperty('--dnd-card-decoration', decoration); this._lastAppliedVars.add('--dnd-card-decoration'); }
         }
         
         // 装饰元素
         if (morphology.decorations) {
             const { corners, dividers, headers, icons } = morphology.decorations;
-            if (corners) root.style.setProperty('--dnd-corner-ornament', corners);
-            if (dividers) root.style.setProperty('--dnd-divider-style', dividers);
-            if (headers) root.style.setProperty('--dnd-header-decoration', headers);
-            if (icons) root.style.setProperty('--dnd-icon-shape', icons);
+            if (corners) { root.style.setProperty('--dnd-corner-ornament', corners); this._lastAppliedVars.add('--dnd-corner-ornament'); }
+            if (dividers) { root.style.setProperty('--dnd-divider-style', dividers); this._lastAppliedVars.add('--dnd-divider-style'); }
+            if (headers) { root.style.setProperty('--dnd-header-decoration', headers); this._lastAppliedVars.add('--dnd-header-decoration'); }
+            if (icons) { root.style.setProperty('--dnd-icon-shape', icons); this._lastAppliedVars.add('--dnd-icon-shape'); }
         }
         
         // 视觉特效
         if (morphology.effects) {
             const { overlay, innerGlow, borderGlow, texture } = morphology.effects;
-            if (overlay) root.style.setProperty('--dnd-effect-overlay', this._getOverlayValue(overlay));
-            if (innerGlow) root.style.setProperty('--dnd-effect-inner-glow', this._getGlowValue(innerGlow));
-            if (borderGlow) root.style.setProperty('--dnd-effect-border-glow', this._getGlowValue(borderGlow));
-            if (texture) root.style.setProperty('--dnd-effect-texture', this._getTextureValue(texture));
+            if (overlay) { root.style.setProperty('--dnd-effect-overlay', this._getOverlayValue(overlay)); this._lastAppliedVars.add('--dnd-effect-overlay'); }
+            if (innerGlow) { root.style.setProperty('--dnd-effect-inner-glow', this._getGlowValue(innerGlow)); this._lastAppliedVars.add('--dnd-effect-inner-glow'); }
+            if (borderGlow) { root.style.setProperty('--dnd-effect-border-glow', this._getGlowValue(borderGlow)); this._lastAppliedVars.add('--dnd-effect-border-glow'); }
+            if (texture) { root.style.setProperty('--dnd-effect-texture', this._getTextureValue(texture)); this._lastAppliedVars.add('--dnd-effect-texture'); }
         }
         
         // 布局密度
@@ -26559,12 +28368,14 @@ const StyleManager = {
             const { density, cardMinWidth, gridGap } = morphology.layout;
             if (density) {
                 root.style.setProperty('--dnd-layout-density', density);
+                this._lastAppliedVars.add('--dnd-layout-density');
                 // 根据密度调整间距
                 const densityMultiplier = density === 'compact' ? 0.75 : (density === 'spacious' ? 1.25 : 1);
                 root.style.setProperty('--dnd-density-multiplier', String(densityMultiplier));
+                this._lastAppliedVars.add('--dnd-density-multiplier');
             }
-            if (cardMinWidth) root.style.setProperty('--dnd-card-min-width', cardMinWidth);
-            if (gridGap) root.style.setProperty('--dnd-grid-gap', gridGap);
+            if (cardMinWidth) { root.style.setProperty('--dnd-card-min-width', cardMinWidth); this._lastAppliedVars.add('--dnd-card-min-width'); }
+            if (gridGap) { root.style.setProperty('--dnd-grid-gap', gridGap); this._lastAppliedVars.add('--dnd-grid-gap'); }
         }
         
         Logger.debug('已应用形态配置:', morphology);
@@ -26588,96 +28399,102 @@ const StyleManager = {
         
         if (!root) return;
         
+        // 辅助函数：设置变量并记录
+        const setVar = (key, value) => {
+            root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);
+        };
+        
         // 悬浮状态 (Hover)
         if (interactiveStates.hover) {
             const { brightness, scale, lift, shadow, borderColor, glow, transition } = interactiveStates.hover;
-            if (brightness) root.style.setProperty('--dnd-hover-brightness', String(brightness));
-            if (scale) root.style.setProperty('--dnd-hover-scale', String(scale));
-            if (lift) root.style.setProperty('--dnd-hover-lift', lift);
-            if (shadow) root.style.setProperty('--dnd-hover-shadow', shadow);
-            if (borderColor) root.style.setProperty('--dnd-hover-border-color', borderColor);
-            if (glow) root.style.setProperty('--dnd-hover-glow', glow);
-            if (transition) root.style.setProperty('--dnd-hover-transition', transition);
+            if (brightness) setVar('--dnd-hover-brightness', String(brightness));
+            if (scale) setVar('--dnd-hover-scale', String(scale));
+            if (lift) setVar('--dnd-hover-lift', lift);
+            if (shadow) setVar('--dnd-hover-shadow', shadow);
+            if (borderColor) setVar('--dnd-hover-border-color', borderColor);
+            if (glow) setVar('--dnd-hover-glow', glow);
+            if (transition) setVar('--dnd-hover-transition', transition);
         }
         
         // 卡片悬浮
         if (interactiveStates.cardHover) {
             const { transform, shadow, borderColor } = interactiveStates.cardHover;
-            if (transform) root.style.setProperty('--dnd-card-hover-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-card-hover-shadow', shadow);
-            if (borderColor) root.style.setProperty('--dnd-card-hover-border-color', borderColor);
+            if (transform) setVar('--dnd-card-hover-transform', transform);
+            if (shadow) setVar('--dnd-card-hover-shadow', shadow);
+            if (borderColor) setVar('--dnd-card-hover-border-color', borderColor);
         }
         
         // 按钮悬浮
         if (interactiveStates.buttonHover) {
             const { brightness, transform, shadow } = interactiveStates.buttonHover;
-            if (brightness) root.style.setProperty('--dnd-btn-hover-brightness', String(brightness));
-            if (transform) root.style.setProperty('--dnd-btn-hover-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-btn-hover-shadow', shadow);
+            if (brightness) setVar('--dnd-btn-hover-brightness', String(brightness));
+            if (transform) setVar('--dnd-btn-hover-transform', transform);
+            if (shadow) setVar('--dnd-btn-hover-shadow', shadow);
         }
         
         // 点击/激活状态 (Active/Pressed)
         if (interactiveStates.active) {
             const { scale, brightness, transform, shadow } = interactiveStates.active;
-            if (scale) root.style.setProperty('--dnd-active-scale', String(scale));
-            if (brightness) root.style.setProperty('--dnd-active-brightness', String(brightness));
-            if (transform) root.style.setProperty('--dnd-active-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-active-shadow', shadow);
+            if (scale) setVar('--dnd-active-scale', String(scale));
+            if (brightness) setVar('--dnd-active-brightness', String(brightness));
+            if (transform) setVar('--dnd-active-transform', transform);
+            if (shadow) setVar('--dnd-active-shadow', shadow);
         }
         
         // 按钮点击
         if (interactiveStates.buttonActive) {
             const { transform, shadow } = interactiveStates.buttonActive;
-            if (transform) root.style.setProperty('--dnd-btn-active-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-btn-active-shadow', shadow);
+            if (transform) setVar('--dnd-btn-active-transform', transform);
+            if (shadow) setVar('--dnd-btn-active-shadow', shadow);
         }
         
         // 选中状态 (Selected)
         if (interactiveStates.selected) {
             const { background, borderColor, borderWidth, glow, textColor } = interactiveStates.selected;
-            if (background) root.style.setProperty('--dnd-selected-bg', background);
-            if (borderColor) root.style.setProperty('--dnd-selected-border-color', borderColor);
-            if (borderWidth) root.style.setProperty('--dnd-selected-border-width', borderWidth);
-            if (glow) root.style.setProperty('--dnd-selected-glow', glow);
-            if (textColor) root.style.setProperty('--dnd-selected-text-color', textColor);
+            if (background) setVar('--dnd-selected-bg', background);
+            if (borderColor) setVar('--dnd-selected-border-color', borderColor);
+            if (borderWidth) setVar('--dnd-selected-border-width', borderWidth);
+            if (glow) setVar('--dnd-selected-glow', glow);
+            if (textColor) setVar('--dnd-selected-text-color', textColor);
         }
         
         // 导航选中状态
         if (interactiveStates.navActive) {
             const { background, border, indicator } = interactiveStates.navActive;
-            if (background) root.style.setProperty('--dnd-nav-active-bg', background);
-            if (border) root.style.setProperty('--dnd-nav-active-border', border);
-            if (indicator) root.style.setProperty('--dnd-nav-active-indicator', indicator);
+            if (background) setVar('--dnd-nav-active-bg', background);
+            if (border) setVar('--dnd-nav-active-border', border);
+            if (indicator) setVar('--dnd-nav-active-indicator', indicator);
         }
         
         // 聚焦状态 (Focus)
         if (interactiveStates.focus) {
             const { borderColor, shadow, outline } = interactiveStates.focus;
-            if (borderColor) root.style.setProperty('--dnd-focus-border-color', borderColor);
-            if (shadow) root.style.setProperty('--dnd-focus-shadow', shadow);
-            if (outline) root.style.setProperty('--dnd-focus-outline', outline);
+            if (borderColor) setVar('--dnd-focus-border-color', borderColor);
+            if (shadow) setVar('--dnd-focus-shadow', shadow);
+            if (outline) setVar('--dnd-focus-outline', outline);
         }
         
         // 禁用状态 (Disabled)
         if (interactiveStates.disabled) {
             const { opacity, cursor, filter } = interactiveStates.disabled;
-            if (opacity) root.style.setProperty('--dnd-disabled-opacity', String(opacity));
-            if (cursor) root.style.setProperty('--dnd-disabled-cursor', cursor);
-            if (filter) root.style.setProperty('--dnd-disabled-filter', filter);
+            if (opacity) setVar('--dnd-disabled-opacity', String(opacity));
+            if (cursor) setVar('--dnd-disabled-cursor', cursor);
+            if (filter) setVar('--dnd-disabled-filter', filter);
         }
         
         // 图标悬浮
         if (interactiveStates.iconHover) {
             const { glow, scale } = interactiveStates.iconHover;
-            if (glow) root.style.setProperty('--dnd-icon-hover-glow', glow);
-            if (scale) root.style.setProperty('--dnd-icon-hover-scale', String(scale));
+            if (glow) setVar('--dnd-icon-hover-glow', glow);
+            if (scale) setVar('--dnd-icon-hover-scale', String(scale));
         }
         
         // 输入框聚焦
         if (interactiveStates.inputFocus) {
             const { border, shadow } = interactiveStates.inputFocus;
-            if (border) root.style.setProperty('--dnd-input-focus-border', border);
-            if (shadow) root.style.setProperty('--dnd-input-focus-shadow', shadow);
+            if (border) setVar('--dnd-input-focus-border', border);
+            if (shadow) setVar('--dnd-input-focus-shadow', shadow);
         }
         
         Logger.debug('已应用交互状态配置:', interactiveStates);
@@ -29806,6 +31623,160 @@ function getWeatherIcon(weatherText) {
     _lastToggleTime: 0, // 用于防止重复触发
     _controlledCharId: null, // [新增] 当前操控的角色ID，null表示默认PC
     _dynamicBgIds: {}, // [新增] 动态背景效果实例ID存储
+    _hideFloatingBall: false, // [新增] 隐藏浮动球模式开关
+    _helperButtonRegistered: false, // [新增] Helper 按钮事件是否已注册
+    _helperButtonStop: null,
+    _helperButtonRetryTimer: null,
+    _helperButtonRetryCount: 0,
+    _miniHudPos: null,
+
+    _parseSavedPosition(raw) {
+        if (!raw) return null;
+        let pos = raw;
+
+        if (typeof pos === 'string') {
+            try {
+                pos = JSON.parse(pos);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        if (!pos || typeof pos.left !== 'string' || typeof pos.top !== 'string') {
+            return null;
+        }
+
+        return {
+            left: pos.left,
+            top: pos.top
+        };
+    },
+
+    // [新增] 应用浮动球可见性设置
+    async applyFloatingBallVisibility() {
+        const { $ } = getCore();
+        const savedHide = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
+        this._hideFloatingBall = savedHide === true || savedHide === 'true';
+        this._miniHudPos = this._parseSavedPosition(await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.MINI_HUD_POS));
+        
+        const $btn = $('#dnd-toggle-btn');
+        if (this._hideFloatingBall) {
+            $btn.addClass('dnd-force-hidden');
+            Logger.info('[UICore] 浮动球已隐藏');
+
+            if (!this._helperButtonRegistered) {
+                this.registerHelperButtonEvent({ scheduleRetry: true });
+            }
+        } else {
+            $btn.removeClass('dnd-force-hidden');
+            Logger.info('[UICore] 浮动球已显示');
+        }
+        
+        // 触发 HUD 位置更新
+        if (window.DND_Dashboard_UI && window.DND_Dashboard_UI.updateHUDPosition) {
+            window.DND_Dashboard_UI.updateHUDPosition();
+        }
+    },
+
+    _getHelperButtonAPI() {
+        const { window: coreWin } = getCore();
+        const candidates = [];
+        const addCandidate = (candidate) => {
+            if (candidate && !candidates.includes(candidate)) candidates.push(candidate);
+        };
+
+        addCandidate(window);
+        try { addCandidate(window.parent); } catch (e) {}
+        try { addCandidate(window.top); } catch (e) {}
+        addCandidate(coreWin);
+
+        for (const candidate of candidates) {
+            const getButtonEvent = candidate.getButtonEvent;
+            const eventOn = candidate.eventOn;
+            if (typeof getButtonEvent === 'function' && typeof eventOn === 'function') {
+                return {
+                    getButtonEvent,
+                    eventOn,
+                    appendInexistentScriptButtons: candidate.appendInexistentScriptButtons,
+                    sourceWindow: candidate
+                };
+            }
+        }
+
+        return null;
+    },
+
+    _scheduleHelperButtonRetry() {
+        if (!this._hideFloatingBall || this._helperButtonRegistered || this._helperButtonRetryTimer) return;
+        if (this._helperButtonRetryCount >= 30) {
+            Logger.warn('[UICore] Helper 按钮事件注册重试已达到上限');
+            return;
+        }
+
+        this._helperButtonRetryCount += 1;
+        this._helperButtonRetryTimer = setTimeout(() => {
+            this._helperButtonRetryTimer = null;
+            this.registerHelperButtonEvent({ scheduleRetry: true });
+        }, 1000);
+    },
+
+    // [新增] 注册 Tavern Helper 按钮事件
+    registerHelperButtonEvent(options = {}) {
+        if (this._helperButtonRegistered) return;
+        const { scheduleRetry = false } = options;
+        
+        try {
+            // 安全检查 Helper API 是否存在
+            const helperAPI = this._getHelperButtonAPI();
+            
+            if (!helperAPI) {
+                Logger.debug('[UICore] Tavern Helper API 不可用，等待重试');
+                if (scheduleRetry) this._scheduleHelperButtonRetry();
+                return;
+            }
+
+            const { getButtonEvent, eventOn, appendInexistentScriptButtons } = helperAPI;
+            
+            // 尝试创建按钮（如果不存在）
+            if (appendInexistentScriptButtons) {
+                try {
+                    appendInexistentScriptButtons([{ name: 'DND仪表盘', visible: true }]);
+                } catch (e) {
+                    Logger.debug('[UICore] Helper 按钮已存在或创建失败:', e.message);
+                }
+            }
+            
+            // 注册按钮点击事件
+            const buttonEvent = getButtonEvent('DND仪表盘');
+            if (buttonEvent) {
+                this._helperButtonStop = eventOn(buttonEvent, () => {
+                    Logger.info('[UICore] Helper 按钮被点击');
+                    
+                    if (this._hideFloatingBall) {
+                        // 隐藏浮动球模式下，助手按钮承担主开关职责：
+                        // collapsed -> mini，mini/full -> collapsed
+                        this.toggleDashboard();
+                    } else {
+                        this.toggleDashboard();
+                    }
+                });
+                
+                this._helperButtonRegistered = true;
+                this._helperButtonRetryCount = 0;
+                if (this._helperButtonRetryTimer) {
+                    clearTimeout(this._helperButtonRetryTimer);
+                    this._helperButtonRetryTimer = null;
+                }
+                Logger.info('[UICore] Helper 按钮事件已注册');
+            } else if (scheduleRetry) {
+                Logger.debug('[UICore] Helper 按钮事件名暂不可用，等待重试');
+                this._scheduleHelperButtonRetry();
+            }
+        } catch (e) {
+            Logger.warn('[UICore] 注册 Helper 按钮事件失败:', e.message);
+            if (scheduleRetry) this._scheduleHelperButtonRetry();
+        }
+    },
 
     setControlledCharacter(charId) {
         this._controlledCharId = charId;
@@ -30098,6 +32069,21 @@ function getWeatherIcon(weatherText) {
             $(document).off('dblclick.dndAvatar');
             $(document).off('click.dndPos'); // 清除位置设置弹窗的监听器
         } catch (e) { console.warn('Event cleanup error:', e); }
+
+        if (this._helperButtonStop && typeof this._helperButtonStop.stop === 'function') {
+            try {
+                this._helperButtonStop.stop();
+            } catch (e) {
+                Logger.warn('[UICore] Helper 按钮监听清理失败:', e);
+            }
+        }
+        this._helperButtonStop = null;
+        this._helperButtonRegistered = false;
+        if (this._helperButtonRetryTimer) {
+            clearTimeout(this._helperButtonRetryTimer);
+            this._helperButtonRetryTimer = null;
+        }
+        this._helperButtonRetryCount = 0;
 
         // 3. 清除 DOM 元素 (更彻底的清除)
         const selectorsToRemove = [
@@ -30586,7 +32572,7 @@ function getWeatherIcon(weatherText) {
             if (charId) {
                 // 验证是否为主角或队友 (只允许修改己方头像)
                 const party = DataManager.getPartyData();
-                const isPartyMember = party && party.some(p => {
+                const matchedPartyMember = party && party.find(p => {
                     // 匹配 ID 或 姓名
                     return (p['PC_ID'] == charId) || 
                         (p['CHAR_ID'] == charId) || 
@@ -30594,8 +32580,8 @@ function getWeatherIcon(weatherText) {
                         (p['姓名'] == charName);
                 });
 
-                if (isPartyMember) {
-                    this.showAvatarUploadDialog(charId, charName);
+                if (matchedPartyMember) {
+                    this.showAvatarUploadDialog(matchedPartyMember, matchedPartyMember['姓名'] || charName);
                 } else {
                     console.log('[DND Dashboard] 仅限修改主角或队友头像');
                     // 可以选择添加一个视觉反馈，比如 shake 动画
@@ -30610,6 +32596,16 @@ function getWeatherIcon(weatherText) {
                 }
             }
         });
+
+        // [新增] 读取并应用隐藏浮动球设置
+        void this.applyFloatingBallVisibility();
+        
+        // [新增] 在隐藏悬浮球模式下延迟重试 Helper 按钮注册
+        setTimeout(() => {
+            if (this._hideFloatingBall) {
+                this.registerHelperButtonEvent({ scheduleRetry: true });
+            }
+        }, 1000);
     }
 });
 
@@ -30625,8 +32621,62 @@ function getWeatherIcon(weatherText) {
 
 
 
+
+async function invokeManualUpdate(event) {
+    const { $, getDB } = getCore();
+    const $btn = event ? $(event.currentTarget).closest('.dnd-footer-btn') : $();
+    const $icon = $btn.find('.dnd-refresh-icon i');
+    const api = typeof getDB === 'function' ? getDB() : null;
+
+    if (!api || typeof api.manualUpdate !== 'function') {
+        Logger.warn('[UIHUD] 当前数据库插件未提供 manualUpdate 接口');
+        NotificationSystem.error('当前数据库插件未提供手动更新接口，请先更新数据库插件');
+        return false;
+    }
+
+    try {
+        $btn.css({
+            pointerEvents: 'none',
+            opacity: '0.7'
+        });
+        $icon.removeClass('fa-sync').addClass('fa-spinner fa-spin');
+
+        const success = await api.manualUpdate();
+        if (success === false) {
+            throw new Error('数据库插件返回失败');
+        }
+
+        const globalUI = window.DND_Dashboard_UI || getCore().window?.DND_Dashboard_UI;
+        if (globalUI) {
+            if (globalUI.state === 'mini' && typeof globalUI.renderHUD === 'function') {
+                setTimeout(() => globalUI.renderHUD(), 50);
+            } else if (globalUI.state === 'full' && typeof globalUI.renderPanel === 'function') {
+                const activeTarget = $('.dnd-nav-item.active').data('target');
+                if (activeTarget) {
+                    setTimeout(() => globalUI.renderPanel(activeTarget), 50);
+                }
+            }
+        }
+
+        Logger.info('[UIHUD] 已触发数据库手动更新');
+        NotificationSystem.success('已触发数据库手动更新');
+        return true;
+    } catch (err) {
+        const message = err?.message || '未知错误';
+        Logger.error('[UIHUD] 手动更新失败:', err);
+        NotificationSystem.error(`手动更新失败：${message}`);
+        return false;
+    } finally {
+        $btn.css({
+            pointerEvents: '',
+            opacity: ''
+        });
+        $icon.removeClass('fa-spinner fa-spin').addClass('fa-sync');
+    }
+}
+
 /* harmony default export */ const UIHUD = ({
-    renderHUD() {
+    async renderHUD() {
         const { $ } = getCore();
         const $hud = $('#dnd-mini-hud');
         const $body = $('#dnd-hud-body');
@@ -30636,6 +32686,10 @@ function getWeatherIcon(weatherText) {
         
         // 仅在 mini 状态下渲染
         if (this.state !== 'mini') return;
+
+        // 获取迷你地图显示设置（提前获取，传递给子渲染函数）
+        const showMiniMapSetting = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP);
+        const showMiniMap = showMiniMapSetting !== false && showMiniMapSetting !== 'false'; // 默认开启
 
         // 获取全局状态
         const global = DataManager.getTable('SYS_GlobalState');
@@ -30675,11 +32729,11 @@ function getWeatherIcon(weatherText) {
         
         // 添加展开按钮 (如果尚未存在)
         if ($('#dnd-hud-toggle-bar').length === 0) {
-            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:linear-gradient(to bottom, #1a1a1a, #0a0a0a);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#666;font-size:8px;transition:all 0.2s;" title="展开/收起表格管理">▼</div>`);
+            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:var(--dnd-bg-tertiary);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dnd-text-dim);font-size:8px;transition:all 0.2s;" title="展开/收起表格管理">▼</div>`);
             
             $toggleBar.hover(
-                function() { $(this).css({color: 'var(--dnd-text-highlight)', background: 'rgba(255,255,255,0.05)'}); },
-                function() { $(this).css({color: '#666', background: 'linear-gradient(to bottom, #1a1a1a, #0a0a0a)'}); }
+                function() { $(this).css({color: 'var(--dnd-text-highlight)', background: 'var(--dnd-selected-bg)'}); },
+                function() { $(this).css({color: 'var(--dnd-text-dim)', background: 'var(--dnd-bg-tertiary)'}); }
             );
             
             const self = this;
@@ -30717,10 +32771,10 @@ function getWeatherIcon(weatherText) {
         // [美化] 添加/移除战斗模式特殊样式类
         if (isCombat) {
             $hud.addClass('dnd-combat-mode');
-            this.renderCombatHUD($body);
+            this.renderCombatHUD($body, showMiniMap);
         } else {
             $hud.removeClass('dnd-combat-mode');
-            this.renderExploreHUD($body);
+            this.renderExploreHUD($body, showMiniMap);
         }
         
         // [美化] 为主体内容添加交错入场动画
@@ -30741,15 +32795,15 @@ function getWeatherIcon(weatherText) {
         // [新增] 渲染行动队列面板 (如果有待执行行动)
         if (this._actionQueue && this._actionQueue.length > 0) {
             const $queuePanel = $(`
-                <div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid var(--dnd-border-gold);border-radius:4px;overflow:hidden;">
-                    <div style="background:rgba(197, 160, 89, 0.1);padding:5px 10px;font-weight:bold;color:var(--dnd-text-highlight);display:flex;justify-content:space-between;align-items:center;">
+                <div style="margin-top:10px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-gold);border-radius:4px;overflow:hidden;">
+                    <div style="background:var(--dnd-bg-secondary);padding:5px 10px;font-weight:bold;color:var(--dnd-text-highlight);display:flex;justify-content:space-between;align-items:center;">
                         <span><i class="fa-solid fa-hourglass-half"></i> 待执行行动 (${this._actionQueue.length})</span>
                         <div style="display:flex;gap:5px;">
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-check"></i> 执行</button>
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-times"></i> 清空</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-check"></i> 执行</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-times"></i> 清空</button>
                         </div>
                     </div>
-                    <div style="padding:5px 10px;font-size:12px;color:#ccc;">
+                    <div style="padding:5px 10px;font-size:12px;color:var(--dnd-text-dim);">
                         ${this._actionQueue.map((a, i) => `<div style="margin-bottom:2px;">${i+1}. ${a.desc}</div>`).join('')}
                     </div>
                 </div>
@@ -30769,9 +32823,12 @@ function getWeatherIcon(weatherText) {
         
         // 每次渲染后更新位置
         this.updateHUDPosition();
+        
+        // [新增] 初始化独立拖拽功能（隐藏球模式下使用）
+        this.initIndependentDrag();
     },
 
-    // [新增] 更新 HUD 位置使其跟随悬浮球
+        // [新增] 更新 HUD 位置使其跟随悬浮球
     updateHUDPosition() {
         const { $, window: coreWin } = getCore(); // 获取正确的 window 对象
         // [修复] 使用 coreWin 获取尺寸，确保与 DOM 元素所在的文档一致 (兼容 iframe)
@@ -30790,7 +32847,32 @@ function getWeatherIcon(weatherText) {
         const $btn = $('#dnd-toggle-btn');
         const $hud = $('#dnd-mini-hud');
         
-        if (!$btn.length || !$hud.length) return;
+        if (!$hud.length) return;
+        
+        // [新增] 检查是否隐藏球模式
+        const hideFloatingBall = $btn.hasClass('dnd-force-hidden') || 
+            (UICore._hideFloatingBall === true);
+        
+        if (hideFloatingBall) {
+            // 隐藏球模式：使用独立位置
+            $hud.addClass('dnd-independent-mode');
+
+            const hudRect = $hud[0].getBoundingClientRect();
+            const hudW = hudRect.width || 360;
+            const savedPos = UICore._miniHudPos;
+
+            const top = savedPos?.top || '20px';
+            const left = savedPos?.left || `${Math.max(20, winW - hudW - 20)}px`;
+
+            $hud[0].style.setProperty('top', top, 'important');
+            $hud[0].style.setProperty('left', left, 'important');
+            return;
+        }
+        
+        // 正常模式：跟随浮动球
+        $hud.removeClass('dnd-independent-mode');
+        
+        if (!$btn.length) return;
         
         const btnRect = $btn[0].getBoundingClientRect();
         const hudRect = $hud[0].getBoundingClientRect();
@@ -30836,6 +32918,119 @@ function getWeatherIcon(weatherText) {
         $hud[0].style.setProperty('left', left + 'px', 'important');
     },
 
+    // [新增] 初始化 Mini HUD 独立拖拽功能
+    initIndependentDrag() {
+        const { $, window: coreWin } = getCore();
+        const $hud = $('#dnd-mini-hud');
+        const $header = $hud.find('.dnd-hud-header');
+        
+        if (!$hud.length || !$header.length) return;
+        
+        // 检查是否已初始化
+        if ($hud.data('dnd-independent-drag-init')) return;
+        $hud.data('dnd-independent-drag-init', true);
+        
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let hudStartX = 0, hudStartY = 0;
+        const DRAG_THRESHOLD = 5;
+        
+        const handlePointerDown = (e) => {
+            // 只在独立模式下响应
+            if (!UICore._hideFloatingBall) return;
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            if ($(e.target).closest('#dnd-logo-container, #dnd-hud-theme, #dnd-hud-toggle-bar, button').length) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isDragging = false;
+            dragStartX = e.screenX;
+            dragStartY = e.screenY;
+            
+            const rect = $hud[0].getBoundingClientRect();
+            hudStartX = rect.left;
+            hudStartY = rect.top;
+            
+            if ($hud[0].setPointerCapture) {
+                try { $hud[0].setPointerCapture(e.pointerId); } catch(err) {}
+            }
+            
+            const win = $hud[0].ownerDocument.defaultView || window;
+            win.addEventListener('pointermove', handlePointerMove);
+            win.addEventListener('pointerup', handlePointerUp);
+            win.addEventListener('pointercancel', handlePointerUp);
+        };
+        
+        const handlePointerMove = (e) => {
+            if (!UICore._hideFloatingBall) return;
+            
+            e.preventDefault();
+            
+            const dx = e.screenX - dragStartX;
+            const dy = e.screenY - dragStartY;
+            
+            if (!isDragging && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+                isDragging = true;
+                $hud.addClass('is-dragging');
+            }
+            
+            if (isDragging) {
+                const uiScale = UICore.currentScale || 1;
+                const browserZoom = window.devicePixelRatio || 1;
+                const totalScale = browserZoom * uiScale;
+                
+                let newLeft = hudStartX + dx / totalScale;
+                let newTop = hudStartY + dy / totalScale;
+                
+                const win = $hud[0].ownerDocument.defaultView || window;
+                const winW = win.innerWidth;
+                const winH = win.innerHeight;
+                const hudRect = $hud[0].getBoundingClientRect();
+                const hudW = hudRect.width || 360;
+                const hudH = hudRect.height || 400;
+                
+                // 边界限制
+                newLeft = Math.max(5, Math.min(newLeft, winW - hudW - 5));
+                newTop = Math.max(5, Math.min(newTop, winH - hudH - 5));
+                
+                $hud[0].style.setProperty('left', newLeft + 'px', 'important');
+                $hud[0].style.setProperty('top', newTop + 'px', 'important');
+            }
+        };
+        
+        const handlePointerUp = (e) => {
+            const win = $hud[0].ownerDocument.defaultView || window;
+            win.removeEventListener('pointermove', handlePointerMove);
+            win.removeEventListener('pointerup', handlePointerUp);
+            win.removeEventListener('pointercancel', handlePointerUp);
+            
+            if ($hud[0].releasePointerCapture) {
+                try { $hud[0].releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+            
+            if (isDragging) {
+                // 保存位置
+                const rect = $hud[0].getBoundingClientRect();
+                const nextPos = {
+                    left: rect.left + 'px',
+                    top: rect.top + 'px'
+                };
+
+                UICore._miniHudPos = nextPos;
+                safeSave(CONFIG.STORAGE_KEYS.MINI_HUD_POS, JSON.stringify(nextPos));
+                setTimeout(() => $hud.removeClass('is-dragging'), 50);
+            }
+            
+            isDragging = false;
+        };
+        
+        // 在 header 上绑定拖拽事件
+        $header[0].addEventListener('pointerdown', handlePointerDown);
+        
+        Logger.info('[UIHUD] Mini HUD 独立拖拽已初始化');
+    },
+
     // [新增] 显示位置设置对话框
     showPositionDialog() {
         const { $, window: coreWin } = getCore();
@@ -30861,19 +33056,19 @@ function getWeatherIcon(weatherText) {
         ];
         
         let btnsHtml = positions.map(p => 
-            `<button class="dnd-pos-btn" data-left="${p.left}" data-top="${p.top}" style="padding:8px;background:#2a2a2c;border:1px solid #444;color:#ccc;border-radius:4px;cursor:pointer;">${p.label}</button>`
+            `<button class="dnd-pos-btn" data-left="${p.left}" data-top="${p.top}" style="padding:8px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;">${p.label}</button>`
         ).join('');
         
         const html = `
-            <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#161618;border:1px solid #9d8b6c;border-radius:8px;padding:15px;z-index:2147483650;box-shadow:0 10px 40px rgba(0,0,0,0.8);min-width:280px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid #444;padding-bottom:8px;">
-                    <span style="color:#ffdb85;font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
-                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;"><i class="fa-solid fa-times"></i></span>
+            <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--dnd-bg-popup);border:1px solid var(--dnd-border-gold);border-radius:8px;padding:15px;z-index:2147483650;box-shadow:var(--dnd-shadow-lg);min-width:280px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:8px;">
+                    <span style="color:var(--dnd-text-highlight);font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
+                    <span id="dnd-pos-close" style="cursor:pointer;color:var(--dnd-text-dim);"><i class="fa-solid fa-times"></i></span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px;">${btnsHtml}</div>
-                <div style="font-size:11px;color:#666;text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
             </div>
-            <div id="dnd-pos-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:2147483646;"></div>
+            <div id="dnd-pos-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--dnd-bg-main);opacity:0.85;z-index:2147483646;"></div>
         `;
         
         $('body').append(html);
@@ -30915,41 +33110,43 @@ function getWeatherIcon(weatherText) {
         
         // 辅助样式效果
         $(document).on('mouseover', '.dnd-pos-btn', function() {
-            $(this).css({ 'border-color': '#9d8b6c', 'color': '#ffdb85' });
+            $(this).css({ 'border-color': 'var(--dnd-border-gold)', 'color': 'var(--dnd-text-highlight)' });
         }).on('mouseout', '.dnd-pos-btn', function() {
-            $(this).css({ 'border-color': '#444', 'color': '#ccc' });
+            $(this).css({ 'border-color': 'var(--dnd-border-subtle)', 'color': 'var(--dnd-text-main)' });
         });
     },
 
-    renderCombatHUD($container) {
+    renderCombatHUD($container, showMiniMap) {
         const { $ } = getCore();
         const encounters = DataManager.getTable('COMBAT_Encounter');
+        const partyData = DataManager.getPartyData() || [];
         const global = DataManager.getTable('SYS_GlobalState');
         const round = (global && global[0]) ? global[0]['当前回合'] : 0;
         
         // 布局
         let html = `<div class="dnd-hud-combat-layout">`;
         
-        // 左侧：迷你地图
+        // 左侧：迷你地图（根据设置决定是否显示）
         const turnRes = this._turnResources || { action: 1, bonus: 1, reaction: 1, movement: 30 };
+        
         html += `
             <div style="display:flex;flex-direction:column;gap:5px;">
-                <div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:180px;height:180px;"></div>
+                ${showMiniMap ? '<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:180px;height:180px;"></div>' : ''}
                 
                 <!-- 动作经济展示 -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;background:rgba(0,0,0,0.3);padding:4px;border-radius:4px;">
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'#2ecc71':'#555'}"><i class="fa-solid fa-bolt"></i> 动作: ${turnRes.action}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'#e67e22':'#555'}"><i class="fa-solid fa-plus-circle"></i> 附赠: ${turnRes.bonus}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'#f1c40f':'#555'}"><i class="fa-solid fa-rotate"></i> 反应: ${turnRes.reaction}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'#3498db':'#555'}"><i class="fa-solid fa-shoe-prints"></i> 移动: ${turnRes.movement}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;background:var(--dnd-bg-secondary);padding:4px;border-radius:4px;">
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'var(--dnd-accent-green)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-bolt"></i> 动作: ${turnRes.action}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'var(--dnd-text-highlight)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-plus-circle"></i> 附赠: ${turnRes.bonus}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'var(--dnd-border-gold)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-rotate"></i> 反应: ${turnRes.reaction}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'var(--dnd-accent-blue)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-shoe-prints"></i> 移动: ${turnRes.movement}</div>
                 </div>
 
                 <div style="display:flex;gap:5px;">
                     <button class="dnd-clickable" style="
                         flex: 1;
-                        background: linear-gradient(135deg, #2c3e50, #2980b9);
-                        border: 1px solid #3498db;
-                        color: #fff;
+                        background: linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-accent-blue));
+                        border: 1px solid var(--dnd-accent-blue);
+                        color: var(--dnd-btn-text);
                         padding: 5px;
                         border-radius: 4px;
                         cursor: pointer;
@@ -30963,9 +33160,9 @@ function getWeatherIcon(weatherText) {
                     })"><i class="fa-solid fa-person-walking"></i> 移动</button>
                     <button class="dnd-clickable" style="
                         flex: 1;
-                        background: linear-gradient(135deg, #8e44ad, #9b59b6);
-                        border: 1px solid #9b59b6;
-                        color: #fff;
+                        background: linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-text-highlight));
+                        border: 1px solid var(--dnd-text-highlight);
+                        color: var(--dnd-btn-text);
                         padding: 5px;
                         border-radius: 4px;
                         cursor: pointer;
@@ -31008,11 +33205,13 @@ function getWeatherIcon(weatherText) {
                 const acVal = acMatch ? acMatch[1] : (defInfo.length < 5 ? defInfo : '??');
                 
                 const charIdCombat = unit['单位名称'];
+                const avatarIdentity = partyData.find(p => p['姓名'] === unit['单位名称']) || { '单位名称': unit['单位名称'] };
+                const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, unit['单位名称']);
                 const initialCombat = this.getNameInitial(unit['单位名称']);
                 const uid = `combat-avatar-${charIdCombat.replace(/[^a-zA-Z0-9]/g, '_')}-${Math.random().toString(36).substr(2,5)}`;
                 
                 // Trigger async load
-                setTimeout(() => this.loadAvatarAsync(charIdCombat, uid), 0);
+                setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, unit['单位名称']), 0);
                 
                 let nameColor = 'var(--dnd-text-main)';
                 if (isEnemy) nameColor = 'var(--dnd-accent-red)';
@@ -31020,24 +33219,24 @@ function getWeatherIcon(weatherText) {
                 
                 html += `
                     <div class="dnd-mini-char dnd-hud-entry ${isActive ? 'active' : ''}" style="${isEnemy ? 'border-left-color:var(--dnd-accent-red) !important;' : ''}">
-                        <div id="${uid}" class="dnd-mini-char-avatar dnd-avatar-container ${isActive ? 'dnd-active-turn' : ''}" data-char-id="${charIdCombat}" style="overflow:hidden;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);position:relative;cursor:pointer;border-color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-border-gold)'};" title="${unit['单位名称']}">
-                            <div class="dnd-avatar-initial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${isEnemy?'#ff6b6b':'var(--dnd-text-highlight)'};font-weight:bold;font-size:16px;">${initialCombat}</div>
+                        <div id="${uid}" class="dnd-mini-char-avatar dnd-avatar-container ${isActive ? 'dnd-active-turn' : ''}" data-char-id="${charIdCombat}" data-avatar-key="${avatarInfo.domKey}" style="overflow:hidden;background:linear-gradient(135deg, var(--dnd-bg-tertiary) 0%, var(--dnd-bg-secondary) 100%);position:relative;cursor:pointer;border-color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-border-gold)'};" title="${unit['单位名称']}">
+                            <div class="dnd-avatar-initial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-text-highlight)'};font-weight:bold;font-size:16px;">${initialCombat}</div>
                         </div>
                         <div class="dnd-mini-char-info">
                             <div style="display:flex;justify-content:space-between">
                                 <div class="dnd-mini-name" style="color:${nameColor}">${unit['单位名称']} ${isActive ? '<i class="fa-solid fa-bolt"></i>' : ''}</div>
-                                <div style="font-size:11px;color:#888">AC: ${acVal}</div>
+                                <div style="font-size:11px;color:var(--dnd-text-dim)">AC: ${acVal}</div>
                             </div>
                             <div class="dnd-mini-bars">
-                                <div class="dnd-micro-bar hp dnd-bar-shimmer" title="${hpStr}"><div class="dnd-micro-bar-fill" style="width:${hpPercent}%;background:${isEnemy?'#c0392b':'var(--dnd-accent-green)'} !important;"></div></div>
+                                <div class="dnd-micro-bar hp dnd-bar-shimmer" title="${hpStr}"><div class="dnd-micro-bar-fill" style="width:${hpPercent}%;background:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-accent-green)'} !important;"></div></div>
                             </div>
-                            ${buffs ? `<div style="font-size:10px;color:#aaa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${buffs}</div>` : ''}
+                            ${buffs ? `<div style="font-size:10px;color:var(--dnd-text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${buffs}</div>` : ''}
                         </div>
                     </div>
                 `;
             });
         } else {
-            html += `<div style="color:#666;text-align:center;padding:10px;">等待战斗数据...</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">等待战斗数据...</div>`;
         }
         
         html += `</div></div>`;
@@ -31058,19 +33257,24 @@ function getWeatherIcon(weatherText) {
             this.renderResourceConsumption($('#dnd-combat-resource-panel'));
         }
 
-        this.renderMiniMap($('#dnd-hud-minimap-content'));
+        // 渲染地图（如果启用）
+        if (showMiniMap) {
+            this.renderMiniMap($('#dnd-hud-minimap-content'));
+        }
     },
 
-    renderExploreHUD($container) {
+    renderExploreHUD($container, showMiniMap) {
         const { $ } = getCore();
 
-        // 0. 渲染探索地图 (新增)
-        // 使用 100% 宽度，高度设为 240px 以便更好地展示艺术地图
-        const $mapContainer = $('<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:100% !important; height:240px !important; margin-bottom:10px; border:1px solid var(--dnd-border-gold);"></div>');
-        $container.append($mapContainer);
-        
-        // 异步渲染地图
-        this.renderMiniMap($mapContainer);
+        // 0. 渲染探索地图 (根据设置决定是否显示)
+        if (showMiniMap) {
+            // 使用 100% 宽度，高度设为 240px 以便更好地展示艺术地图
+            const $mapContainer = $('<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:100% !important; height:240px !important; margin-bottom:10px; border:1px solid var(--dnd-border-gold);"></div>');
+            $container.append($mapContainer);
+            
+            // 异步渲染地图
+            this.renderMiniMap($mapContainer);
+        }
         
         // 1. 渲染行动选项 (优先)
         // [修复] 使用独立容器并移除 await，确保渲染顺序正确（地图 -> 选项 -> 任务 -> 其他）
@@ -31089,15 +33293,15 @@ function getWeatherIcon(weatherText) {
             const timeLimit = activeQ['时限'] || '';
             
             const qHtml = `
-                <div class="dnd-hud-quests dnd-hud-entry" style="animation-delay:0.2s; margin-top:5px;background:rgba(0,0,0,0.2);padding:6px;border-radius:4px;border-left:2px solid var(--dnd-border-gold);cursor:pointer;">
+                <div class="dnd-hud-quests dnd-hud-entry" style="animation-delay:0.2s; margin-top:5px;background:var(--dnd-bg-secondary);padding:6px;border-radius:4px;border-left:2px solid var(--dnd-border-gold);cursor:pointer;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
                         <div style="font-weight:bold;color:var(--dnd-text-header);font-size:12px;display:flex;align-items:center;gap:5px;">
                             <span><i class="fa-solid fa-thumbtack dnd-icon-notify"></i> ${activeQ['任务名称']}</span>
-                            ${type ? `<span style="font-size:10px;background:rgba(255,255,255,0.1);padding:0 4px;border-radius:2px;color:var(--dnd-text-dim);">${type}</span>` : ''}
+                            ${type ? `<span style="font-size:10px;background:var(--dnd-bg-tertiary);padding:0 4px;border-radius:2px;color:var(--dnd-text-dim);">${type}</span>` : ''}
                         </div>
-                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:#e67e22;"><i class="fa-solid fa-clock"></i> ${timeLimit}</div>` : ''}
+                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:var(--dnd-text-highlight);"><i class="fa-solid fa-clock"></i> ${timeLimit}</div>` : ''}
                     </div>
-                    <div style="font-size:11px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    <div style="font-size:11px;color:var(--dnd-text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         ${activeQ['当前进度'] || activeQ['目标描述'] || '...'}
                     </div>
                 </div>
@@ -31140,7 +33344,7 @@ function getWeatherIcon(weatherText) {
         validOpts.forEach((opt, idx) => {
             html += `
                 <button class="dnd-action-btn dnd-clickable dnd-hud-entry dnd-hover-lift" data-text="${opt.text}" style="animation-delay:${idx * 0.05}s;
-                    background: linear-gradient(to bottom, #2a2a2c, #1a1a1c);
+                    background: linear-gradient(to bottom, var(--dnd-bg-tertiary), var(--dnd-bg-secondary));
                     border: 1px solid var(--dnd-border-inner);
                     color: var(--dnd-text-main);
                     padding: 8px 5px;
@@ -31207,11 +33411,13 @@ function getWeatherIcon(weatherText) {
             const level = char['等级'] || 1;
             
             const charId = char['PC_ID'] || char['CHAR_ID'] || char['姓名'];
+            const avatarIdentity = char;
+            const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, char['姓名']);
             const initial = this.getNameInitial(char['姓名']);
             const avatarUid = `party-avatar-${charId}-${idx}`;
             
             // 触发异步头像加载
-            setTimeout(() => this.loadAvatarAsync(charId, avatarUid), 0);
+            setTimeout(() => this.loadAvatarAsync(avatarIdentity, avatarUid, char['姓名']), 0);
             
             // [新增] 检查是否为当前操控角色
             const isControlled = (this._controlledCharId === charId);
@@ -31230,7 +33436,7 @@ function getWeatherIcon(weatherText) {
             html += `
                 <div class="party-bar-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-idx="${idx}" style="animation-delay:${idx * 0.05}s;">
                     <div style="position:relative;">
-                        <div id="${avatarUid}" class="dnd-avatar-container party-avatar-container" data-char-id="${charId}" title="${char['姓名']}">
+                        <div id="${avatarUid}" class="dnd-avatar-container party-avatar-container" data-char-id="${charId}" data-avatar-key="${avatarInfo.domKey}" title="${char['姓名']}">
                             <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">${initial}</span>
                         </div>
                         <div class="party-lvl-badge">Lv.${level}</div>
@@ -31250,14 +33456,14 @@ function getWeatherIcon(weatherText) {
                     </div>
                     
                     <!-- HP条 -->
-                    <div class="dnd-bar-shimmer" style="width:100%;height:4px;background:#333;border-radius:2px;overflow:hidden;margin-top:2px;">
-                        <div class="dnd-bar-fill" style="width:${hpPercent}%;height:100%;background:${hpPercent < 30 ? '#c0392b' : 'var(--dnd-accent-green)'};transition:width 0.3s;"></div>
+                    <div class="dnd-bar-shimmer" style="width:100%;height:4px;background:var(--dnd-bg-secondary);border-radius:2px;overflow:hidden;margin-top:2px;">
+                        <div class="dnd-bar-fill" style="width:${hpPercent}%;height:100%;background:${hpPercent < 30 ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)'};transition:width 0.3s;"></div>
                     </div>
                     
                     <!-- XP条 -->
                     ${xpText ? `
-                    <div class="dnd-bar-shimmer" style="width:100%;height:2px;background:#222;border-radius:1px;overflow:hidden;margin-top:1px;" title="XP: ${xpText}">
-                        <div class="dnd-bar-fill" style="width:${xpPercent}%;height:100%;background:#8e44ad;transition:width 0.3s;"></div>
+                    <div class="dnd-bar-shimmer" style="width:100%;height:2px;background:var(--dnd-bg-input);border-radius:1px;overflow:hidden;margin-top:1px;" title="XP: ${xpText}">
+                        <div class="dnd-bar-fill" style="width:${xpPercent}%;height:100%;background:var(--dnd-text-highlight);transition:width 0.3s;"></div>
                     </div>` : ''}
                 </div>
             `;
@@ -31427,7 +33633,7 @@ function getWeatherIcon(weatherText) {
                 case 'spellbook': self.showSpellBook(e); break;
                 case 'npclist': self.showNPCListPanel(e); break;
                 case 'dice': self.showQuickDice(e); break;
-                case 'manual-update': self.triggerManualUpdate(e); break;
+                case 'manual-update': void invokeManualUpdate(e); break;
                 case 'settings':
                     // 切换到完整面板并打开设置页
                     $('.dnd-nav-item').removeClass('active');
@@ -31438,6 +33644,11 @@ function getWeatherIcon(weatherText) {
         });
         
         $container.append($footerEl);
+    },
+
+    // [新增] 手动触发神数据库更新
+    async triggerManualUpdate(event) {
+        return invokeManualUpdate(event);
     },
 
     // [新增] 显示NPC列表面板
@@ -31714,6 +33925,18 @@ const ItemManager = {
 // src/core/TavernAPI.js
 
 const TavernAPI = {
+    getDatabaseAPI: function() {
+        try {
+            return window.AutoCardUpdaterAPI
+                || (window.parent && window.parent.AutoCardUpdaterAPI)
+                || (window.top && window.top.AutoCardUpdaterAPI)
+                || null;
+        } catch (e) {
+            console.error('[TavernAPI] 获取数据库 API 失败:', e);
+            return window.AutoCardUpdaterAPI || null;
+        }
+    },
+
     // 获取全局核心对象（兼容 iframe 和 父窗口）
     getCore: function() {
         let st = null;
@@ -31735,6 +33958,28 @@ const TavernAPI = {
         return {
             SillyTavern: st,
             TavernHelper: helper
+        };
+    },
+
+    getDatabaseAIStatus: function() {
+        const api = this.getDatabaseAPI();
+        let presets = [];
+        let tablePreset = '';
+        let plotPreset = '';
+
+        try {
+            if (api?.getApiPresets) presets = api.getApiPresets() || [];
+            if (api?.getTableApiPreset) tablePreset = api.getTableApiPreset() || '';
+            if (api?.getPlotApiPreset) plotPreset = api.getPlotApiPreset() || '';
+        } catch (e) {
+            console.warn('[TavernAPI] 读取数据库 AI 状态失败:', e);
+        }
+
+        return {
+            available: !!(api && typeof api.callAI === 'function'),
+            presetCount: Array.isArray(presets) ? presets.length : 0,
+            tablePreset,
+            plotPreset
         };
     },
 
@@ -31845,7 +34090,20 @@ const TavernAPI = {
      */
     generate: async function(messages, options = {}) {
         const { SillyTavern, TavernHelper } = this.getCore();
-        const { presetId, customConfig, maxTokens = 4096 } = options;
+        const { presetId, customConfig, maxTokens = 4096, useDatabaseAPI = false } = options;
+
+        if (useDatabaseAPI) {
+            const dbApi = this.getDatabaseAPI();
+            if (!dbApi || typeof dbApi.callAI !== 'function') {
+                throw new Error('当前数据库 API 未提供 callAI()');
+            }
+
+            const response = await dbApi.callAI(messages, { max_tokens: maxTokens });
+            if (!response) {
+                throw new Error('数据库 AI 调用失败，请检查数据库中的 AI 配置');
+            }
+            return typeof response === 'string' ? response.trim() : String(response).trim();
+        }
 
         if (!SillyTavern && !TavernHelper) {
             throw new Error("SillyTavern 核心 API 未就绪");
@@ -32120,13 +34378,22 @@ const SettingsManager = {
         return {
             url: parsed.url || '',
             key: parsed.key || '',
-            model: parsed.model || ''
+            model: parsed.model || '',
+            provider: parsed.provider || 'plugin'
         };
     },
 
     setAPIConfig: async (config) => {
         Logger.info('[SettingsManager] Saving API Config:', config);
         await TavernSettingsSync.setSetting('dnd_global_api_config', config);
+    },
+
+    getAISettings: async () => {
+        const apiConfig = await SettingsManager.getAPIConfig();
+        return {
+            provider: apiConfig.provider || 'plugin',
+            apiConfig
+        };
     },
     
     // 获取同步状态（用于设置面板显示）
@@ -32137,6 +34404,198 @@ const SettingsManager = {
     // 手动触发同步
     forceSync: async () => {
         return await TavernSettingsSync.forceSync();
+    }
+};
+
+;// ./dist/DND仪表盘配套模板.json
+const DND_namespaceObject = /*#__PURE__*/JSON.parse('{"mate":{"type":"chatSheets","version":1,"updateConfigUiSentinel":-1,"globalInjectionConfig":{"readableEntryPlacement":{"position":"before_character_definition","depth":2,"order":99981},"wrapperPlacement":{"position":"before_character_definition","depth":2,"order":99980}}},"sheet_SYS_GlobalState":{"uid":"sheet_SYS_GlobalState","name":"🌍 全局状态","sourceData":{"note":"【系统核心表】记录游戏世界的全局状态，此表有且仅有一行数据。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| 当前场景 | string | 主角当前所在的具体场景名称 |\\n| 场景描述 | string | 当前场景的环境描述（光线、氛围、危险度）|\\n| 游戏时间 | datetime | 格式：YYYY-MM-DD HH:MM（必须精确，禁止模糊）|\\n| 上轮时间 | datetime | 上一轮交互结束时的精确时间 |\\n| 流逝时长 | string | 本轮与上轮的时间差（如：2小时30分钟）|\\n| 天气状况 | string | 当前天气及对行动的影响 |\\n| 战斗模式 | enum | 值域：[非战斗/战斗中/战斗结束]，决定战斗表是否激活 |\\n| 当前回合 | int | 战斗中的回合计数，非战斗时为0 |\\n| 系统通知 | string | 系统通知信息，由系统自动更新，禁止手动更改 |","initNode":"【初始化】\\n1. 根据剧情设定填写初始场景和时间\\n2. 时间必须是明确的日期时间，禁止使用\\"未知\\"或\\"某天\\"\\n3. 战斗模式设为\\"非战斗\\"\\n4. 当前回合设为0","updateNode":"【每轮必须更新】\\n1. 将当前时间复制到上轮时间\\n2. 根据剧情推进更新当前时间\\n3. 计算并填写流逝时长\\n4. 场景变化时更新场景信息\\n5. 进入/退出战斗时更新战斗模式","insertNode":"【禁止】此表只能有一行","deleteNode":"【禁止】不允许删除"},"content":[[null,"当前场景","场景描述","游戏时间","上轮时间","流逝时长","天气状况","战斗模式","当前回合","系统通知"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"全局状态","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🌍 全局状态-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":0},"sheet_NPC_Registry":{"uid":"sheet_NPC_Registry","name":"👥 NPC注册表","sourceData":{"note":"【NPC统一管理表】所有重要NPC的唯一数据源，通过NPC_ID关联其他表。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| NPC_ID | pk | 主键，格式：NPC_XXX（如NPC_001） |\\n| 姓名 | string | NPC全名，死亡时在末尾加†符号 |\\n| 种族/性别/年龄 | string | 基础信息 |\\n| 职业/身份 | string | 社会角色或职业 |\\n| 外貌描述 | text | 客观的外貌描写 |\\n| 等级 | int | NPC职业等级，怪物可用CR值 |\\n| HP | string | 生命值，格式：当前/最大（如：45/52） |\\n| AC | int | 护甲等级 |\\n| 主要技能 | string | 常用技能/法术/能力，逗号分隔（如：剑术精通, 二次攻击） |\\n| 随身物品 | string | 身上携带的物品，逗号分隔（如：长剑, 皮甲, 治疗药水x2） |\\n| 当前状态 | enum | [在场/离场/死亡/失踪] |\\n| 所在位置 | string | 当前所在的场景名 |\\n| 与主角关系 | string | 关系描述（如：盟友、敌人、雇主）|","initNode":"【初始化】为开局剧情中的重要NPC创建条目，包括基础战斗数据（等级、HP、AC）和技能物品","updateNode":"【触发条件】\\n- 状态变化时更新当前状态和位置\\n- 关系变化时更新与主角关系\\n- 死亡时在姓名后加†，状态改为死亡\\n- 受伤/治疗时更新HP\\n- 获得/失去物品时更新随身物品","insertNode":"【触发条件】新的重要NPC登场且需要长期追踪时添加","deleteNode":"【禁止】NPC数据不删除，只标记状态"},"content":[[null,"NPC_ID","姓名","种族/性别/年龄","职业/身份","外貌描述","等级","HP","AC","主要技能","随身物品","当前状态","所在位置","与主角关系","关键经历"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":true,"entryName":"NPC信息","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"👥 NPC注册表-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":1},"sheet_ITEM_Inventory":{"uid":"sheet_ITEM_Inventory","name":"🎒 背包","sourceData":{"note":"【物品管理表】记录队伍成员持有的所有物品。每件物品通过[所属人]字段标识归属。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| 物品ID | pk | 主键，格式：ITEM_XXX |\\n| 物品名称 | string | 物品名 |\\n| 类别 | enum | [武器/护甲/消耗品/工具/杂物/魔法物品] |\\n| 数量 | int | 持有数量 |\\n| 已装备 | bool | 是/否 |\\n| 所属人 | string | 物品的持有者姓名（主角/队友名），空则默认为公共物品 |\\n| 伤害 | string | 武器伤害骰，如 1d8+3 |\\n| 特性 | string | 物品特性及具体机制效果（如：轻型, +1AC, 每日1次施法）|\\n| 稀有度 | enum | [普通/非凡/稀有/极稀有/传说] |\\n| 描述 | text | 物品外观及背景故事（**禁止在此存放机制性规则**） |\\n| 重量 | float | 磅数，用于负重计算 |\\n| 价值 | string | 市场价值，如：50gp |","initNode":"【初始化】根据背景和职业添加初始装备","updateNode":"【触发条件】\\n- 获得物品时数量+1或新增条目\\n- 消耗物品时数量-1，归零则删除\\n- 装备/卸下时更新已装备状态\\n- **数据清洗**：若发现\'描述\'中包含具体的数值/规则效果，必须将其移动到\'特性\'字段，防止被剧情描述覆盖。","insertNode":"【触发条件】获得背包中没有的新物品","deleteNode":"【触发条件】物品数量归零、被摧毁或永久丢失"},"content":[[null,"物品ID","物品名称","类别","数量","已装备","所属人","伤害","特性","稀有度","描述","重量","价值"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"背包物品","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🎒 背包-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":2},"sheet_QUEST_Active":{"uid":"sheet_QUEST_Active","name":"📜 任务","sourceData":{"note":"【任务追踪表】当前活跃的任务。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| 任务ID | pk | 主键，格式：QUEST_XXX |\\n| 任务名称 | string | 任务标题 |\\n| 类型 | enum | [主线/支线/个人] |\\n| 发布者 | string | NPC姓名或势力名 |\\n| 目标描述 | text | 任务目标和要求 |\\n| 当前进度 | text | 进度描述 |\\n| 状态 | enum | [进行中/已完成/已失败] |\\n| 时限 | string | 剩余时间或\\"无限制\\" |\\n| 奖励 | text | 预期奖励 |","initNode":"【初始化】根据剧情设定添加初始任务","updateNode":"【触发条件】\\n- 任务进展时更新进度\\n- 完成/失败时更新状态","insertNode":"【触发条件】接受新任务或触发新事件线","deleteNode":"【触发条件】任务完成或失败后可选择删除以保持简洁"},"content":[[null,"任务ID","任务名称","类型","发布者","目标描述","当前进度","状态","时限","奖励"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"任务列表","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"📜 任务-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":3},"sheet_FACTION_Standing":{"uid":"sheet_FACTION_Standing","name":"🏛️ 势力声望","sourceData":{"note":"【势力关系表】与各组织的关系状态。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| 势力ID | pk | 主键，格式：FACTION_XXX |\\n| 势力名称 | string | 组织/城邦/公会名 |\\n| 势力类型 | enum | [王国/公会/教团/商会/秘社/部落/军团/其他] |\\n| 势力领袖 | string | 势力的领导者或代表人物 |\\n| 势力宗旨 | text | 势力的核心理念、目标或使命 |\\n| 势力总部 | string | 势力的总部或主要据点所在地 |\\n| 势力描述 | text | 势力的背景介绍、历史和特色 |\\n| 关系等级 | enum | [-2敌对/-1不友善/0中立/+1友善/+2盟友] |\\n| 声望值 | int | 数值化声望，用于精细判定 |\\n| 主角头衔 | string | 在该势力中的地位（如：学徒、特工）|\\n| 关键事件 | text | 影响关系的重大事件记录 |\\n| 特权/通缉 | text | 获得的特权或被通缉状态 |","initNode":"【初始化】根据角色背景设置初始势力关系，填写势力基本信息（类型、领袖、宗旨、总部、描述）","updateNode":"【触发条件】\\n- 完成任务/冲突后调整关系和声望\\n- 获得头衔时更新\\n- 添加关键事件记录\\n- 势力领袖或总部变更时更新","insertNode":"【触发条件】首次与新势力产生实质性互动","deleteNode":"【触发条件】势力被毁灭或彻底离开该地区"},"content":[[null,"势力ID","势力名称","势力类型","势力领袖","势力宗旨","势力总部","势力描述","关系等级","声望值","主角头衔","关键事件","特权/通缉"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"势力关系","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🏛️ 势力声望-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":4},"sheet_COMBAT_Encounter":{"uid":"sheet_COMBAT_Encounter","name":"⚔️ 战斗遭遇表","sourceData":{"note":"【战斗核心表】仅在战斗模式下激活，用于回合制战斗追踪。\\n\\n⚠️ 前端兼容说明：此表数据会被战术地图UI读取显示。\\n\\n| 列名 | 类型 | 前端读取 | 说明 |\\n|------|------|----------|------|\\n| 单位名称 | pk | ✅ | 唯一标识，必须与战斗地图表一致 |\\n| 阵营 | enum | ✅ | [友方/敌方/中立]，用于颜色标记 |\\n| 先攻/位置 | string | ✅ | 格式：先攻值/相对位置，如：18/近战 |\\n| HP状态 | string | ✅ | 格式：当前/最大 [状态]，如：25/30 [健康] |\\n| 防御/抗性 | string | ✅ | AC及特殊抗性，如：AC16 抗火 |\\n| 附着状态 | string | ✅ | Buff/Debuff列表，用分号分隔 |\\n| 是否为当前行动者 | enum | ✅ | [是/否]，高亮当前行动单位 |\\n| 回合资源 | string | ✅ | 如：动作1/1;附赠0/1;移动30/30尺 |","initNode":"【战斗开始时】\\n1. 全局状态表的战斗模式改为\\"战斗中\\"\\n2. 为所有参战单位投掷先攻\\n3. 按先攻降序排列所有行\\n4. 将先攻最高者的\\"是否为当前行动者\\"设为\\"是\\"\\n5. 填入每个单位的初始HP、AC","updateNode":"【每轮更新】\\n1. 攻击命中时扣除目标HP，更新状态标签\\n2. 单位行动后将其\\"是否为当前行动者\\"改为\\"否\\"\\n3. 下一个单位改为\\"是\\"\\n4. 移动时更新位置描述\\n5. 施加/移除状态效果","insertNode":"【触发条件】增援或召唤物加入战斗","deleteNode":"【战斗结束时】清空全表，全局状态的战斗模式改为\\"非战斗\\""},"content":[[null,"单位名称","阵营","先攻/位置","HP状态","防御/抗性","附着状态","是否为当前行动者","回合资源"]],"updateConfig":{"contextDepth":-1,"updateFrequency":1,"batchSize":3,"uiSentinel":-1,"groupId":3},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"战斗遭遇","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"⚔️ 战斗遭遇表-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":5},"sheet_COMBAT_BattleMap":{"uid":"sheet_COMBAT_BattleMap","name":"🗺️ 战斗地图","sourceData":{"note":"【战术地图数据表】存储战场的几何空间数据，供前端可视化渲染。\\n\\n⚠️ 前端兼容说明：严格遵守数据格式，否则地图无法渲染。\\n\\n| 列名 | 类型 | 格式要求 |\\n|------|------|----------|\\n| 单位名称 | pk | 必须与战斗遭遇表的单位名称完全一致 |\\n| 类型 | enum | [Config/Token/Wall/Terrain/Zone] |\\n| 坐标 | string | Config行：{\\"w\\":宽,\\"h\\":高}；其他行：{\\"x\\":列,\\"y\\":行} |\\n| 大小 | string | {\\"w\\":占格宽,\\"h\\":占格高}，默认{\\"w\\":1,\\"h\\":1} |\\n| Token | string | DiceBear图标，格式：风格:种子，如 adventurer:Hero |\\n\\n【类型说明】\\n- Config: 地图配置，必须有且仅有一行，坐标存地图尺寸\\n- Token: 可移动单位（PC、NPC、怪物）\\n- Wall: 不可穿越的障碍物\\n- Terrain: 困难地形、水域等\\n- Zone: 法术效果区域","initNode":"【战斗开始时】\\n1. 清空旧数据\\n2. 创建Map_Config行设定地图大小（默认20x20）\\n3. 根据场景描述创建Wall/Terrain\\n4. 为所有参战单位创建Token行\\n5. 分配不重叠的初始坐标","updateNode":"【移动时】更新对应单位的坐标\\n【环境变化时】添加/修改/删除Wall/Terrain/Zone","insertNode":"【触发条件】新单位加入战场或施放区域法术","deleteNode":"【战斗结束时】清空全表，删除所有记录，包括Map_Config行"},"content":[[null,"单位名称","类型","坐标","大小","Token"]],"updateConfig":{"contextDepth":-1,"updateFrequency":1,"batchSize":3,"uiSentinel":-1,"groupId":3},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"战斗地图","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🗺️ 战斗地图-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":6},"sheet_LOG_Summary":{"uid":"sheet_LOG_Summary","name":"纪要表","sourceData":{"note":"轮次日志，每轮交互后必须立即插入一条新记录。\\n- 列0: 时间跨度 - 本轮事件发生的精确时间范围。\\n- 列1: 地点 - 本轮事件发生的地点，从大到小描述。\\n- 列2: 纪要 - 以第三方视角客观记录本轮事件，不得加入推测、情绪化语言、负面解读或主观判断。内容必须基于正文明确发生的事实，不得补充未出现的情节，不少于300字，结尾部分禁止进行总结或者升华。\\n- 列3: 概览 - 30字以内，一句话概括纪要内容。\\n- 列4: 编码索引 - 格式为 AMXX，XX从01递增。\\n","initNode":"故事初始化时，插入一条新记录用于记录初始化剧情。","deleteNode":"禁止删除。","updateNode":"禁止操作。","insertNode":"每轮交互结束后插入一条新记录。"},"content":[[null,"时间跨度","地点","纪要","概览","编码索引"]],"updateConfig":{"uiSentinel":-1,"contextDepth":-1,"updateFrequency":-1,"batchSize":-1,"skipFloors":-1},"exportConfig":{"enabled":true,"splitByRow":true,"entryName":"纪要","entryType":"keyword","keywords":"编码索引","preventRecursion":true,"injectionTemplate":"<记忆回溯>\\n$1\\n</记忆回溯>","extraIndexEnabled":true,"extraIndexEntryName":"纪要索引","extraIndexColumns":["概览","编码索引"],"extraIndexColumnModes":{"概览":"index_only","编码索引":"both"},"extraIndexInjectionTemplate":"<已发生的事件概览>\\n$1\\n</已发生的事件概览>","entryPlacement":{"position":"at_depth_as_system","depth":999,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":1000,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":9999,"order":99987},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":9999,"order":99988}},"orderNo":7},"sheet_UI_ActionOptions":{"uid":"sheet_UI_ActionOptions","name":"🎮 行动选项","sourceData":{"note":"【前端UI表】每轮为玩家生成可选的行动选项，此表有且仅有一行。\\n\\n⚠️ 前端兼容说明：前端会读取此表渲染为可点击按钮。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| 选项A | action | 符合逻辑的常规行动 |\\n| 选项B | action | 谨慎/防御性的行动 |\\n| 选项C | action | 大胆/冒险性的行动 |\\n| 选项D | action | 社交/非战斗行动 |","initNode":"【初始化】根据开局情境生成4个初始选项","updateNode":"【每轮必须更新】根据当前剧情和环境重新生成4个选项","insertNode":"【禁止】","deleteNode":"【禁止】"},"content":[[null,"选项A","选项B","选项C","选项D"]],"updateConfig":{"uiSentinel":-1,"contextDepth":-1,"updateFrequency":-1,"batchSize":-1,"skipFloors":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"行动选项","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🎮 行动选项-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991},"injectIntoWorldbook":false},"orderNo":8},"sheet_DICE_Pool":{"uid":"sheet_DICE_Pool","name":"🎲 骰子池","sourceData":{"note":"【预生成骰子池】存储真随机生成的骰子数值。前端会自动补充。使用时取第一行数据，使用对应列的数值，然后删除该行。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| ID | int | 骰子序号 |\\n| D4 | int | D4骰值 |\\n| D6 | int | D6骰值 |\\n| D8 | int | D8骰值 |\\n| D10 | int | D10骰值 |\\n| D12 | int | D12骰值 |\\n| D20 | int | D20骰值 |\\n| D100 | int | D100骰值 |","initNode":"【禁止】请勿手动初始化，由前端脚本自动管理。","updateNode":"【禁止】不可修改已生成的随机数","insertNode":"【禁止】由前端脚本自动管理补充","deleteNode":"【使用后删除】当一次检定需要随机数时，读取第一行对应骰面数值，然后删除该行。"},"content":[[null,"ID","D4","D6","D8","D10","D12","D20","D100"]],"updateConfig":{"batchSize":-1,"uiSentinel":-1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"骰子池","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🎲 骰子池-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":9},"sheet_EXPLORATION_Map_Data":{"uid":"sheet_EXPLORATION_Map_Data","name":"🗺️ 探索地图数据","sourceData":{"note":"【探索地图结构表】存储每个场景的地图结构数据（JSON格式）。\\n你是一个拥有建筑学学位的资深DND地牢架构师。请根据 LocationName（作为主题）及所属 IP 风格，设计一个紧凑、工整且富有环境叙事的地牢平面图。\\n\\n关键设计原则：\\n1. **网格吸附系统**：为了保证工整，所有房间的坐标(x,y)和尺寸(width,height) **必须是 25 或 50 的整数倍**。\\n2. **物理拓扑**：房间之间必须物理紧邻（间隙为0），形成闭环。严禁出现细长的无效缝隙。\\n3. **走廊实体化**：走廊(corridor)必须是拥有真实坐标(x,y,w,h)的长条形房间，绝不能是抽象连线。\\n4. **门与通道**：门必须精确计算坐标，位于两个房间的**共享边**上。\\n5. **IP沉浸式布局**：房间命名和形状应反映当前地点的历史背景（如：废弃实验室应有破碎的窗户和绿色毒雾颜色）。\\n\\n请生成一个至少包含 **8-12个区域**（房间+走廊）的复杂结构，确保有一个明确的入口和一个位于深处的Boss区域。\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| LocationName | pk | 场景名称（对应全局状态表的“当前场景”） |\\n| MapStructureJSON | text | 只有结构数据的JSON字符串（严格执行网格对齐） |\\n| LastUpdated | datetime | 最后生成时间 |\\n| 当前显示地图 | enum | [是/否]，强制显示该地图，忽略全局场景 |\\n\\n【JSON结构定义】MapStructureJSON 必须符合以下 Schema：\\n{\\n  \\"mapName\\": \\"地图名称 (e.g. 影牙城堡-下层)\\",\\n  \\"mapSize\\": { \\"width\\": 1000, \\"height\\": 800 },\\n  \\"rooms\\": [\\n    {\\n      \\"id\\": \\"room_1\\",\\n      \\"name\\": \\"入口大厅/仪式大厅/军械库\\",\\n      \\"type\\": \\"entrance/corridor/room/hall/secret_room/boss_arena/shop\\",\\n      \\"shape\\": \\"rectangular/L-shaped/cross/circular/cave_blob (人工建筑多用几何体，自然洞穴用 irregular)\\",\\n      \\"x\\": 100, \\"y\\": 100, \\"width\\": 200, \\"height\\": 150,\\n      \\"description\\": \\"详细的环境描写（光影、气味、声音）...\\",\\n      \\"color\\": \\"#hex (符合环境氛围的色调，如深红、幽蓝)\\"\\n    }\\n  ],\\n  \\"doors\\": [\\n    {\\n      \\"x\\": 300, \\"y\\": 175,\\n      \\"type\\": \\"open/door/secret_door/barred/magic_barrier\\",\\n      \\"orientation\\": \\"horizontal/vertical\\",\\n      \\"connects\\": [\\"room_1\\", \\"room_2\\"]\\n    }\\n  ],\\n  \\"features\\": [\\n    {\\n      \\"x\\": 150, \\"y\\": 150,\\n      \\"type\\": \\"column/statue/chest/trap/fountain/table/altar/terminal\\"\\n    }\\n  ]\\n}","initNode":"【初始化】如果游戏开始时主角已处于某个地牢/探索区域，应用下方【insertNode】的逻辑生成该区域的初始地图。","updateNode":"【触发条件】通常不更新结构。除非剧情导致地形发生巨大改变（如塌方、魔法重塑、发现新房间），此时重新执行生成逻辑。","insertNode":"【触发条件】当主角进入一个新的探索区域时触发。作为资深DND地牢架构师及Lore专家，请根据 LocationName（作为主题）设计一个紧凑、真实且富有叙事感的地牢平面图结构。\\n\\n## 核心思维流（CoT）：\\n1. **IP检索与风格分析**：首先分析 LocationName。如果它属于著名IP（如生化危机、黑暗之魂、DND模组、魔兽世界等）或特定历史风格，**立即调用内部知识库**检索其典型布局、房间命名习惯及环境氛围。\\n2. **功能区划**：不要随机堆砌。按照“入口缓冲区 -> 枢纽区 -> 功能分支 -> 核心/Boss区”的建筑逻辑规划。\\n3. **几何网格化**：想象一个虚拟网格。所有房间的坐标(x,y)和尺寸(w,h)必须是整数且尽量对齐，确保地图看起来工整、专业。\\n\\n## 关键设计原则：\\n1. **无缝模块化**：房间与房间之间必须物理“贴合”（坐标紧邻），形成一个闭环的建筑群，杜绝孤岛。\\n2. **走廊实体化**：Corridor（走廊）必须是具有真实坐标(x,y,w,h)的长条形房间实体，绝不能是抽象的连线。\\n3. **复杂的连通性**：避免单一直线流程。设计环路、捷径和分支，使得地图具有探索深度。\\n4. **IP化命名**：房间名称应贴合设定（例如：若是生化危机主题，使用“S.T.A.R.S.办公室”而非“房间A”；若是魔幻主题，使用“奥术凝视大厅”而非“大房间”）。\\n5. **不规则中的秩序**：虽然布局可以不对称，但边缘应整齐，避免出现无意义的细长缝隙。\\n\\n## 生成要求：\\n- **数量强制**：必须包含 **8-12 个** 独立的探索区域（房间+走廊）。\\n- **结构完整**：明确标记入口（Entrance）和深处的Boss区域/关键剧情点。\\n- **数据格式**：\\n  - 严格输出符合 Note 中定义的 JSON Schema。\\n  - 确保坐标数值精确，互不重叠但紧密相连。\\n  - 将完整的 JSON 字符串输出到 `MapStructureJSON` 字段。\\n  - 获取当前时间并填入 `LastUpdated`。\\n\\n现在，开始构建 [{{LocationName}}] 的地图数据：","deleteNode":"【触发条件】当主角彻底离开该区域且短期内不会返回时，可删除以节省空间。"},"content":[[null,"LocationName","MapStructureJSON","LastUpdated","当前显示地图"]],"updateConfig":{"batchSize":3,"uiSentinel":-1,"groupId":3},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"探索地图数据","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🗺️ 探索地图数据-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":17},"sheet_COMBAT_Map_Visuals":{"uid":"sheet_COMBAT_Map_Visuals","name":"🖌️ 战斗地图绘制","sourceData":{"note":"【战斗地图视觉表】存储战斗场景的视觉结构数据，用于生成底图。与COMBAT_BattleMap配合，后者存逻辑(墙/怪)，此表存视觉(地面/装饰)。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| SceneName | pk | 场景名称，通常对应全局状态的“当前场景” |\\n| VisualJSON | text | 视觉结构数据(JSON)，包含地面材质、装饰物等 |\\n| GridSize | string | 网格尺寸，格式: 20x20 |\\n| LastUpdated | datetime | 最后更新时间 |\\n\\n【VisualJSON结构定义】\\n{\\n  \\"mapName\\": \\"场景名\\",\\n  \\"dimensions\\": { \\"width\\": 20, \\"height\\": 20 },\\n  \\"ground\\": \\"grass/stone/wood_plank/water/lava/snow...\\",\\n  \\"terrain_objects\\": [\\n    {\\n      \\"type\\": \\"tree/rock/wall/pillar/water_pool/furniture/rubble...\\",\\n      \\"x\\": 1, \\"y\\": 1, \\"w\\": 1, \\"h\\": 1,\\n      \\"rotation\\": 0,\\n      \\"description\\": \\"描述\\",\\n      \\"tactical\\": \\"cover/block/difficult\\"\\n    }\\n  ]\\n}","initNode":"【初始化】无需预填。","updateNode":"【触发条件】当战斗场景的环境发生重大视觉变化时更新。","insertNode":"【触发条件】当进入一场战斗，且该场景尚未在此表中存在记录时，根据正文剧情的环境描述生成视觉数据。\\n操作指南：\\n1. 提取剧情中的环境要素（如：酒馆地板是木质的，角落有翻倒的桌子）。\\n2. 生成符合JSON格式的VisualJSON。\\n3. GridSize 默认为 20x20，除非剧情暗示了极小或极大的空间。\\n4. 这是生成地图底图的关键依据。","deleteNode":"【触发条件】场景不再需要或地图数据过旧时删除。"},"content":[[null,"SceneName","VisualJSON","GridSize","LastUpdated"]],"updateConfig":{"batchSize":3,"uiSentinel":-1,"groupId":3},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"战斗绘制","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🖌️ 战斗地图绘制-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":18},"sheet_CHARACTER_Registry":{"uid":"sheet_CHARACTER_Registry","name":"👤 角色表","sourceData":{"note":"【角色统一管理表】记录主角和队伍成员的基础信息。主角ID固定为PC_MAIN，队友ID格式为ALLY_XXX。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| CHAR_ID | pk | 主键，**主角固定为PC_MAIN**，队友为ALLY_XXX |\\n| 成员类型 | enum | [主角/同伴/宠物/召唤物/魔宠/随从] |\\n| 姓名 | string | 角色全名 |\\n| 种族/性别/年龄 | string | 基础信息 |\\n| 职业 | string | 职业及子职，如：圣武士(复仇誓言) Lv5 |\\n| 外貌描述 | text | 详细的外貌特征描写 |\\n| 性格特点 | text | 核心性格、理想、牵绊、缺陷 |\\n| 背景故事 | text | 角色背景，主角最多500字，队友最多300字 |\\n| 加入时间 | datetime | 主角为游戏开始时间，队友为加入队伍时间 |","initNode":"【初始化】\\n1. 必须创建主角行，CHAR_ID=PC_MAIN，成员类型=主角\\n2. 根据用户提供的角色信息填写主角数据\\n3. 根据剧情设定填写初始队友信息","updateNode":"【触发条件】\\n- 职业升级时更新职业列\\n- 经历重大事件后追加背景故事（主角控制在500字内，队友300字内）\\n- 外貌变化时更新描述","insertNode":"【严格限制】\\n- 主角行：禁止插入，初始化时已创建\\n- 队友：只有在NPC明确表达加入意愿，并且被玩家明确接受后，方可添加","deleteNode":"【触发条件】\\n- 主角行：禁止删除\\n- 队友：永久离队、死亡或背叛时删除"},"content":[[null,"CHAR_ID","成员类型","姓名","种族/性别/年龄","职业","外貌描述","性格特点","背景故事","加入时间"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":true,"splitByRow":true,"entryName":"角色信息","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"👤 角色表-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":14},"sheet_CHARACTER_Attributes":{"uid":"sheet_CHARACTER_Attributes","name":"📊 角色属性","sourceData":{"note":"【角色属性表】记录所有角色的完整战斗数据。每个角色一行，通过CHAR_ID关联。\\n\\n| 列名 | 类型 | 格式示例 |\\n|------|------|------|\\n| CHAR_ID | fk | 外键，关联角色表(PC_MAIN或ALLY_XXX) |\\n| 等级 | int | 总等级数字 |\\n| HP | ratio | 当前/最大，如：45/52 |\\n| AC | int | 护甲等级数值 |\\n| 先攻加值 | int | 敏捷调整值+其他加值 |\\n| 速度 | string | 如：30尺(6格) |\\n| 属性值 | string | {\\"STR\\":16,\\"DEX\\":14,\\"CON\\":14,\\"INT\\":10,\\"WIS\\":12,\\"CHA\\":8} |\\n| 豁免熟练 | string | 如：[\\"力量\\",\\"体质\\"] |\\n| 技能熟练 | string | 如：[\\"运动\\",\\"威吓\\",\\"宗教\\"] |\\n| 被动感知 | int | 10+感知调整值+熟练(若有) |\\n| 经验值 | ratio | 当前/下级所需，如：6500/14000|","initNode":"【初始化】\\n1. 必须创建主角属性行，CHAR_ID=PC_MAIN\\n2. 根据职业和等级按DND 5E规则计算所有数值\\n3. 队友加入时同步添加属性行","updateNode":"【触发条件】\\n- 受伤/治疗时更新HP\\n- 升级时重算所有数值\\n- 装备变化时重算AC\\n- **主动经验结算（最高优先级）**：作为GM，你必须时刻监控剧情正文。一旦检测到战斗胜利、敌人倒下、谜题解开或任务达成，**必须在当前轮次**立即结算并增加经验值(XP)。不要等待玩家指令，不要依赖其他表格的状态。直接根据表现给予奖励（如：杂兵+50，精英+200，Boss+1000）。","insertNode":"【触发条件】新角色加入时，同步添加属性行","deleteNode":"【触发条件】\\n- 主角行：禁止删除\\n- 队友：离队时同步删除"},"content":[[null,"CHAR_ID","等级","HP","AC","先攻加值","速度","属性值","豁免熟练","技能熟练","被动感知","经验值"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":true,"splitByRow":false,"entryName":"角色属性","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"📊 角色属性-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":15},"sheet_CHARACTER_Resources":{"uid":"sheet_CHARACTER_Resources","name":"⚡ 角色资源","sourceData":{"note":"【角色资源表】记录所有角色的可消耗资源。每个角色一行，通过CHAR_ID关联。\\n\\n| 列名 | 类型 | 格式示例 |\\n|------|------|------|\\n| CHAR_ID | fk | 外键，关联角色表(PC_MAIN或ALLY_XXX) |\\n| 法术位 | string | {\\"1级\\":\\"3/4\\",\\"2级\\":\\"2/3\\",\\"3级\\":\\"0/2\\"} |\\n| 职业资源 | string | 如战士：{\\"动作如潮\\":\\"0/1\\",\\"再战\\":\\"1/1\\"} |\\n| 生命骰 | ratio | 短休可用，如：3/5 |\\n| 特殊能力 | string | 种族/专长能力次数 |\\n| 金币 | int | 当前持有金币数 |","initNode":"【初始化】\\n1. 必须创建主角资源行，CHAR_ID=PC_MAIN\\n2. 根据职业等级设置初始资源池\\n3. 队友加入时同步添加资源行","updateNode":"【触发条件】\\n- 使用法术/能力后扣除\\n- 短休后恢复生命骰和部分职业资源\\n- 长休后完全恢复\\n- 金币变动时更新","insertNode":"【触发条件】新角色加入时，同步添加资源行","deleteNode":"【触发条件】\\n- 主角行：禁止删除\\n- 队友：离队时同步删除"},"content":[[null,"CHAR_ID","法术位","职业资源","生命骰","特殊能力","金币"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"角色资源","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"⚡ 角色资源-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":16},"sheet_SKILL_Library":{"uid":"sheet_SKILL_Library","name":"📚 技能/法术库","sourceData":{"note":"【共享技能库】存储所有技能和法术的详细信息。角色通过关联表引用此库中的技能。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| SKILL_ID | pk | 主键，格式：SKL_XXX |\\n| 技能名称 | string | 技能/法术名 |\\n| 技能类型 | enum | [法术/武技/特技/天赋/种族能力/职业能力] |\\n| 环阶 | string | 法术环阶(0=戏法)或技能等级 |\\n| 学派 | string | 法术学派或武技流派 |\\n| 施法时间 | string | 如：1动作、1附赠动作、1分钟 |\\n| 射程 | string | 如：自身、接触、120尺 |\\n| 成分 | string | V/S/M(材料)或能力消耗 |\\n| 持续时间 | string | 如：立即、专注1分钟、8小时 |\\n| 效果描述 | text | **完整规则文本**。优先摘录正文中的详细描述（含自制规则）。仅在正文缺失细节时调用DND规则库。禁止概括或简化。 |\\n| 升阶效果 | text | 高环施放的额外效果(法术专用) |","initNode":"【初始化】根据角色职业预填常用技能/法术，必须调用规则库填入完整描述，包含以下所有类型：\\n\\n1. **基础攻击动作**（所有职业必填）：\\n   - 为角色装备的每种武器创建攻击技能（如：长剑斩击、短弓射击）\\n   - 徒手攻击（所有角色默认拥有）\\n   - 技能类型=武技，环阶=基础\\n   \\n2. **通用战斗动作**（所有职业必填）：\\n   - 攻击(Attack)、疾走(Dash)、撤离(Disengage)、躲藏(Hide)、\\n   - 帮助(Help)、准备(Ready)、搜索(Search)、使用物品(Use Object)\\n   - 技能类型=特技，环阶=基础\\n   \\n3. **职业战斗技能**（按职业添加）：\\n   - 战士：二次攻击、动作如潮、再战\\n   - 武僧：疾风连击、气弹投射、震山靠、百裂拳\\n   - 野蛮人：狂暴攻击、鲁莽攻击\\n   - 游荡者：偷袭、狡诈动作\\n   \\n4. **法术**（施法职业添加）：\\n   - 戏法和已知/已准备法术","updateNode":"【禁止】技能库内容通常不修改，如需修改请谨慎","insertNode":"【触发条件】正文提及或角色获得新技能/法术时必须立即添加。\\n**完整性要求**：\\n1. **原文优先**：如果正文包含了技能的具体效果、伤害骰或特殊规则（可能是自制/魔改技能），**必须原样摘录正文的完整描述**，严禁使用标准规则覆盖，也严禁摘要。\\n2. **查漏补缺**：仅当正文只提到技能名且无细节（如“释放了火球术”）时，才调用DND5e规则库补全标准描述。\\n3. 长文本必须保留所有细节条款。","deleteNode":"【触发条件】确认技能不再使用且无角色关联时可删除"},"content":[[null,"SKILL_ID","技能名称","技能类型","环阶","学派","施法时间","射程","成分","持续时间","效果描述","升阶效果"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"技能库","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"📚 技能/法术库-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":10},"sheet_CHARACTER_Skills":{"uid":"sheet_CHARACTER_Skills","name":"🔗 角色技能关联","sourceData":{"note":"【角色技能关联表】建立角色与技能的多对多关系。一个角色可拥有多个技能，一个技能可被多人拥有。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| LINK_ID | pk | 主键，格式：SLINK_XXX |\\n| CHAR_ID | fk | 角色ID (PC_MAIN 或 ALLY_XXX) |\\n| SKILL_ID | fk | 技能ID (关联技能库) |\\n| 获取方式 | string | 职业/种族/专长/道具/卷轴 |\\n| 已准备 | bool | 是否已准备(法术类)，戏法永远为是 |\\n| 熟练度 | enum | [生疏/熟练/精通] |\\n| 备注 | text | 特殊说明(如：限制条件) |","initNode":"【初始化】根据角色职业和等级建立初始技能关联","updateNode":"【触发条件】长休后更新已准备状态，熟练度提升时更新","insertNode":"【触发条件】角色学习新技能时添加关联","deleteNode":"【触发条件】永久失去技能时删除关联（极少见）"},"content":[[null,"LINK_ID","CHAR_ID","SKILL_ID","获取方式","已准备","熟练度","备注"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"角色技能","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🔗 角色技能关联-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":11},"sheet_FEAT_Library":{"uid":"sheet_FEAT_Library","name":"🏅 专长库","sourceData":{"note":"【共享专长库】存储所有专长的详细信息。角色通过关联表引用此库中的专长。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| FEAT_ID | pk | 主键，格式：FEAT_XXX |\\n| 专长名称 | string | 专长名 |\\n| 类别 | enum | [通用/战斗/法术/技巧/种族] |\\n| 前置条件 | string | 获取前置要求（如：力量13+，施法能力）|\\n| 效果描述 | text | 专长的完整效果说明 |\\n| 属性提升 | string | 是否含属性提升（如：+1力量）|\\n| 附带能力ID | string | 专长附带的技能ID列表(关联技能库) |","initNode":"【初始化】根据角色专长预填常用专长","updateNode":"【禁止】专长库内容通常不修改","insertNode":"【触发条件】遇到新专长时添加到库中","deleteNode":"【触发条件】确认专长不再使用且无角色关联时可删除"},"content":[[null,"FEAT_ID","专长名称","类别","前置条件","效果描述","属性提升","附带能力ID"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"专长库","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🏅 专长库-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":12},"sheet_CHARACTER_Feats":{"uid":"sheet_CHARACTER_Feats","name":"🔗 角色专长关联","sourceData":{"note":"【角色专长关联表】建立角色与专长的多对多关系。\\n\\n| 列名 | 类型 | 说明 |\\n|------|------|------|\\n| LINK_ID | pk | 主键，格式：FLINK_XXX |\\n| CHAR_ID | fk | 角色ID (PC_MAIN 或 ALLY_XXX) |\\n| FEAT_ID | fk | 专长ID (关联专长库) |\\n| 获取来源 | string | 等级/种族/职业/奖励/背景 |\\n| 获取等级 | int | 获得此专长时的角色等级 |\\n| 已选择项 | string | 专长需选择时的具体选项(如：选择的语言) |\\n| 备注 | text | 特殊说明 |","initNode":"【初始化】根据角色背景和等级建立初始专长关联","updateNode":"【触发条件】专长效果变化时更新备注","insertNode":"【触发条件】角色获得新专长时添加关联(4/8/12/16/19级或人类变体)","deleteNode":"【禁止】已获得的专长通常不会失去"},"content":[[null,"LINK_ID","CHAR_ID","FEAT_ID","获取来源","获取等级","已选择项","备注"]],"updateConfig":{"batchSize":1,"uiSentinel":-1,"groupId":1},"exportConfig":{"enabled":false,"splitByRow":false,"entryName":"角色专长","entryType":"constant","keywords":"","preventRecursion":true,"injectionTemplate":"","extraIndexEnabled":false,"extraIndexEntryName":"🔗 角色专长关联-索引","extraIndexColumns":[],"extraIndexColumnModes":{},"extraIndexInjectionTemplate":"","entryPlacement":{"position":"at_depth_as_system","depth":2,"order":10000},"extraIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":10010},"fixedEntryPlacement":{"position":"at_depth_as_system","depth":2,"order":99990},"fixedIndexPlacement":{"position":"at_depth_as_system","depth":2,"order":99991}},"orderNo":13}}');
+;// ./src/config/EmbeddedTemplate.js
+// src/config/EmbeddedTemplate.js
+
+
+const EMBEDDED_TEMPLATE = DND_namespaceObject;
+
+;// ./src/features/TemplateSync.js
+// src/features/TemplateSync.js
+
+
+
+
+
+
+
+/**
+ * 模板自动同步模块
+ * 
+ * 当插件首次启用或版本更新时，使用内置模板数据
+ * 弹窗询问用户是否导入到神·数据库中。
+ */
+const TemplateSync = {
+    /**
+     * 手动触发模板导入
+     */
+    manualImport: async (options = {}) => {
+        try {
+            const currentVersion = CONFIG.TEMPLATE_SYNC.CURRENT_VERSION;
+            const { getDB } = getCore();
+            const api = getDB();
+
+            const {
+                skipConfirm = false,
+                confirmMessage = null,
+                confirmTitle = null,
+            } = options || {};
+
+            if (!api || !api.importTemplateFromData) {
+                NotificationSystem.error('当前数据库 API 不支持模板导入，请先确认数据库插件已启用。', '模板同步');
+                return false;
+            }
+
+            const message = confirmMessage
+                || `确定要手动导入 DND 仪表盘 v${currentVersion} 的内置模板吗？\n\n这会将当前数据库模板替换为插件内置模板结构。`;
+
+            const confirmed = skipConfirm
+                ? true
+                : await NotificationSystem.confirm(message, {
+                    title: confirmTitle || '手动导入模板',
+                    confirmText: '立即导入',
+                    cancelText: '取消',
+                    type: 'warning'
+                });
+
+            if (!confirmed) {
+                Logger.info('[TemplateSync] 用户取消手动模板导入');
+                return false;
+            }
+
+            return await TemplateSync._importEmbeddedTemplate(currentVersion);
+        } catch (err) {
+            Logger.error('[TemplateSync] 手动导入失败:', err);
+            NotificationSystem.error(`手动导入模板失败: ${err.message}`, '模板同步');
+            return false;
+        }
+    },
+
+    /**
+     * 初始化：检查是否需要同步模板
+     * 需要在 API 可用之后调用
+     */
+    init: async () => {
+        try {
+            const currentVersion = CONFIG.TEMPLATE_SYNC.CURRENT_VERSION;
+            const syncedVersion = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION);
+
+            Logger.debug('[TemplateSync] 当前版本:', currentVersion, '已同步版本:', syncedVersion);
+
+            // 版本相同，无需同步
+            if (syncedVersion === currentVersion) {
+                Logger.debug('[TemplateSync] 模板已是最新版本，跳过同步');
+                return;
+            }
+
+            // 检查 API 是否可用
+            const { getDB } = getCore();
+            const api = getDB();
+            if (!api || !api.importTemplateFromData) {
+                Logger.warn('[TemplateSync] 数据库 API 不可用或不支持 importTemplateFromData，跳过模板同步');
+                return;
+            }
+
+            // 版本不同，弹窗确认
+            const isFirstTime = !syncedVersion;
+            const message = isFirstTime
+                ? `检测到首次使用 DND 仪表盘 v${currentVersion}，是否导入配套模板？\n\n导入模板后，数据库将使用最新的表格结构，确保仪表盘功能正常运行。`
+                : `DND 仪表盘已从 v${syncedVersion} 更新到 v${currentVersion}，是否导入最新配套模板？\n\n新版本可能包含表格结构调整，建议导入以确保兼容性。`;
+
+            const confirmed = await NotificationSystem.confirm(message, {
+                title: isFirstTime ? '导入配套模板' : '模板更新可用',
+                confirmText: '导入模板',
+                cancelText: '跳过',
+                type: 'info'
+            });
+
+            if (!confirmed) {
+                Logger.info('[TemplateSync] 用户跳过模板导入');
+                return;
+            }
+
+            // 用户确认，开始导入内置模板
+            await TemplateSync._importEmbeddedTemplate(currentVersion);
+
+        } catch (err) {
+            Logger.error('[TemplateSync] 初始化失败:', err);
+        }
+    },
+
+    /**
+     * 读取内置模板并导入
+     */
+    _importEmbeddedTemplate: async (version) => {
+        try {
+            NotificationSystem.info('正在准备内置模板...', '模板同步');
+
+            const templateData = JSON.parse(JSON.stringify(EMBEDDED_TEMPLATE));
+            const importOptions = {
+                scope: 'global',
+                presetName: `DND仪表盘 ${version}`
+            };
+
+            // 基本校验
+            if (!templateData || !templateData.mate || templateData.mate.type !== 'chatSheets') {
+                throw new Error('模板数据格式无效：缺少 mate.type=chatSheets');
+            }
+
+            const sheetCount = Object.keys(templateData).filter(k => k.startsWith('sheet_')).length;
+            if (sheetCount === 0) {
+                throw new Error('模板数据格式无效：没有找到任何 sheet');
+            }
+
+            const invalidSheet = Object.entries(templateData).find(([key, value]) => key.startsWith('sheet_') && (
+                !value
+                || typeof value !== 'object'
+                || !('name' in value)
+                || !('content' in value)
+                || !('sourceData' in value)
+            ));
+            if (invalidSheet) {
+                throw new Error(`模板数据格式无效：${invalidSheet[0]} 缺少 name/content/sourceData 字段`);
+            }
+
+            Logger.info(`[TemplateSync] 内置模板准备完成，包含 ${sheetCount} 个表格`);
+
+            // 调用数据库 API 导入模板
+            const { getDB } = getCore();
+            const api = getDB();
+            let result = await api.importTemplateFromData(templateData, importOptions);
+
+            if (!result || !result.success) {
+                Logger.warn('[TemplateSync] 对象导入失败，尝试以 JSON 字符串重试:', result?.message || '未知错误');
+                const retryPayload = JSON.stringify(templateData);
+                const retryResult = await api.importTemplateFromData(retryPayload, importOptions);
+                if (retryResult && retryResult.success) {
+                    result = retryResult;
+                } else {
+                    const primaryMsg = result?.message || '未知错误';
+                    const retryMsg = retryResult?.message || '未知错误';
+                    throw new Error(`API 导入失败: ${primaryMsg}${retryMsg && retryMsg !== primaryMsg ? `；字符串重试失败: ${retryMsg}` : ''}`);
+                }
+            }
+
+            if (result && result.success) {
+                // 记录已同步的版本
+                await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION, version);
+                NotificationSystem.success(`模板导入成功 (${sheetCount} 个表格)`, '模板同步');
+                Logger.info(`[TemplateSync] 模板 v${version} 导入成功`);
+                return true;
+            }
+
+            return false;
+
+        } catch (err) {
+            Logger.error('[TemplateSync] 导入内置模板失败:', err);
+            NotificationSystem.error(`模板同步失败: ${err.message}\n\n你可以稍后重新打开页面后重试。`, '模板同步');
+            return false;
+        }
     }
 };
 
@@ -32153,45 +34612,196 @@ const SettingsManager = {
 
 
 
+
+const getAvatarValue = (value) => {
+    if (value === undefined || value === null) return null;
+    const normalized = String(value).trim();
+    return normalized || null;
+};
+
+const uniqueAvatarValues = (values) => {
+    const result = [];
+    const seen = new Set();
+
+    values.forEach(value => {
+        const normalized = getAvatarValue(value);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        result.push(normalized);
+    });
+
+    return result;
+};
+
+const normalizeAvatarIdentity = (avatarIdentity, fallbackName = '') => {
+    if (avatarIdentity && typeof avatarIdentity === 'object' && !Array.isArray(avatarIdentity)) {
+        return {
+            CHAR_ID: getAvatarValue(avatarIdentity['CHAR_ID'] ?? avatarIdentity.CHAR_ID ?? avatarIdentity.charId),
+            PC_ID: getAvatarValue(avatarIdentity['PC_ID'] ?? avatarIdentity.PC_ID ?? avatarIdentity.pcId),
+            姓名: getAvatarValue(avatarIdentity['姓名'] ?? avatarIdentity.name ?? fallbackName),
+            单位名称: getAvatarValue(avatarIdentity['单位名称'] ?? avatarIdentity.unitName),
+            legacyKey: getAvatarValue(avatarIdentity.legacyKey ?? avatarIdentity.rawKey)
+        };
+    }
+
+    return {
+        CHAR_ID: null,
+        PC_ID: null,
+        姓名: getAvatarValue(fallbackName),
+        单位名称: null,
+        legacyKey: getAvatarValue(avatarIdentity)
+    };
+};
+
+const buildAvatarScopedKey = (chatId, identityType, identityValue) => {
+    const scope = encodeURIComponent(getAvatarValue(chatId) || 'global');
+    const type = encodeURIComponent(getAvatarValue(identityType) || 'legacy');
+    const value = encodeURIComponent(getAvatarValue(identityValue) || 'unknown');
+    return `chat_avatar__${scope}__${type}__${value}`;
+};
+
+const resolveAvatarStorageInfo = (avatarIdentity, fallbackName = '') => {
+    const identity = normalizeAvatarIdentity(avatarIdentity, fallbackName);
+    const displayName = identity.姓名 || identity.单位名称 || identity.legacyKey || getAvatarValue(fallbackName) || '角色';
+    const canonicalType = identity.CHAR_ID
+        ? 'char'
+        : identity.PC_ID
+            ? 'pc'
+            : identity.姓名
+                ? 'name'
+                : identity.单位名称
+                    ? 'unit'
+                    : identity.legacyKey
+                        ? 'legacy'
+                        : null;
+    const canonicalValue = identity.CHAR_ID || identity.PC_ID || identity.姓名 || identity.单位名称 || identity.legacyKey;
+    const chatId = TavernSettingsSync.getCurrentChatId() || 'global';
+    const canonicalKey = canonicalValue ? buildAvatarScopedKey(chatId, canonicalType, canonicalValue) : null;
+    const legacyRawKeys = uniqueAvatarValues([
+        identity.CHAR_ID,
+        identity.PC_ID,
+        identity.姓名,
+        identity.单位名称,
+        identity.legacyKey
+    ]);
+
+    return {
+        identity,
+        displayName,
+        chatId,
+        canonicalKey,
+        canonicalChatKey: canonicalKey ? `avatar_${canonicalKey}` : null,
+        canonicalLocalStorageKey: canonicalKey ? `dnd_avatar_${canonicalKey}` : null,
+        legacyRawKeys,
+        legacyChatKeys: legacyRawKeys.map(key => `avatar_${key}`),
+        legacyLocalStorageKeys: legacyRawKeys.map(key => `dnd_avatar_${key}`),
+        domKey: canonicalKey || buildAvatarScopedKey(chatId, 'legacy', displayName)
+    };
+};
+
+const persistCanonicalAvatar = async (avatarInfo, base64Data) => {
+    if (!avatarInfo?.canonicalKey || !base64Data) return false;
+    await TavernSettingsSync.saveToChat(avatarInfo.canonicalChatKey, base64Data);
+    return await DBAdapter.put(avatarInfo.canonicalKey, base64Data);
+};
+
+const removeLocalAvatarKey = (key) => {
+    try {
+        if (key) localStorage.removeItem(key);
+    } catch (e) {}
+};
+
 /* harmony default export */ const UICharacter = ({
+    resolveAvatarIdentity(avatarIdentity, fallbackName = '') {
+        return normalizeAvatarIdentity(avatarIdentity, fallbackName);
+    },
+
+    resolveAvatarStorageKeys(avatarIdentity, fallbackName = '') {
+        return resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+    },
+
     // 头像存储管理 (使用 IndexedDB + Chat Metadata)
     avatarStorage: {
-        get: async (charId) => {
-            // 1. 优先尝试 Chat Metadata (跟随聊天文件)
-            const chatVal = TavernSettingsSync.getFromChat(`avatar_${charId}`);
-            if (chatVal) return chatVal;
+        get: async (avatarIdentity, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+            if (!avatarInfo.canonicalKey) return null;
 
-            // 2. 尝试 IndexedDB (本地缓存)
-            let val = await DBAdapter.get(charId);
-            // 兼容旧版 localStorage (迁移数据)
-            if (!val) {
-                const old = localStorage.getItem(`dnd_avatar_${charId}`);
-                if (old) {
-                    await DBAdapter.put(charId, old);
-                    localStorage.removeItem(`dnd_avatar_${charId}`); // 迁移后删除
-                    val = old;
-                }
+            // 1. 优先尝试新的聊天作用域主键
+            const canonicalChatVal = TavernSettingsSync.getFromChat(avatarInfo.canonicalChatKey);
+            if (canonicalChatVal) {
+                await DBAdapter.put(avatarInfo.canonicalKey, canonicalChatVal);
+                return canonicalChatVal;
             }
-            return val;
+
+            const canonicalDbVal = await DBAdapter.get(avatarInfo.canonicalKey);
+            if (canonicalDbVal) {
+                await TavernSettingsSync.saveToChat(avatarInfo.canonicalChatKey, canonicalDbVal);
+                return canonicalDbVal;
+            }
+
+            // 2. 回退到旧版 Chat Metadata Key
+            for (const legacyChatKey of avatarInfo.legacyChatKeys) {
+                const legacyChatVal = TavernSettingsSync.getFromChat(legacyChatKey);
+                if (!legacyChatVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyChatVal);
+                return legacyChatVal;
+            }
+
+            // 3. 回退到旧版 IndexedDB Key
+            for (const legacyKey of avatarInfo.legacyRawKeys) {
+                const legacyDbVal = await DBAdapter.get(legacyKey);
+                if (!legacyDbVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyDbVal);
+                return legacyDbVal;
+            }
+
+            // 4. 回退到旧版 localStorage Key，并迁移到新主键
+            for (const legacyStorageKey of avatarInfo.legacyLocalStorageKeys) {
+                const legacyLocalVal = localStorage.getItem(legacyStorageKey);
+                if (!legacyLocalVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyLocalVal);
+                removeLocalAvatarKey(legacyStorageKey);
+                return legacyLocalVal;
+            }
+
+            return null;
         },
-        set: async (charId, base64Data) => {
-            // 保存到 Chat Metadata
-            await TavernSettingsSync.saveToChat(`avatar_${charId}`, base64Data);
-            // 保存到 IndexedDB
-            return await DBAdapter.put(charId, base64Data);
+        set: async (avatarIdentity, base64Data, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+            return await persistCanonicalAvatar(avatarInfo, base64Data);
         },
-        remove: async (charId) => {
-            // 从 Chat Metadata 移除
-            await TavernSettingsSync.deleteFromChat(`avatar_${charId}`);
-            // 从 IndexedDB 移除
-            return await DBAdapter.delete(charId);
+        remove: async (avatarIdentity, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+
+            if (avatarInfo.canonicalChatKey) {
+                await TavernSettingsSync.deleteFromChat(avatarInfo.canonicalChatKey);
+            }
+            if (avatarInfo.canonicalKey) {
+                await DBAdapter.delete(avatarInfo.canonicalKey);
+            }
+            removeLocalAvatarKey(avatarInfo.canonicalLocalStorageKey);
+
+            for (const legacyChatKey of avatarInfo.legacyChatKeys) {
+                await TavernSettingsSync.deleteFromChat(legacyChatKey);
+            }
+            for (const legacyKey of avatarInfo.legacyRawKeys) {
+                await DBAdapter.delete(legacyKey);
+            }
+            for (const legacyStorageKey of avatarInfo.legacyLocalStorageKeys) {
+                removeLocalAvatarKey(legacyStorageKey);
+            }
+
+            return true;
         }
     },
 
     // 异步加载头像
-    async loadAvatarAsync(charId, elemId) {
+    async loadAvatarAsync(avatarIdentity, elemId, fallbackName = '') {
         const { $ } = getCore();
-        const base64 = await this.avatarStorage.get(charId);
+        const base64 = await this.avatarStorage.get(avatarIdentity, fallbackName);
         if (base64) {
             const $el = $(`#${elemId}`);
             if ($el.length) {
@@ -32210,26 +34820,30 @@ const SettingsManager = {
     },
 
     // 生成头像HTML (异步模式)
-    renderAvatar(name, charId, size = 40) {
+    renderAvatar(name, avatarIdentity, size = 40) {
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, name);
         const initial = this.getNameInitial(name);
         const fontSize = Math.floor(size * 0.5);
+        const rawIdentityKey = avatarInfo.identity.CHAR_ID || avatarInfo.identity.PC_ID || avatarInfo.identity.legacyKey || avatarInfo.displayName;
         // 生成唯一ID以便异步填充
-        const uid = `avatar-${charId}-${Math.random().toString(36).substr(2, 9)}`;
+        const uid = `avatar-${avatarInfo.domKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Math.random().toString(36).substr(2, 9)}`;
         
         // 触发异步加载
-        setTimeout(() => this.loadAvatarAsync(charId, uid), 0);
+        setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, name), 0);
 
         // 返回占位符 (显示首字母)
         return `
-            <div id="${uid}" class="dnd-avatar-container" data-char-id="${charId}" style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1px solid var(--dnd-border-gold);flex-shrink:0;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="${name}">
+            <div id="${uid}" class="dnd-avatar-container" data-char-id="${rawIdentityKey || ''}" data-avatar-key="${avatarInfo.domKey}" style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1px solid var(--dnd-border-gold);flex-shrink:0;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="${name}">
                 <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:${fontSize}px;">${initial}</span>
             </div>
         `;
     },
 
     // 显示头像上传对话框
-    showAvatarUploadDialog(charId, charName) {
+    showAvatarUploadDialog(avatarIdentity, charName) {
         const { $, window: coreWin } = getCore();
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, charName);
+        const displayName = charName || avatarInfo.displayName;
         
         // 移除已存在的对话框
         $('#dnd-avatar-upload-dialog').remove();
@@ -32253,8 +34867,8 @@ const SettingsManager = {
         // "onclick="window.DND_Dashboard_UI.showAvatarUploadDialog..."
         // So it can be async.
         
-        this.avatarStorage.get(charId).then(storedAvatar => {
-            const initial = this.getNameInitial(charName);
+        this.avatarStorage.get(avatarIdentity, displayName).then(storedAvatar => {
+            const initial = this.getNameInitial(displayName);
             
             // 检测是否为移动端
             const isMobileDialog = (coreWin.innerWidth || $(coreWin).width()) < 768;
@@ -32283,7 +34897,7 @@ const SettingsManager = {
                     box-shadow: 0 10px 40px rgba(0,0,0,0.8);
                 ">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-inner);padding-bottom:10px;">
-                        <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${charName}</span>
+                        <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${displayName}</span>
                         <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭"><i class="fa-solid fa-times"></i></span>
                     </div>
                     
@@ -32367,14 +34981,14 @@ const SettingsManager = {
                     
                     // 压缩图片
                     self.compressImage(base64, 150, (compressedBase64) => {
-                        // 保存到 localStorage
-                        self.avatarStorage.set(charId, compressedBase64).then(success => {
+                        // 保存头像
+                        self.avatarStorage.set(avatarIdentity, compressedBase64, displayName).then(success => {
                             if (success) {
                                 // 更新预览
                                 $('#dnd-avatar-preview').html(`<img src="${compressedBase64}" style="width:100%;height:100%;object-fit:cover;">`);
                                 
                                 // 更新页面上所有该角色的头像
-                                self.refreshAvatars(charId);
+                                self.refreshAvatars(avatarIdentity, displayName);
                                 
                                 // 关闭对话框
                                 setTimeout(() => {
@@ -32396,19 +35010,21 @@ const SettingsManager = {
                     type: 'danger'
                 });
                 if (confirmed) {
-                    this.avatarStorage.remove(charId);
-                    this.refreshAvatars(charId);
+                    await this.avatarStorage.remove(avatarIdentity, displayName);
+                    this.refreshAvatars(avatarIdentity, displayName);
                     $('#dnd-avatar-upload-dialog, #dnd-avatar-dialog-backdrop').remove();
                 }
             });
         });
     },
-
+    
     // 刷新页面上指定角色的所有头像
-    refreshAvatars(charId) {
+    refreshAvatars(avatarIdentity, fallbackName = '') {
         const { $ } = getCore();
-        this.avatarStorage.get(charId).then(storedAvatar => {
-            $(`.dnd-avatar-container[data-char-id="${charId}"]`).each(function() {
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, fallbackName);
+
+        this.avatarStorage.get(avatarIdentity, fallbackName).then(storedAvatar => {
+            $(`[data-avatar-key="${avatarInfo.domKey}"]`).each(function() {
                 const $container = $(this);
                 const size = $container.width();
                 const fontSize = Math.floor(size * 0.5);
@@ -32530,7 +35146,8 @@ const SettingsManager = {
         else if (memRes) res = memRes.find(r => r['CHAR_ID'] === charId) || {};
         
         // 构建 HTML
-        const detailAvatarHtml = this.renderAvatar(char['姓名'], charId, 48);
+        const avatarIdentity = char;
+        const detailAvatarHtml = this.renderAvatar(char['姓名'], avatarIdentity, 48);
         
         // [新增] 只有当是主角或队友时，才显示上传按钮
         const party = DataManager.getPartyData();
@@ -32539,7 +35156,7 @@ const SettingsManager = {
         let html = `
             <div class="dnd-detail-header">
                 <div style="display:flex;align-items:center;gap:15px;flex:1;overflow:hidden;">
-                    <div style="position:relative;cursor:pointer;" class="dnd-avatar-wrapper" onclick="${isPartyMember ? `window.DND_Dashboard_UI.showAvatarUploadDialog('${charId}', '${char['姓名']}')` : ''}" title="${isPartyMember ? '点击修改头像' : ''}">
+                    <div style="position:relative;cursor:${isPartyMember ? 'pointer' : 'default'};" class="dnd-avatar-wrapper" title="${isPartyMember ? '点击修改头像' : ''}">
                         ${detailAvatarHtml}
                         ${isPartyMember ? `<div style="position:absolute;bottom:-2px;right:-2px;background:#333;border:1px solid var(--dnd-border-gold);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dnd-text-highlight);">📷</div>` : ''}
                     </div>
@@ -32639,6 +35256,13 @@ const SettingsManager = {
                 $(this).find('span').text('▲');
             }
         });
+
+        if (isPartyMember) {
+            $card.find('.dnd-avatar-wrapper').on('click', (e) => {
+                e.stopPropagation();
+                this.showAvatarUploadDialog(avatarIdentity, char['姓名']);
+            });
+        }
 
         // ========== 智能定位逻辑 ==========
         const { window: coreWin } = getCore();
@@ -32929,7 +35553,7 @@ const SettingsManager = {
 
                 // 如果仍未初始化 (无存档或解析失败)，则使用默认值
                 if (!this._charCreatorState) {
-                    let apiConfig = { url: '', key: '', model: '' };
+                    let apiConfig = { provider: 'plugin', url: '', key: '', model: '' };
                     
                     // [新增] 获取世界书内容
                     const worldInfo = await TavernAPI.getEnabledWorldInfo();
@@ -32947,17 +35571,20 @@ const SettingsManager = {
                         useWorldInfo: true
                     };
                     
-                    // 异步加载全局 API 配置 (仅在全新开始时加载)
-                    SettingsManager.getAPIConfig().then(config => {
-                        if (config && config.url) {
-                            if (this._charCreatorState) {
-                                this._charCreatorState.apiConfig = config;
-                            }
-                        }
-                        // 加载配置后刷新显示
-                        this.renderCharacterCreationPanel($container);
-                    });
-                    return; // 等待回调刷新
+                }
+
+                // 无论是恢复会话还是全新开始，都强制同步一次最新的全局 API 配置
+                const latestApiConfig = await SettingsManager.getAPIConfig();
+                if (this._charCreatorState && latestApiConfig) {
+                    this._charCreatorState.apiConfig = {
+                        provider: 'plugin',
+                        url: '',
+                        key: '',
+                        model: '',
+                        ...(this._charCreatorState.apiConfig || {}),
+                        ...latestApiConfig
+                    };
+                    this.saveCreatorState();
                 }
                 
                 // 状态已就绪，刷新显示
@@ -33451,7 +36078,13 @@ const SettingsManager = {
             // 更新本地状态以确保同步
             state.apiConfig = currentConfig;
 
-            if (!state.apiConfig.url || !state.apiConfig.model) {
+            if (state.apiConfig.provider === 'database') {
+                if (!TavernAPI.getDatabaseAIStatus().available) {
+                    NotificationSystem.warning('当前数据库插件未提供 AI 调用接口，请先更新数据库插件或切回自定义 API', '配置缺失');
+                    this.renderPanel('settings');
+                    return;
+                }
+            } else if (!state.apiConfig.url || !state.apiConfig.model) {
                 NotificationSystem.warning('请先在设置中配置 API 地址和模型', '配置缺失');
                 // Use global reference for cross-module call if needed, but this is mixin
                 // UIRenderer is 'this' when called
@@ -33755,11 +36388,31 @@ ${JSON.stringify(state.characterData, null, 2)}
                 messages.push({ role: msg.role, content: msg.content });
             });
             
+            // 每次发送前都同步一次最新的全局 API 配置，确保设置页切换立即生效
+            const latestApiConfig = await SettingsManager.getAPIConfig();
+            if (latestApiConfig) {
+                state.apiConfig = {
+                    provider: 'plugin',
+                    url: '',
+                    key: '',
+                    model: '',
+                    ...(state.apiConfig || {}),
+                    ...latestApiConfig
+                };
+            }
+
             // 调用 API
-            const response = await TavernAPI.generate(messages, {
-                customConfig: state.apiConfig,
+            const requestOptions = {
                 maxTokens: 4096 // 增加最大 Token 数以防止截断
-            });
+            };
+
+            if (state.apiConfig?.provider === 'database') {
+                requestOptions.useDatabaseAPI = true;
+            } else {
+                requestOptions.customConfig = state.apiConfig;
+            }
+
+            const response = await TavernAPI.generate(messages, requestOptions);
             
             // 处理响应
             if (response) {
@@ -33833,10 +36486,12 @@ ${JSON.stringify(state.characterData, null, 2)}
     },
 
     // 完成角色创建，保存数据
-    async finalizeCharacterCreation() {
+    async finalizeCharacterCreation(options = {}) {
         const { $ } = getCore();
         const state = this._charCreatorState;
         const data = state.characterData;
+
+        const { _retrying = false } = options || {};
         
         if (!data || !data.name) {
             NotificationSystem.warning('角色数据不完整，无法保存');
@@ -33872,6 +36527,77 @@ ${JSON.stringify(state.characterData, null, 2)}
             const skillLinkTable = findTable('CHARACTER_Skills');
             const featLibTable = findTable('FEAT_Library');
             const featLinkTable = findTable('CHARACTER_Feats');
+
+            const spells = data.spells || [];
+            const features = data.features || [];
+
+            // 模板表格有效性检查（缺失/损坏时引导导入，并在成功后自动重试保存）
+            const isTableStructValid = (table, requiredHeaders = []) => {
+                if (!table) return false;
+                if (!Array.isArray(table.content) || table.content.length === 0) return false;
+                const headers = table.content[0];
+                if (!Array.isArray(headers) || headers.length === 0) return false;
+                return requiredHeaders.every(h => headers.includes(h));
+            };
+
+            const templateIssues = [];
+            if (!isTableStructValid(mainTable, ['CHAR_ID'])) {
+                templateIssues.push('角色注册表 (CHARACTER_Registry) 缺失或结构异常（缺少表头或 CHAR_ID 列）');
+            }
+
+            if (spells.length > 0) {
+                if (!isTableStructValid(skillLibTable, ['SKILL_ID', '技能名称'])) {
+                    templateIssues.push('法术/技能库 (SKILL_Library) 缺失或结构异常（缺少表头或 SKILL_ID/技能名称 列）');
+                }
+                if (!isTableStructValid(skillLinkTable, ['CHAR_ID', 'SKILL_ID'])) {
+                    templateIssues.push('角色-法术/技能关联表 (CHARACTER_Skills) 缺失或结构异常（缺少表头或 CHAR_ID/SKILL_ID 列）');
+                }
+            }
+
+            if (features.length > 0) {
+                if (!isTableStructValid(featLibTable, ['FEAT_ID', '专长名称'])) {
+                    templateIssues.push('专长/特性库 (FEAT_Library) 缺失或结构异常（缺少表头或 FEAT_ID/专长名称 列）');
+                }
+                if (!isTableStructValid(featLinkTable, ['CHAR_ID', 'FEAT_ID'])) {
+                    templateIssues.push('角色-专长/特性关联表 (CHARACTER_Feats) 缺失或结构异常（缺少表头或 CHAR_ID/FEAT_ID 列）');
+                }
+            }
+
+            if (templateIssues.length > 0) {
+                // 已重试仍失败：避免无限循环
+                if (_retrying) {
+                    throw new Error(`模板表格仍缺失或结构异常，无法保存：\n- ${templateIssues.join('\n- ')}`);
+                }
+
+                const confirmed = await NotificationSystem.confirm(
+                    `检测到当前数据库缺少/损坏 DND 仪表盘配套模板，导致无法保存角色。\n\n问题：\n- ${templateIssues.join('\n- ')}\n\n是否立即导入配套模板，并在导入成功后自动重试本次保存？`,
+                    {
+                        title: '需要导入配套模板',
+                        confirmText: '导入并重试',
+                        cancelText: '取消保存',
+                        type: 'warning'
+                    }
+                );
+
+                if (!confirmed) {
+                    NotificationSystem.warning('已取消保存：缺少或损坏配套模板');
+                    return;
+                }
+
+                const imported = await TemplateSync.manualImport({
+                    skipConfirm: true,
+                    confirmTitle: '导入配套模板',
+                    confirmMessage: '角色保存需要更新配套模板结构，是否继续导入内置模板？'
+                });
+
+                if (!imported) {
+                    NotificationSystem.error('模板导入未完成，已取消本次保存。', '角色创建');
+                    return;
+                }
+
+                NotificationSystem.info('模板导入完成，正在重试保存...', '角色创建');
+                return await this.finalizeCharacterCreation({ _retrying: true });
+            }
             
             if (!mainTable) throw new Error('找不到角色注册表 (CHARACTER_Registry)');
             
@@ -33984,7 +36710,6 @@ ${JSON.stringify(state.characterData, null, 2)}
             if (resTable) updateOrInsert(resTable, charId);
 
             // 处理技能和法术
-            const spells = data.spells || [];
             if (spells.length > 0 && skillLibTable && skillLinkTable) {
                 const linkHeaders = skillLinkTable.content[0];
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
@@ -34089,7 +36814,6 @@ ${JSON.stringify(state.characterData, null, 2)}
             }
 
             // 处理专长和特性
-            const features = data.features || [];
             if (features.length > 0 && featLibTable && featLinkTable) {
                 const linkHeaders = featLinkTable.content[0];
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
@@ -34276,18 +37000,18 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         // [新增] 队伍工具栏 - 导入/导出按钮
         const $toolbar = $(`
-            <div class="dnd-party-toolbar" style="display:flex;gap:10px;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:6px;border:1px solid var(--dnd-border-inner);">
+            <div class="dnd-party-toolbar" style="display:flex;gap:10px;margin-bottom:15px;padding:10px;background:var(--dnd-bg-secondary);border-radius:6px;border:1px solid var(--dnd-border-inner);">
                 <div style="flex:1;display:flex;align-items:center;gap:10px;">
                     <span style="font-weight:bold;color:var(--dnd-text-highlight);"><i class="fa-solid fa-users"></i> 冒险队伍</span>
-                    <span style="font-size:12px;color:#888;">(${party.length} 名成员)</span>
+                    <span style="font-size:12px;color:var(--dnd-text-dim);">(${party.length} 名成员)</span>
                 </div>
-                <button class="dnd-btn dnd-clickable dnd-export-party-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-gold);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-export-party-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-gold);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-download"></i> 导出队伍
                 </button>
-                <button class="dnd-btn dnd-clickable dnd-import-party-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-import-party-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-upload"></i> 导入队伍
                 </button>
-                <button class="dnd-btn dnd-clickable dnd-import-fvtt-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-inner);color:#e67e22;padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-import-fvtt-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-highlight);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-file-import"></i> 导入 FVTT
                 </button>
             </div>
@@ -34337,15 +37061,14 @@ ${JSON.stringify(state.characterData, null, 2)}
             const statsObj = DataManager.parseValue(char['属性值'], 'stats') || {};
 
             if (Object.keys(statsObj).length > 0) {
-                statsHtml = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; background:rgba(0,0,0,0.2); padding:5px; border-radius:4px;">';
+                statsHtml = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; background:var(--dnd-bg-secondary); padding:5px; border-radius:4px;">';
                 Object.keys(statsObj).forEach(k => {
-                    statsHtml += `<div style="text-align:center;"><div style="font-size:10px;color:#888">${k}</div><div style="font-weight:bold">${statsObj[k]}</div></div>`;
+                    statsHtml += `<div style="text-align:center;"><div style="font-size:10px;color:var(--dnd-text-dim)">${k}</div><div style="font-weight:bold">${statsObj[k]}</div></div>`;
                 });
                 statsHtml += '</div>';
             }
 
-            const charId = char['PC_ID'] || char['CHAR_ID'] || char['姓名'];
-            const avatarHtml = this.renderAvatar(char['姓名'], charId, 40);
+            const avatarHtml = this.renderAvatar(char['姓名'], char, 40);
             
             // 解析熟练技能 (用于悬浮提示)
             let skillTooltip = '点击查看详情';
@@ -34414,7 +37137,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             </div>
                         </div>` : ''}
                         
-                        <div style="margin-top:5px;font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <div style="margin-top:5px;font-size:12px;color:var(--dnd-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                             ${char['外貌描述'] || '无描述'}
                         </div>
                     </div>
@@ -34445,7 +37168,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const $list = $('<div style="display:flex;flex-direction:column;gap:15px;"></div>');
 
         quests.forEach((q, index) => {
-            const statusColor = q['状态'] === '已完成' ? '#3a6b4a' : (q['状态'] === '已失败' ? '#8a2c2c' : '#c5a059');
+            const statusColor = q['状态'] === '已完成' ? 'var(--dnd-accent-green)' : (q['状态'] === '已失败' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-highlight)');
             
             const itemHtml = `
                 <div class="dnd-anim-entry" style="animation-delay:${index * 0.05}s; background:var(--dnd-bg-panel);border:1px solid var(--dnd-border-inner);padding:15px;border-radius:4px;">
@@ -34471,7 +37194,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
         // 布局
         const $layout = $('<div style="display:flex;gap:20px;height:100%;"></div>');
-        const $sidebar = $('<div style="width:250px;background:rgba(0,0,0,0.3);padding:10px;overflow-y:auto;"></div>');
+        const $sidebar = $('<div style="width:250px;background:var(--dnd-bg-secondary);padding:10px;overflow-y:auto;"></div>');
         const $mapArea = $('<div class="dnd-map-container"></div>');
 
         $sidebar.html('<h3 style="color:var(--dnd-text-header);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;">先攻列表</h3>');
@@ -34486,13 +37209,13 @@ ${JSON.stringify(state.characterData, null, 2)}
             sorted.forEach(unit => {
                 const isActive = unit['是否为当前行动者'] === '是';
                 const hp = unit['HP状态'] || '??/??';
-                const activeStyle = isActive ? 'background:rgba(197, 160, 89, 0.2);border-left:3px solid var(--dnd-border-gold);' : '';
+                const activeStyle = isActive ? 'background:var(--dnd-selected-bg);border-left:3px solid var(--dnd-border-gold);' : '';
                 
                 const rowHtml = `
-                    <div style="padding:8px;border-bottom:1px solid #333;display:flex;justify-content:space-between;${activeStyle}">
+                    <div style="padding:8px;border-bottom:1px solid var(--dnd-border-subtle);display:flex;justify-content:space-between;${activeStyle}">
                         <div>
                             <div style="font-weight:bold;color:${unit['阵营'] === '敌方' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-main)'}">${unit['单位名称']}</div>
-                            <div style="font-size:12px;color:#888;">HP: ${hp}</div>
+                            <div style="font-size:12px;color:var(--dnd-text-dim);">HP: ${hp}</div>
                         </div>
                         <div style="font-size:16px;font-weight:bold;color:var(--dnd-text-header)">${parseInt(unit['先攻/位置'])||0}</div>
                     </div>
@@ -34500,7 +37223,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 $sidebar.append(rowHtml);
             });
         } else {
-            $sidebar.append('<div style="color:#666">非战斗状态</div>');
+            $sidebar.append('<div style="color:var(--dnd-text-dim)">非战斗状态</div>');
         }
 
         if (mapData && mapData.length > 0) {
@@ -34516,9 +37239,9 @@ ${JSON.stringify(state.characterData, null, 2)}
             }
 
             // 移除全屏版战斗地图显示，仅保留文字提示或预留空间
-            $mapArea.html('<div style="color:#888;padding:20px;text-align:center;">（战斗地图已隐藏，请使用 HUD 查看）</div>');
+                $mapArea.html('<div style="color:var(--dnd-text-dim);padding:20px;text-align:center;">（战斗地图已隐藏，请使用 HUD 查看）</div>');
         } else {
-            $mapArea.html('<div style="color:#666">无地图数据</div>');
+            $mapArea.html('<div style="color:var(--dnd-text-dim)">无地图数据</div>');
         }
 
         $layout.append($sidebar).append($mapArea);
@@ -34528,7 +37251,7 @@ ${JSON.stringify(state.characterData, null, 2)}
     renderInventoryPanel($c) {
         const items = DataManager.getTable('ITEM_Inventory');
         if(!items || items.length === 0) {
-            $c.html('<div style="padding:20px;text-align:center;color:#888"><i class="fa-solid fa-suitcase"></i> 背包空空如也</div>');
+            $c.html('<div style="padding:20px;text-align:center;color:var(--dnd-text-dim)"><i class="fa-solid fa-suitcase"></i> 背包空空如也</div>');
             return;
         }
 
@@ -34563,14 +37286,14 @@ ${JSON.stringify(state.characterData, null, 2)}
 
         // 搜索和筛选区域 (Panel)
         const searchHtml = `
-            <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid var(--dnd-border-inner);display:flex;gap:10px;align-items:center;">
+            <div style="background:var(--dnd-bg-secondary);padding:10px;border-radius:6px;border:1px solid var(--dnd-border-inner);display:flex;gap:10px;align-items:center;">
                 <div style="font-weight:bold;color:var(--dnd-text-highlight);white-space:nowrap;"><i class="fa-solid fa-search"></i> 查找物品</div>
-                <input type="text" id="dnd-panel-inv-search" placeholder="物品名称..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px 10px;border-radius:4px;" oninput="window.DND_Dashboard_UI.filterPanelInventory()">
-                <select id="dnd-panel-inv-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
+                <input type="text" id="dnd-panel-inv-search" placeholder="物品名称..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px 10px;border-radius:4px;" oninput="window.DND_Dashboard_UI.filterPanelInventory()">
+                <select id="dnd-panel-inv-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
                     <option value="">全部分类</option>
                     ${sortedCats.map(c => `<option value="${c}">${c}</option>`).join('')}
                 </select>
-                <select id="dnd-panel-inv-owner" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
+                <select id="dnd-panel-inv-owner" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
                     <option value="">全部持有者</option>
                     ${sortedOwners.map(o => `<option value="${o}">${o}</option>`).join('')}
                     <option value="无">无持有者</option>
@@ -34582,7 +37305,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         // 1. 已装备区域 (仪表盘样式)
         if (equippedItems.length > 0) {
             const $equipSection = $(`
-                <div class="dnd-inv-section-equipped" style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-gold);">
+                <div class="dnd-inv-section-equipped" style="background:var(--dnd-bg-secondary);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-gold);">
                     <div style="font-size:16px;font-weight:bold;color:var(--dnd-text-header);margin-bottom:10px;display:flex;align-items:center;gap:10px;">
                         <span><i class="fa-solid fa-shield-halved"></i> 已装备</span>
                         <span style="font-size:12px;background:var(--dnd-accent-green);color:#fff;padding:2px 6px;border-radius:4px;">${equippedItems.length}</span>
@@ -34609,7 +37332,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             const catItems = categories[cat];
             const $catSection = $(`
                 <div class="dnd-inv-category" data-category="${cat}" style="background:var(--dnd-bg-panel);border:1px solid var(--dnd-border-inner);border-radius:4px;overflow:hidden;">
-                    <div class="dnd-inv-header" style="padding:10px 15px;background:rgba(255,255,255,0.05);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                    <div class="dnd-inv-header" style="padding:10px 15px;background:var(--dnd-bg-secondary);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                         <span style="font-weight:bold;color:var(--dnd-text-main);">${cat} (${catItems.length})</span>
                         <span class="dnd-collapse-icon" style="color:var(--dnd-text-dim)">▼</span>
                     </div>
@@ -34710,11 +37433,11 @@ ${JSON.stringify(state.characterData, null, 2)}
             <div style="background:var(--dnd-bg-panel);padding:20px;border:1px solid var(--dnd-border-gold);">
                 <h2 style="color:var(--dnd-text-header);margin-top:0;">${g['当前场景']}</h2>
                 <p style="color:var(--dnd-text-main);">${g['场景描述']}</p>
-                <hr style="border:0;border-bottom:1px solid #333;margin:15px 0;">
+                <hr style="border:0;border-bottom:1px solid var(--dnd-border-subtle);margin:15px 0;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div><span style="color:#888">时间:</span> ${g['游戏时间']}</div>
-                    <div><span style="color:#888">天气:</span> ${g['天气状况']}</div>
-                    <div><span style="color:#888">战斗模式:</span> ${g['战斗模式']}</div>
+                <div><span style="color:var(--dnd-text-dim)">时间:</span> ${g['游戏时间']}</div>
+                <div><span style="color:var(--dnd-text-dim)">天气:</span> ${g['天气状况']}</div>
+                <div><span style="color:var(--dnd-text-dim)">战斗模式:</span> ${g['战斗模式']}</div>
                 </div>
             </div>
         `);
@@ -34726,7 +37449,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         let html = '<div style="display:flex;flex-direction:column;gap:15px;">';
         [...logs].reverse().forEach(l => {
             html += `
-            <div style="background:rgba(255,255,255,0.05);padding:15px;border-left:3px solid var(--dnd-border-gold);">
+            <div style="background:var(--dnd-bg-secondary);padding:15px;border-left:3px solid var(--dnd-border-gold);">
                 <div style="display:flex;justify-content:space-between;color:var(--dnd-text-dim);font-size:12px;margin-bottom:5px;">
                     <span>${l['时间跨度']} @ ${l['地点']}</span>
                     <span>${l['编码索引']}</span>
@@ -34746,7 +37469,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const $grid = $('<div class="dnd-grid"></div>');
         
         npcs.forEach((npc, index) => {
-            const statusColor = npc['当前状态'] === '死亡' ? '#8a2c2c' : (npc['当前状态'] === '在场' ? '#3a6b4a' : '#888');
+            const statusColor = npc['当前状态'] === '死亡' ? 'var(--dnd-accent-red)' : (npc['当前状态'] === '在场' ? 'var(--dnd-accent-green)' : 'var(--dnd-text-dim)');
             
             // 解析HP用于显示血条
             const hpStr = npc['HP'] || '';
@@ -34754,31 +37477,31 @@ ${JSON.stringify(state.characterData, null, 2)}
             const hpCurrent = hpMatch ? parseInt(hpMatch[1]) : 0;
             const hpMax = hpMatch ? parseInt(hpMatch[2]) : 1;
             const hpPercent = Math.min(100, Math.max(0, (hpCurrent / hpMax) * 100));
-            const hpColor = hpPercent > 50 ? '#4a7c59' : (hpPercent > 25 ? '#b8860b' : '#8a2c2c');
+            const hpColor = hpPercent > 50 ? 'var(--dnd-accent-green)' : (hpPercent > 25 ? 'var(--dnd-border-gold)' : 'var(--dnd-accent-red)');
             
             const cardHtml = `
                 <div class="dnd-char-card dnd-anim-entry dnd-clickable" style="cursor:pointer; animation-delay:${index * 0.05}s">
                     <div class="dnd-card-header">
                         <span class="dnd-char-name">${npc['姓名'] || '未知'}</span>
                         <span style="font-size:11px;">
-                            ${npc['等级'] ? `<span style="color:#d4af37;margin-right:6px;">Lv.${npc['等级']}</span>` : ''}
+                            ${npc['等级'] ? `<span style="color:var(--dnd-text-highlight);margin-right:6px;">Lv.${npc['等级']}</span>` : ''}
                             <span style="color:${statusColor}">${npc['当前状态'] || ''}</span>
                         </span>
                     </div>
                     <div class="dnd-card-body">
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">${npc['种族/性别/年龄'] || '-'} | ${npc['职业/身份'] || '-'}</div>
+                        <div style="font-size:12px;color:var(--dnd-text-dim);margin-bottom:8px;">${npc['种族/性别/年龄'] || '-'} | ${npc['职业/身份'] || '-'}</div>
                         
                         ${hpStr ? `
                         <div style="margin-bottom:8px;">
                             <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-                                <span style="color:#888;">HP</span>
-                                <span style="color:#ccc;">${hpStr}${npc['AC'] ? ` | AC ${npc['AC']}` : ''}</span>
+                                <span style="color:var(--dnd-text-dim);">HP</span>
+                                <span style="color:var(--dnd-text-main);">${hpStr}${npc['AC'] ? ` | AC ${npc['AC']}` : ''}</span>
                             </div>
-                            <div style="background:#1a1a1a;border-radius:3px;height:6px;overflow:hidden;">
+                            <div style="background:var(--dnd-bg-input);border-radius:3px;height:6px;overflow:hidden;">
                                 <div style="width:${hpPercent}%;height:100%;background:${hpColor};transition:width 0.3s;"></div>
                             </div>
                         </div>
-                        ` : (npc['AC'] ? `<div style="font-size:11px;color:#888;margin-bottom:8px;">AC ${npc['AC']}</div>` : '')}
+                        ` : (npc['AC'] ? `<div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:8px;">AC ${npc['AC']}</div>` : '')}
                         
                         <div class="dnd-stat-row">
                             <span class="dnd-stat-label">位置</span>
@@ -34788,7 +37511,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             <span class="dnd-stat-label">关系</span>
                             <span class="dnd-stat-val">${npc['与主角关系'] || '-'}</span>
                         </div>
-                        <div style="margin-top:10px;font-size:13px;line-height:1.4;color:#ccc;max-height:60px;overflow:hidden;">
+                        <div style="margin-top:10px;font-size:13px;line-height:1.4;color:var(--dnd-text-main);max-height:60px;overflow:hidden;">
                             ${npc['外貌描述'] || ''}
                         </div>
                     </div>
@@ -34801,43 +37524,43 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 // 战斗属性区块
                 if (npc['等级'] || npc['HP'] || npc['AC']) {
-                    detail += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;margin-bottom:15px;">`;
+                    detail += `<div style="background:var(--dnd-bg-secondary);padding:12px;border-radius:6px;margin-bottom:15px;">`;
                     detail += `<div style="display:flex;gap:20px;flex-wrap:wrap;">`;
-                    if (npc['等级']) detail += `<div><span style="color:#888;font-size:11px;">等级</span><br><span style="color:#d4af37;font-size:16px;font-weight:bold;">Lv.${npc['等级']}</span></div>`;
-                    if (npc['HP']) detail += `<div><span style="color:#888;font-size:11px;">生命值</span><br><span style="color:#c94c4c;font-size:16px;font-weight:bold;">${npc['HP']}</span></div>`;
-                    if (npc['AC']) detail += `<div><span style="color:#888;font-size:11px;">护甲</span><br><span style="color:#6a9fb5;font-size:16px;font-weight:bold;">AC ${npc['AC']}</span></div>`;
+                    if (npc['等级']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">等级</span><br><span style="color:var(--dnd-text-highlight);font-size:16px;font-weight:bold;">Lv.${npc['等级']}</span></div>`;
+                    if (npc['HP']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">生命值</span><br><span style="color:var(--dnd-accent-red);font-size:16px;font-weight:bold;">${npc['HP']}</span></div>`;
+                    if (npc['AC']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">护甲</span><br><span style="color:var(--dnd-text-main);font-size:16px;font-weight:bold;">AC ${npc['AC']}</span></div>`;
                     detail += `</div></div>`;
                 }
                 
                 // 主要技能
                 if (npc['主要技能']) {
-                    detail += `<div style="margin-bottom:12px;"><strong style="color:#d4af37;">主要技能:</strong><br>`;
+                    detail += `<div style="margin-bottom:12px;"><strong style="color:var(--dnd-text-highlight);">主要技能:</strong><br>`;
                     const skills = npc['主要技能'].split(/[,，]/).map(s => s.trim()).filter(s => s);
                     detail += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">`;
                     skills.forEach(skill => {
-                        detail += `<span style="background:rgba(212,175,55,0.15);color:#d4af37;padding:3px 8px;border-radius:4px;font-size:12px;">${skill}</span>`;
+                        detail += `<span style="background:var(--dnd-bg-tertiary);color:var(--dnd-text-highlight);padding:3px 8px;border-radius:4px;font-size:12px;">${skill}</span>`;
                     });
                     detail += `</div></div>`;
                 }
                 
                 // 随身物品
                 if (npc['随身物品']) {
-                    detail += `<div style="margin-bottom:12px;"><strong style="color:#8b7355;">随身物品:</strong><br>`;
+                    detail += `<div style="margin-bottom:12px;"><strong style="color:var(--dnd-text-header);">随身物品:</strong><br>`;
                     const items = npc['随身物品'].split(/[,，]/).map(s => s.trim()).filter(s => s);
                     detail += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">`;
                     items.forEach(item => {
-                        detail += `<span style="background:rgba(139,115,85,0.15);color:#c9a86c;padding:3px 8px;border-radius:4px;font-size:12px;">${item}</span>`;
+                        detail += `<span style="background:var(--dnd-bg-tertiary);color:var(--dnd-text-header);padding:3px 8px;border-radius:4px;font-size:12px;">${item}</span>`;
                     });
                     detail += `</div></div>`;
                 }
                 
                 // 关键经历
-                detail += `<div style="margin-bottom:10px"><strong>关键经历:</strong><br><span style="color:#aaa;">${npc['关键经历'] || '无'}</span></div>`;
+                detail += `<div style="margin-bottom:10px"><strong>关键经历:</strong><br><span style="color:var(--dnd-text-main);">${npc['关键经历'] || '无'}</span></div>`;
                 
                 // 外貌描述
-                detail += `<div style="margin-bottom:10px"><strong>外貌:</strong><br><span style="color:#aaa;">${npc['外貌描述'] || '无'}</span></div>`;
+                detail += `<div style="margin-bottom:10px"><strong>外貌:</strong><br><span style="color:var(--dnd-text-main);">${npc['外貌描述'] || '无'}</span></div>`;
                 
-                detail += `<div style="margin-top:20px;font-size:10px;color:#666">ID: ${npc['NPC_ID']}</div>`;
+                detail += `<div style="margin-top:20px;font-size:10px;color:var(--dnd-text-dim)">ID: ${npc['NPC_ID']}</div>`;
                 this.showModal(npc['姓名'], detail);
             });
             
@@ -34855,7 +37578,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         $modal.html(`
             <div class="dnd-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-gold);padding-bottom:12px;">
                 <h3 style="margin:0;color:var(--dnd-text-highlight);font-size:18px;">${title}</h3>
-                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
+                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:var(--dnd-text-dim);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
             </div>
             <div class="dnd-modal-body" style="max-height:60vh;overflow-y:auto;padding-right:5px;text-align: left;">${content}</div>
         `);
@@ -34864,9 +37587,9 @@ ${JSON.stringify(state.characterData, null, 2)}
         $modal.find('.dnd-modal-close').on('click', function() {
             $overlay.removeClass('active');
         }).on('mouseenter', function() {
-            $(this).css({ background: 'rgba(255,255,255,0.1)', color: 'var(--dnd-text-highlight)' });
+            $(this).css({ background: 'var(--dnd-bg-tertiary)', color: 'var(--dnd-text-highlight)' });
         }).on('mouseleave', function() {
-            $(this).css({ background: 'transparent', color: '#888' });
+            $(this).css({ background: 'transparent', color: 'var(--dnd-text-dim)' });
         });
         
         $overlay.addClass('active');
@@ -34883,7 +37606,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         Object.keys(data).forEach(key => {
             if (key === 'mate') return;
             const sheet = data[key];
-            const $btn = $(`<button style="padding:5px 10px;background:#333;border:1px solid #555;color:#ccc;cursor:pointer;">${sheet.name || key}</button>`);
+            const $btn = $(`<button style="padding:5px 10px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);cursor:pointer;">${sheet.name || key}</button>`);
             
             $btn.on('click', () => {
                 let html = `<h3 style="color:var(--dnd-text-highlight)">${sheet.name}</h3>`;
@@ -34902,7 +37625,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 }
                 $viewArea.html(html);
                 
-                $selector.children().css('border-color', '#555');
+                $selector.children().css('border-color', 'var(--dnd-border-subtle)');
                 $btn.css('border-color', 'var(--dnd-border-gold)');
             });
             $selector.append($btn);
@@ -34939,13 +37662,13 @@ ${JSON.stringify(state.characterData, null, 2)}
             const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
-                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
-                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
-                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='var(--dnd-selected-bg)'"
+                       onmouseleave="this.style.background='var(--dnd-bg-secondary)'">
                     <input type="checkbox" class="dnd-export-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
                     <span style="flex:1;">
                         <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
-                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
                     </span>
                 </label>
             `;
@@ -34955,12 +37678,12 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         const modalContent = `
             <div style="margin-bottom:20px;">
-                <p style="color:#888;margin-bottom:15px;">选择要导出的角色：</p>
+                <p style="color:var(--dnd-text-dim);margin-bottom:15px;">选择要导出的角色：</p>
                 ${checkboxHtml}
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="dnd-btn dnd-export-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
-                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
+                <button class="dnd-btn dnd-export-cancel-btn" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:var(--dnd-text-header);padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
             </div>
         `;
         
@@ -35081,13 +37804,13 @@ ${JSON.stringify(state.characterData, null, 2)}
             const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
-                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
-                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
-                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='var(--dnd-selected-bg)'"
+                       onmouseleave="this.style.background='var(--dnd-bg-secondary)'">
                     <input type="checkbox" class="dnd-import-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
                     <span style="flex:1;">
                         <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
-                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
                     </span>
                 </label>
             `;
@@ -35100,18 +37823,18 @@ ${JSON.stringify(state.characterData, null, 2)}
             <div style="margin-bottom:20px;">
                 <p style="color:var(--dnd-text-highlight);font-weight:bold;margin-bottom:10px;">导入模式：</p>
                 <div style="display:flex;flex-direction:column;gap:10px;">
-                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--dnd-bg-tertiary);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
                         <input type="radio" name="dnd-import-mode" value="append" checked style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
                             <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">📥 追加角色</span>
-                            <span style="color:#888;font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
+                            <span style="color:var(--dnd-text-dim);font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
                         </span>
                     </label>
-                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--dnd-bg-tertiary);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
                         <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
                             <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">${ICONS.SYNC} 替换队伍</span>
-                            <span style="color:#e74c3c;font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                            <span style="color:var(--dnd-accent-red);font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
                         </span>
                     </label>
                 </div>
@@ -35120,13 +37843,13 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         const modalContent = `
             <div style="margin-bottom:15px;">
-                <p style="color:#888;margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
+                <p style="color:var(--dnd-text-dim);margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
                 ${checkboxHtml}
             </div>
             ${modeHtml}
             <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="dnd-btn dnd-import-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
-                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
+                <button class="dnd-btn dnd-import-cancel-btn" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:var(--dnd-text-header);padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
             </div>
         `;
         
@@ -35252,7 +37975,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         if (equipped.length === 0 && consumables.length === 0) return;
         
-        let html = `<div style="padding:5px 10px;border-top:1px solid rgba(255,255,255,0.05);">`;
+        let html = `<div style="padding:5px 10px;border-top:1px solid var(--dnd-border-subtle);">`;
         
         // [已删除] 装备图标流 - 已移至底部装备按钮
         
@@ -35262,7 +37985,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             consumables.forEach((item, idx) => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 html += `
-                    <div class="dnd-quick-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-id="${itemId}" title="[${item['数量']}] ${item['物品名称']}" style="animation-delay:${idx * 0.03}s; padding:2px 6px;background:rgba(255,255,255,0.05);border:1px solid #444;border-radius:10px;font-size:10px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
+                    <div class="dnd-quick-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-id="${itemId}" title="[${item['数量']}] ${item['物品名称']}" style="animation-delay:${idx * 0.03}s; padding:2px 6px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);border-radius:10px;font-size:10px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
                         ${item['物品名称']} x${item['数量']}
                     </div>
                 `;
@@ -35302,12 +38025,15 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 
 
+
 /* harmony default export */ const UISettings = ({
     async renderSettingsPanel($c) {
         const { $ } = getCore();
         const config = CONFIG.PRESET_SWITCHING;
         const presets = PresetSwitcher.getAvailablePresets();
         const apiConfig = await SettingsManager.getAPIConfig();
+        const aiProvider = apiConfig.provider || 'plugin';
+        const dbAiStatus = TavernAPI.getDatabaseAIStatus();
         const syncStatus = await SettingsManager.getSyncStatus();
         const currentScale = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.UI_SCALE) || CONFIG.UI_SCALE.DEFAULT;
         
@@ -35327,6 +38053,14 @@ ${JSON.stringify(state.characterData, null, 2)}
         const savedOptionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
         const optionWrapEnabled = savedOptionWrap === true || savedOptionWrap === 'true';
         
+        // 获取迷你地图显示设置
+        const savedShowMiniMap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP);
+        const showMiniMapEnabled = savedShowMiniMap !== false && savedShowMiniMap !== 'false'; // 默认开启
+        
+        // 获取隐藏浮动球设置
+        const savedHideFloatingBall = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
+        const hideFloatingBallEnabled = savedHideFloatingBall === true || savedHideFloatingBall === 'true'; // 默认关闭
+        
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
             let html = `<option value="">-- 手动输入 --</option>`;
@@ -35344,21 +38078,32 @@ ${JSON.stringify(state.characterData, null, 2)}
                 </h2>
 
                 <!-- 同步状态 -->
-                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="background:var(--dnd-bg-card);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
                     <div>
                         <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">${ICONS.CLOUD} 云同步状态</div>
-                        <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
+                        <div style="color:var(--dnd-text-dim);font-size:12px;">配置将自动同步到酒馆服务器</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
-                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
                     </div>
                 </div>
 
+                <!-- 模板同步 -->
+                <div style="background:var(--dnd-bg-card);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:15px;">
+                    <div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;"><i class="fa-solid fa-table"></i> 表格模板</div>
+                        <div style="color:var(--dnd-text-dim);font-size:12px;line-height:1.6;">当前内置模板版本：v${CONFIG.TEMPLATE_SYNC.CURRENT_VERSION}。可在这里手动重新导入模板。</div>
+                    </div>
+                    <button type="button" id="dnd-template-import" style="background:rgba(157,139,108,0.16);border:1px solid var(--dnd-border-gold);color:var(--dnd-text-highlight);padding:8px 14px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">
+                        <i class="fa-solid fa-file-import"></i> 导入表格模板
+                    </button>
+                </div>
+
                 <!-- 界面显示设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">💻 界面显示</h3>
-                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                    <p style="color:var(--dnd-text-dim);font-size:13px;margin-bottom:15px;">
                         调整仪表盘和悬浮球的大小比例，适配不同分辨率的屏幕。
                     </p>
                     
@@ -35371,7 +38116,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                             <input type="range" id="dnd-set-ui-scale"
                                 min="${CONFIG.UI_SCALE.MIN}" max="${CONFIG.UI_SCALE.MAX}" step="${CONFIG.UI_SCALE.STEP}" value="${currentScale}"
                                 style="flex:1;cursor:pointer;">
-                            <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
+                            <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
                         </div>
                     </div>
                     
@@ -35384,10 +38129,30 @@ ${JSON.stringify(state.characterData, null, 2)}
                             启用后，HUD 中的行动选项按钮文本将自动换行显示完整内容，而不是截断。
                         </p>
                     </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-show-mini-map" ${showMiniMapEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">显示 MiniHUD 地图</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            控制探索模式和战斗模式中的迷你地图是否显示。关闭后可节省屏幕空间。
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-hide-floating-ball" ${hideFloatingBallEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">隐藏浮动球</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后隐藏浮动球，Mini HUD 将独立显示并可拖拽。需配合酒馆助手按钮使用。
+                        </p>
+                    </div>
                 </div>
 
                 <!-- 配色模板设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.PALETTE} 配色模板</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择预设主题或自定义配色，让界面风格更符合你的喜好。
@@ -35395,7 +38160,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">预设主题</label>
-                        <select id="dnd-theme-preset" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                        <select id="dnd-theme-preset" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                             ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || ICONS.PALETTE} ${t.name}</option>`).join('')}
                         </select>
                     </div>
@@ -35414,8 +38179,8 @@ ${JSON.stringify(state.characterData, null, 2)}
                                 return Object.entries(editableVars).map(([key, info]) => `
                                     <div style="display:flex;align-items:center;gap:8px;">
                                         <input type="color" class="dnd-color-picker" data-var="${key}" value="${info.value.replace(/^#/, '#').substring(0, 7)}"
-                                            style="width:32px;height:32px;border:1px solid #444;border-radius:4px;cursor:pointer;background:transparent;padding:0;">
-                                        <span style="color:#ccc;font-size:12px;flex:1;">${info.label}</span>
+                                            style="width:32px;height:32px;border:1px solid var(--dnd-border-subtle);border-radius:4px;cursor:pointer;background:transparent;padding:0;">
+                                        <span style="color:var(--dnd-text-main);font-size:12px;flex:1;">${info.label}</span>
                                     </div>
                                 `).join('');
                             })()}
@@ -35459,7 +38224,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                                 <span class="dnd-badge dnd-badge-warning" style="padding:4px 8px;">警告</span>
                                 <span class="dnd-badge dnd-badge-error" style="padding:4px 8px;">错误</span>
                             </div>
-                            <div style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;">
+                            <div style="margin-top:10px;padding:8px;background:var(--dnd-bg-input);border-radius:4px;">
                                 <span style="color:var(--dnd-text-main);">主文本</span> ·
                                 <span style="color:var(--dnd-text-highlight);">高亮文本</span> ·
                                 <span style="color:var(--dnd-text-dim);">次要文本</span>
@@ -35469,7 +38234,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 </div>
 
                 <!-- 风格管理 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.MASK} 风格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择完整的视觉风格主题，包含颜色、尺寸、圆角、动画等全套配置。
@@ -35478,7 +38243,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">当前风格</label>
-                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--dnd-bg-input);border-radius:6px;border:1px solid var(--dnd-border-inner);">
                             <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || ICONS.PALETTE}</span>
                             <div style="flex:1;">
                                 <div style="font-weight:bold;color:var(--dnd-text-header);">${StyleManager.getCurrentStyle().name || '经典DND'}</div>
@@ -35495,7 +38260,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                                      data-style-id="${style.id}">
                                     <div style="font-size:28px;margin-bottom:6px;">${style.icon || ICONS.PALETTE}</div>
                                     <div style="font-size:12px;font-weight:bold;color:${style.id === StyleManager.currentStyleId ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};">${style.name}</div>
-                                    ${style.isCustom ? '<div style="font-size:9px;color:#888;margin-top:2px;">自定义</div>' : ''}
+                                    ${style.isCustom ? '<div style="font-size:9px;color:var(--dnd-text-dim);margin-top:2px;">自定义</div>' : ''}
                                     ${style.id === StyleManager.currentStyleId ? '<div style="font-size:9px;color:var(--dnd-text-highlight);margin-top:2px;">✓ 当前</div>' : ''}
                                 </div>
                             `).join('')}
@@ -35542,7 +38307,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 </div>
 
                 <!-- 动态背景设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.SPARKLES} 动态背景</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         为界面添加动态背景效果，类似游戏UI设计，让背景不再单调。
@@ -35558,7 +38323,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     <div class="dnd-bg-group" style="opacity:${bgConfig.enabled ? 1 : 0.5};pointer-events:${bgConfig.enabled ? 'auto' : 'none'};transition:all 0.3s;">
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">背景效果</label>
-                            <select id="dnd-bg-type" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                            <select id="dnd-bg-type" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                                 ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || ICONS.SPARKLES} ${e.name}</option>`).join('')}
                             </select>
                         </div>
@@ -35578,39 +38343,65 @@ ${JSON.stringify(state.characterData, null, 2)}
                 </div>
 
                 <!-- API 配置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-plug"></i> API 连接配置</h3>
-                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
-                        配置 OpenAI 兼容 API，用于角色生成和地图绘制。
+                    <p style="color:var(--dnd-text-dim);font-size:13px;margin-bottom:15px;">
+                        可在插件自定义 API 与神数据库 AI 调用之间切换。角色创建与地图生成会使用这里选定的方案。
                     </p>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 地址 (URL)</label>
-                        <input type="text" id="dnd-set-api-url" value="${apiConfig.url || ''}" placeholder="https://api.openai.com/v1" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                    </div>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 密钥 (Key)</label>
-                        <input type="password" id="dnd-set-api-key" value="${apiConfig.key || ''}" placeholder="sk-..." style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                    </div>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">模型名称 (Model)</label>
-                        <div style="display:flex;gap:10px;">
-                            <input type="text" id="dnd-set-api-model" value="${apiConfig.model || ''}" placeholder="gpt-3.5-turbo" style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                            <button type="button" id="dnd-set-fetch-models" style="padding:0 15px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;">获取列表</button>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">AI 调用方案</label>
+                        <select id="dnd-ai-provider" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                            <option value="plugin" ${aiProvider === 'plugin' ? 'selected' : ''}>插件自定义 API</option>
+                            <option value="database" ${aiProvider === 'database' ? 'selected' : ''}>神数据库 AI 调用</option>
+                        </select>
+                        <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:6px;">
+                            选择"神数据库 AI 调用"后，将直接使用数据库插件的 <code>callAI()</code> 能力，而不是插件内单独配置的 URL / Key / Model。
                         </div>
-                        <!-- 模型下拉列表容器 -->
-                        <div id="dnd-model-list-container" style="display:none;margin-top:5px;">
-                            <select id="dnd-set-model-select" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                                <option value="">-- 选择模型 --</option>
-                            </select>
+                    </div>
+
+                    <div id="dnd-db-ai-config-group" style="display:${aiProvider === 'database' ? 'block' : 'none'};margin-bottom:15px;padding:12px;border-radius:6px;border:1px solid var(--dnd-border-subtle);background:var(--dnd-bg-secondary);">
+                        <div style="font-weight:bold;color:var(--dnd-text-header);margin-bottom:8px;">神数据库 AI 状态</div>
+                        <div style="font-size:12px;color:var(--dnd-text-main);line-height:1.7;">
+                            <div>AI 调用接口：<span style="color:${dbAiStatus.available ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};font-weight:bold;">${dbAiStatus.available ? '已检测到' : '未检测到'}</span></div>
+                            <div>已检测到 API 预设：${dbAiStatus.presetCount} 个</div>
+                            <div>当前填表预设：${dbAiStatus.tablePreset || '使用数据库当前配置'}</div>
+                            <div>当前剧情预设：${dbAiStatus.plotPreset || '使用数据库当前配置'}</div>
+                        </div>
+                        <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:8px;line-height:1.6;">
+                            这里显示的是数据库 AI 接口是否已暴露给前端；具体的 API URL、模型与预设切换，请在神数据库插件内部完成配置。
+                        </div>
+                    </div>
+                    
+                    <div id="dnd-plugin-api-config-group" style="opacity:${aiProvider === 'plugin' ? 1 : 0.45};pointer-events:${aiProvider === 'plugin' ? 'auto' : 'none'};transition:all 0.25s;">
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 地址 (URL)</label>
+                            <input type="text" id="dnd-set-api-url" value="${apiConfig.url || ''}" placeholder="https://api.openai.com/v1" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                        </div>
+                        
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 密钥 (Key)</label>
+                            <input type="password" id="dnd-set-api-key" value="${apiConfig.key || ''}" placeholder="sk-..." style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                        </div>
+                        
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">模型名称 (Model)</label>
+                            <div style="display:flex;gap:10px;">
+                                <input type="text" id="dnd-set-api-model" value="${apiConfig.model || ''}" placeholder="gpt-3.5-turbo" style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                                <button type="button" id="dnd-set-fetch-models" style="padding:0 15px;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;">获取列表</button>
+                            </div>
+                            <!-- 模型下拉列表容器 -->
+                            <div id="dnd-model-list-container" style="display:none;margin-top:5px;">
+                                <select id="dnd-set-model-select" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                                    <option value="">-- 选择模型 --</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- 表格管理设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-clipboard-list"></i> 表格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         自定义表格管理模块的布局和显示内容。
@@ -35618,7 +38409,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">每行按钮数</label>
-                        <select id="dnd-tm-cols-setting" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                        <select id="dnd-tm-cols-setting" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                             <option value="auto" ${savedTmCols === 'auto' ? 'selected' : ''}>自动 (Auto)</option>
                             <option value="2" ${savedTmCols == 2 ? 'selected' : ''}>2 列</option>
                             <option value="3" ${savedTmCols == 3 ? 'selected' : ''}>3 列</option>
@@ -35629,22 +38420,22 @@ ${JSON.stringify(state.characterData, null, 2)}
 
                     <div style="margin-bottom:10px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">可见表格</label>
-                        <div style="background:rgba(0,0,0,0.2);border:1px solid #444;border-radius:4px;padding:10px;max-height:150px;overflow-y:auto;">
+                        <div style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);border-radius:4px;padding:10px;max-height:150px;overflow-y:auto;">
                             ${tables.length > 0 ? tables.map(k => {
                                 const name = allData[k].name || k;
                                 const isChecked = !hiddenTables.includes(k);
                                 return `
                                     <label style="display:flex;align-items:center;margin-bottom:5px;cursor:pointer;">
                                         <input type="checkbox" class="dnd-tm-visible-check" value="${k}" ${isChecked ? 'checked' : ''} style="margin-right:8px;">
-                                        <span style="color:#ccc;font-size:12px;">${name}</span>
+                                        <span style="color:var(--dnd-text-main);font-size:12px;">${name}</span>
                                     </label>
                                 `;
-                            }).join('') : '<div style="color:#666;font-size:12px;">暂无可用表格</div>'}
+                            }).join('') : '<div style="color:var(--dnd-text-dim);font-size:12px;">暂无可用表格</div>'}
                         </div>
                     </div>
                 </div>
 
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">🔁 自动预设切换</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:20px;">
                         根据游戏内的战斗状态（全局状态表中的"战斗模式"字段），自动切换酒馆的 Plot/World Info 预设。
@@ -35661,20 +38452,20 @@ ${JSON.stringify(state.characterData, null, 2)}
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.SWORD} 战斗状态预设</label>
                             <div style="display:flex;gap:10px;">
-                                <select id="dnd-cfg-combat-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <select id="dnd-cfg-combat-sel" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.COMBAT_PRESET)}
                                 </select>
-                                <input type="text" id="dnd-cfg-combat-input" value="${config.COMBAT_PRESET}" placeholder="预设名称" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <input type="text" id="dnd-cfg-combat-input" value="${config.COMBAT_PRESET}" placeholder="预设名称" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                             </div>
                         </div>
                         
                         <div style="margin-bottom:20px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.COMPASS} 探索状态预设</label>
                             <div style="display:flex;gap:10px;">
-                                <select id="dnd-cfg-explore-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <select id="dnd-cfg-explore-sel" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.EXPLORE_PRESET)}
                                 </select>
-                                <input type="text" id="dnd-cfg-explore-input" value="${config.EXPLORE_PRESET}" placeholder="预设名称" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <input type="text" id="dnd-cfg-explore-input" value="${config.EXPLORE_PRESET}" placeholder="预设名称" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                             </div>
                         </div>
                     </div>
@@ -35704,7 +38495,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 </div>
 
                 <!-- 存储诊断工具 -->
-                <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                <div style="margin-top:20px;background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-database"></i> 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
@@ -35828,6 +38619,19 @@ ${JSON.stringify(state.characterData, null, 2)}
             $btn.prop('disabled', false).css('opacity', 1);
         });
 
+        // 手动导入模板
+        $c.find('#dnd-template-import').on('click', async function(e) {
+            if (e) e.preventDefault();
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 处理中');
+            try {
+                await TemplateSync.manualImport();
+            } finally {
+                $btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+
         // 绑定刷新按钮 (API)
         $c.find('#dnd-set-fetch-models').on('click', async function(e) {
             if(e) e.preventDefault();
@@ -35869,6 +38673,23 @@ ${JSON.stringify(state.characterData, null, 2)}
             const val = $(this).val();
             if (val) {
                 $c.find('#dnd-set-api-model').val(val);
+            }
+        });
+
+        const updateAIProviderUI = () => {
+            const provider = $c.find('#dnd-ai-provider').val();
+            const isPlugin = provider === 'plugin';
+            $c.find('#dnd-plugin-api-config-group').css({
+                opacity: isPlugin ? 1 : 0.45,
+                pointerEvents: isPlugin ? 'auto' : 'none'
+            });
+            $c.find('#dnd-db-ai-config-group').css('display', isPlugin ? 'none' : 'block');
+        };
+
+        $c.find('#dnd-ai-provider').on('change', function() {
+            updateAIProviderUI();
+            if ($(this).val() === 'database' && !TavernAPI.getDatabaseAIStatus().available) {
+                NotificationSystem.warning('已切换到神数据库 AI 模式，但当前数据库插件还未检测到 callAI() 接口。保存前请确认数据库插件已更新。');
             }
         });
 
@@ -35935,6 +38756,32 @@ ${JSON.stringify(state.characterData, null, 2)}
             const checked = $(this).prop('checked');
             await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP, checked);
             NotificationSystem.notify(checked ? '已启用行动选项换行' : '已禁用行动选项换行', { type: 'success', duration: 2000 });
+        });
+
+        // 迷你地图显示设置
+        $c.find('#dnd-show-mini-map').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, checked);
+            NotificationSystem.notify(checked ? '已显示迷你地图' : '已隐藏迷你地图', { type: 'success', duration: 2000 });
+            
+            // 如果当前在 mini 状态，立即重新渲染 HUD
+            const { window: coreWin } = getCore();
+            if (coreWin.DND_Dashboard_UI && coreWin.DND_Dashboard_UI.state === 'mini') {
+                coreWin.DND_Dashboard_UI.renderHUD();
+            }
+        });
+
+        // 隐藏浮动球设置
+        $c.find('#dnd-hide-floating-ball').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, checked);
+            NotificationSystem.notify(checked ? '已隐藏浮动球' : '已显示浮动球', { type: 'success', duration: 2000 });
+            
+            // 立即应用设置
+            const { window: coreWin } = getCore();
+            if (coreWin.DND_Dashboard_UI) {
+                coreWin.DND_Dashboard_UI.applyFloatingBallVisibility();
+            }
         });
 
         // 配色模板设置
@@ -36092,8 +38939,8 @@ ${JSON.stringify(state.characterData, null, 2)}
                     $(this)
                         .toggleClass('active', isActive)
                         .css({
-                            background: isActive ? 'rgba(157, 139, 108, 0.2)' : 'rgba(0,0,0,0.3)',
-                            borderColor: isActive ? 'var(--dnd-border-gold)' : '#444'
+                            background: isActive ? 'var(--dnd-selected-bg)' : 'var(--dnd-bg-card)',
+                            borderColor: isActive ? 'var(--dnd-border-gold)' : 'var(--dnd-border-subtle)'
                         })
                         .find('div:first').nextAll('div:first').css({
                             color: isActive ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'
@@ -36124,7 +38971,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         }).on('mouseleave', function() {
             if (!$(this).hasClass('active')) {
                 $(this).css({
-                    borderColor: '#444',
+                    borderColor: 'var(--dnd-border-subtle)',
                     transform: 'translateY(0)'
                 });
             }
@@ -36252,7 +39099,12 @@ ${JSON.stringify(state.characterData, null, 2)}
             
             // 0. 保存缩放设置
             const scaleVal = $c.find('#dnd-set-ui-scale').val();
-            safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+            await safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+
+            // 0.1 保存界面显示开关
+            await safeSave(CONFIG.STORAGE_KEYS.OPTION_WRAP, $c.find('#dnd-option-wrap').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, $c.find('#dnd-show-mini-map').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, $c.find('#dnd-hide-floating-ball').prop('checked'));
 
             // 0.5 保存配色设置
             if ($customColorEnabled.prop('checked')) {
@@ -36263,7 +39115,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 await ThemeManager.saveCustom(customVars);
             } else {
                 const themeId = $themePreset.val();
-                safeSave(CONFIG.STORAGE_KEYS.THEME, themeId);
+                await safeSave(CONFIG.STORAGE_KEYS.THEME, themeId);
             }
 
             // 1. 保存动态背景配置
@@ -36273,7 +39125,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 intensity: parseFloat($c.find('#dnd-bg-intensity').val())
             };
             Object.assign(CONFIG.DYNAMIC_BG, newBgConfig);
-            safeSave(CONFIG.STORAGE_KEYS.DYNAMIC_BG, JSON.stringify(newBgConfig));
+            await safeSave(CONFIG.STORAGE_KEYS.DYNAMIC_BG, JSON.stringify(newBgConfig));
 
             // 2. 保存预设配置
             const newConfig = {
@@ -36283,10 +39135,17 @@ ${JSON.stringify(state.characterData, null, 2)}
             };
             
             Object.assign(CONFIG.PRESET_SWITCHING, newConfig);
-            safeSave(CONFIG.STORAGE_KEYS.PRESET_CONFIG, newConfig);
+            await safeSave(CONFIG.STORAGE_KEYS.PRESET_CONFIG, newConfig);
             
             // 3. 保存 API 配置
+            const selectedProvider = $c.find('#dnd-ai-provider').val();
+            if (selectedProvider === 'database' && !TavernAPI.getDatabaseAIStatus().available) {
+                NotificationSystem.error('当前数据库插件未提供 callAI() 接口，请先更新数据库插件后再切换到神数据库 AI。');
+                return;
+            }
+
             const newApiConfig = {
+                provider: selectedProvider,
                 url: $c.find('#dnd-set-api-url').val().trim(),
                 key: $c.find('#dnd-set-api-key').val().trim(),
                 model: $c.find('#dnd-set-api-model').val().trim()
@@ -36305,6 +39164,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             
             // 通知全局更新
             $(document).trigger('dnd:settings-changed');
+            await UICore.applyFloatingBallVisibility();
 
             // 视觉反馈
             const $btn = $(this);
@@ -36343,7 +39203,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         // 所以我们只传递 ID，然后在 showItemDetail 中重新查找
         // 或者将对象存储在 DOM data 属性中
         const isEquipped = item['已装备'] === '是' || item['已装备'] === true || String(item['已装备']).toLowerCase() === 'true';
-        const bg = isEquippedHighlight ? 'background:rgba(197, 160, 89, 0.1);border-color:var(--dnd-border-gold);' : '';
+        const bg = isEquippedHighlight ? 'background:var(--dnd-selected-bg);border-color:var(--dnd-border-gold);' : '';
         
         // 使用 data-item-id 存储 ID，避免 onclick 传递复杂对象
         const itemId = item['物品ID'] || item['物品名称'];
@@ -36357,7 +39217,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         // 生成 HTML
         return `
-            <div style="background:rgba(255,255,255,0.03);padding:10px;border:1px solid var(--dnd-border-inner);border-radius:4px;position:relative;cursor:pointer;animation-delay:${delay}s;${bg}"
+            <div style="background:var(--dnd-bg-secondary);padding:10px;border:1px solid var(--dnd-border-inner);border-radius:4px;position:relative;cursor:pointer;animation-delay:${delay}s;${bg}"
                 class="dnd-item-card dnd-anim-entry dnd-clickable"
                 onclick="window.DND_Dashboard_UI.showItemDetail('${safeId}', event)">
                 <div style="font-weight:bold;color:${isEquipped ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -36367,7 +39227,7 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 ${damage ? `<div class="dnd-item-damage"><i class="fa-solid fa-gavel"></i> ${damage}</div>` : ''}
 
-                <div style="font-size:12px;color:#888;display:flex;justify-content:space-between;margin-top:4px;">
+                <div style="font-size:12px;color:var(--dnd-text-dim);display:flex;justify-content:space-between;margin-top:4px;">
                     <span>x${item['数量']}</span>
                     <span>${item['价值'] || '-'}</span>
                 </div>
@@ -36377,8 +39237,8 @@ ${JSON.stringify(state.characterData, null, 2)}
                 <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px;">
                     <div class="dnd-item-rarity rarity-${rarity.toLowerCase()}">${rarity}</div>
                     <div style="display:flex;flex-direction:column;align-items:flex-end;">
-                        ${owner ? `<div style="font-size:10px;color:var(--dnd-accent-blue);background:rgba(44, 76, 138, 0.2);padding:1px 4px;border-radius:2px;margin-bottom:2px;"><i class="fa-solid fa-user"></i> ${owner}</div>` : ''}
-                        ${item['重量'] ? `<div style="font-size:11px;color:#666;">${item['重量']} lb</div>` : ''}
+                        ${owner ? `<div style="font-size:10px;color:var(--dnd-text-highlight);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;margin-bottom:2px;"><i class="fa-solid fa-user"></i> ${owner}</div>` : ''}
+                        ${item['重量'] ? `<div style="font-size:11px;color:var(--dnd-text-dim);">${item['重量']} lb</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -36433,14 +39293,14 @@ ${JSON.stringify(state.characterData, null, 2)}
                 ${isEquipped ? '<span style="font-size:12px;background:var(--dnd-accent-green);color:#fff;padding:2px 6px;border-radius:4px;">已装备</span>' : ''}
             </div>
             
-            <div style="margin-bottom:15px;background:rgba(255,255,255,0.05);padding:10px;border-radius:4px;font-size:12px;">
+            <div style="margin-bottom:15px;background:var(--dnd-bg-secondary);padding:10px;border-radius:4px;font-size:12px;">
                 ${detailHtml}
             </div>
             
-            <div style="line-height:1.6;color:#ccc;font-size:13px;">
+            <div style="line-height:1.6;color:var(--dnd-text-main);font-size:13px;">
                 ${item['描述'] || '暂无描述'}
             </div>
-            <div style="margin-top:15px;font-size:10px;color:#666;text-align:right;">ID: ${item['物品ID'] || '-'}</div>
+            <div style="margin-top:15px;font-size:10px;color:var(--dnd-text-dim);text-align:right;">ID: ${item['物品ID'] || '-'}</div>
         `;
         
         const { window: coreWin } = getCore();
@@ -36471,7 +39331,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         }
 
         // 添加关闭按钮到内容顶部
-        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
+        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:var(--dnd-text-dim);font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='var(--dnd-bg-tertiary)'" onmouseout="this.style.color='var(--dnd-text-dim)';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
         $popup.html(closeBtn + '<div style="padding-right:20px;">' + contentHtml + '</div>');
         
         // 使用 coreWin 获取正确的窗口尺寸（兼容 iframe）
@@ -36607,13 +39467,13 @@ ${JSON.stringify(state.characterData, null, 2)}
         ];
         
         let html = `<div style="display:flex;flex-direction:column;gap:5px;">`;
-        html += `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
+        html += `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:5px;">
             ${fullItem['物品名称']}
             ${isEquipped ? '<span style="font-size:10px;background:var(--dnd-accent-green);color:#fff;padding:1px 4px;border-radius:3px;margin-left:5px;">已装备</span>' : ''}
         </div>`;
         
         // 显示简要信息
-        html += `<div style="font-size:11px;color:#888;margin-bottom:5px;padding:4px 6px;background:rgba(0,0,0,0.2);border-radius:3px;">
+        html += `<div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:5px;padding:4px 6px;background:var(--dnd-bg-tertiary);border-radius:3px;">
             <div>类别: ${fullItem['类别'] || '-'} | 数量: ${fullItem['数量'] || 1}</div>
             ${fullItem['价值'] ? `<div>价值: ${fullItem['价值']}</div>` : ''}
         </div>`;
@@ -36621,7 +39481,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         // Description with collapse/expand
         const desc = fullItem['描述'] || '暂无描述';
         html += `
-            <div style="font-size:12px;color:#ccc;line-height:1.5;margin-bottom:8px;padding:5px;background:rgba(0,0,0,0.2);border-radius:4px;border-left:2px solid #555;cursor:pointer;max-height:60px;overflow:hidden;transition:max-height 0.3s ease-out;text-overflow:ellipsis;"
+            <div style="font-size:12px;color:var(--dnd-text-main);line-height:1.5;margin-bottom:8px;padding:5px;background:var(--dnd-bg-secondary);border-radius:4px;border-left:2px solid var(--dnd-border-inner);cursor:pointer;max-height:60px;overflow:hidden;transition:max-height 0.3s ease-out;text-overflow:ellipsis;"
                 onclick="this.style.maxHeight = this.style.maxHeight==='60px' ? '500px' : '60px'"
                 title="点击展开/收起">
                 ${desc}
@@ -36630,9 +39490,9 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         actions.forEach(act => {
             html += `
-                <div style="cursor:pointer;padding:6px 10px;border-radius:4px;display:flex;align-items:center;gap:8px;font-size:13px;" 
-                    onmouseover="this.style.background='rgba(255,255,255,0.1)'" 
-                    onmouseout="this.style.background='transparent'"
+                    <div style="cursor:pointer;padding:6px 10px;border-radius:4px;display:flex;align-items:center;gap:8px;font-size:13px;" 
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'" 
+                        onmouseout="this.style.background='transparent'"
                     onclick="window.DND_Dashboard_UI.handleItemAction('${itemId}', '${act.action}', ${fullItem['数量'] || 1})">
                     <span>${act.icon}</span> <span>${act.label}</span>
                 </div>
@@ -36686,7 +39546,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         const items = DataManager.getTable('ITEM_Inventory');
         
         if (!items || items.length === 0) {
-            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-text-dim);">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -36701,14 +39561,14 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
             <span>${ICONS.BACKPACK} 背包物品</span>
-            <span style="font-size:11px;color:#888;">${backpackItems.length} 件</span>
+            <span style="font-size:11px;color:var(--dnd-text-dim);">${backpackItems.length} 件</span>
         </div>`;
 
         // 搜索和筛选
         html += `
             <div style="display:flex;gap:5px;margin-bottom:10px;">
-                <input type="text" id="dnd-inv-search" placeholder="搜索物品..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterInventory()">
-                <select id="dnd-inv-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterInventory()">
+                <input type="text" id="dnd-inv-search" placeholder="搜索物品..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterInventory()">
+                <select id="dnd-inv-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterInventory()">
                     <option value="">全部分类</option>
                     ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
                 </select>
@@ -36718,22 +39578,22 @@ ${JSON.stringify(state.characterData, null, 2)}
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;" id="dnd-inv-list">`;
         
         if (backpackItems.length === 0) {
-            html += `<div style="color:#666;text-align:center;padding:10px;">背包中没有未装备的物品</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">背包中没有未装备的物品</div>`;
         } else {
             backpackItems.forEach(item => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 const safeId = (itemId || '').replace(/'/g, "\\'");
                 const category = item['类别'] || '杂物';
                 html += `
-                    <div class="dnd-inv-list-item" data-name="${item['物品名称']}" data-category="${category}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid var(--dnd-border-inner);border-radius:4px;cursor:pointer;font-size:12px;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.1)'"
-                        onmouseout="this.style.background='rgba(255,255,255,0.03)'"
+                    <div class="dnd-inv-list-item" data-name="${item['物品名称']}" data-category="${category}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);border-radius:4px;cursor:pointer;font-size:12px;"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
+                        onmouseout="this.style.background='var(--dnd-bg-secondary)'"
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:flex;flex-direction:column;">
                             <span>${item['物品名称']}</span>
-                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
+                            <span style="font-size:10px;color:var(--dnd-text-dim);">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
                         </div>
-                        <span style="color:#888;flex-shrink:0;">x${item['数量']}</span>
+                        <span style="color:var(--dnd-text-dim);flex-shrink:0;">x${item['数量']}</span>
                     </div>
                 `;
             });
@@ -36769,7 +39629,7 @@ ${JSON.stringify(state.characterData, null, 2)}
     showEquipmentPanel(event) {
         const items = DataManager.getTable('ITEM_Inventory');
         if (!items) {
-            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-text-dim);">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -36781,26 +39641,26 @@ ${JSON.stringify(state.characterData, null, 2)}
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
             <span>${ICONS.SWORD} 已装备</span>
-            <span style="font-size:11px;color:#888;">${equippedItems.length} 件</span>
+            <span style="font-size:11px;color:var(--dnd-text-dim);">${equippedItems.length} 件</span>
         </div>`;
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">`;
         
         if (equippedItems.length === 0) {
-            html += `<div style="color:#666;text-align:center;padding:10px;">尚未装备任何物品</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">尚未装备任何物品</div>`;
         } else {
             equippedItems.forEach(item => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 const safeId = (itemId || '').replace(/'/g, "\\'");
                 html += `
-                    <div class="dnd-inv-list-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(197, 160, 89, 0.1);border:1px solid var(--dnd-border-gold);border-radius:4px;cursor:pointer;font-size:12px;"
-                        onmouseover="this.style.background='rgba(197, 160, 89, 0.2)'"
-                        onmouseout="this.style.background='rgba(197, 160, 89, 0.1)'"
+                    <div class="dnd-inv-list-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--dnd-selected-bg);border:1px solid var(--dnd-border-gold);border-radius:4px;cursor:pointer;font-size:12px;"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
+                        onmouseout="this.style.background='var(--dnd-selected-bg)'"
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="display:flex;flex-direction:column;overflow:hidden;max-width:180px;">
                             <span style="color:var(--dnd-text-highlight);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><i class="fa-solid fa-shield-halved"></i> ${item['物品名称']}</span>
                             ${item['所属人'] ? `<span style="font-size:10px;color:var(--dnd-accent-blue);"><i class="fa-solid fa-user"></i> ${item['所属人']}</span>` : ''}
                         </div>
-                        <span style="color:#888;flex-shrink:0;">${item['类别'] || '-'}</span>
+                        <span style="color:var(--dnd-text-dim);flex-shrink:0;">${item['类别'] || '-'}</span>
                     </div>
                 `;
             });
@@ -36816,9 +39676,9 @@ ${JSON.stringify(state.characterData, null, 2)}
         if (!factions || factions.length === 0) return;
         
         let html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                 <span>🏛️ 势力与声望</span>
-                <span style="font-size:11px;color:#888;">${factions.length} 个势力</span>
+                <span style="font-size:11px;color:var(--dnd-text-dim);">${factions.length} 个势力</span>
             </div>
             <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
         `;
@@ -36826,7 +39686,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         factions.forEach(f => {
             const relation = parseInt(f['关系等级']) || 0;
             let icon = '<i class="fa-solid fa-scale-balanced"></i>';
-            let color = '#ccc';
+            let color = 'var(--dnd-text-dim)';
             let statusText = '中立';
             let percent = 50; // 中立默认 50%
             
@@ -36859,15 +39719,15 @@ ${JSON.stringify(state.characterData, null, 2)}
             const typeIcon = typeIcons[factionType] || typeIcons['其他'];
             
             html += `
-                <div class="dnd-faction-item" style="padding:10px;background:rgba(30,30,30,0.8);border:1px solid rgba(197,160,89,0.3);border-radius:6px;">
+                <div class="dnd-faction-item" style="padding:10px;background:var(--dnd-bg-card);border:1px solid var(--dnd-border-inner);border-radius:6px;">
                     <!-- 势力标题行 -->
                     <div class="dnd-faction-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:${color};font-size:14px;font-weight:bold;">${icon} ${f['势力名称']}</span>
-                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
+                        <span style="font-size:11px;background:var(--dnd-bg-tertiary);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
                     </div>
                     
                     <!-- 势力类型和领袖 -->
-                    <div style="display:flex;gap:12px;font-size:11px;color:#aaa;margin-top:6px;flex-wrap:wrap;">
+                    <div style="display:flex;gap:12px;font-size:11px;color:var(--dnd-text-dim);margin-top:6px;flex-wrap:wrap;">
                         <span title="势力类型">${typeIcon} ${factionType}</span>
                         ${f['势力领袖'] ? `<span title="势力领袖"><i class="fa-solid fa-user-tie"></i> ${f['势力领袖']}</span>` : ''}
                         ${f['势力总部'] ? `<span title="势力总部"><i class="fa-solid fa-location-dot"></i> ${f['势力总部']}</span>` : ''}
@@ -36875,28 +39735,28 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <!-- 势力宗旨 -->
                     ${f['势力宗旨'] ? `
-                    <div style="font-size:11px;color:#c5a059;margin-top:6px;padding:4px 8px;background:rgba(197,160,89,0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                    <div style="font-size:11px;color:var(--dnd-text-highlight);margin-top:6px;padding:4px 8px;background:var(--dnd-selected-bg);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
                         <i class="fa-solid fa-scroll"></i> ${f['势力宗旨']}
                     </div>
                     ` : ''}
                     
                     <!-- 势力描述 -->
-                    <div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.4;">
+                    <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:6px;line-height:1.4;">
                         ${f['势力描述'] || '暂无描述'}
                     </div>
                     
                     <!-- 声望条 -->
-                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--dnd-text-dim);margin-top:8px;">
                         <span>声望: ${repVal}</span>
-                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:var(--dnd-bg-tertiary);border-radius:3px;overflow:hidden;">
                             <div class="dnd-faction-rep-fill" style="width:${percent}%;height:100%;background:${color};transition:width 0.3s;"></div>
                         </div>
                     </div>
                     
                     <!-- 主角在势力中的信息 -->
                     ${(f['主角头衔'] || f['特权/通缉']) ? `
-                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
-                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);">
+                        <div style="font-size:10px;color:var(--dnd-text-dim);margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
                         <div style="display:flex;gap:10px;font-size:11px;flex-wrap:wrap;">
                             ${f['主角头衔'] ? `<span style="color:var(--dnd-text-highlight);"><i class="fa-solid fa-medal"></i> ${f['主角头衔']}</span>` : ''}
                             ${f['特权/通缉'] ? `<span style="color:${relation >= 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};"><i class="fa-solid fa-scroll"></i> ${f['特权/通缉']}</span>` : ''}
@@ -36906,9 +39766,9 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                     <!-- 关键事件 -->
                     ${f['关键事件'] ? `
-                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
-                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
-                        <div style="font-size:11px;color:#bbb;line-height:1.4;">${f['关键事件']}</div>
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);">
+                        <div style="font-size:10px;color:var(--dnd-text-dim);margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
+                        <div style="font-size:11px;color:var(--dnd-text-main);line-height:1.4;">${f['关键事件']}</div>
                     </div>
                     ` : ''}
                 </div>
@@ -36924,7 +39784,7 @@ ${JSON.stringify(state.characterData, null, 2)}
     showQuestTooltip(quest, x, y) {
         Logger.info('showQuestTooltip 被调用', quest['任务名称']);
         
-        const statusColor = quest['状态'] === '已完成' ? '#3a6b4a' : (quest['状态'] === '已失败' ? '#8a2c2c' : '#c5a059');
+        const statusColor = quest['状态'] === '已完成' ? 'var(--dnd-accent-green)' : (quest['状态'] === '已失败' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-highlight)');
         
         const html = `
             <div style="border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:var(--dnd-text-highlight);font-size:16px;display:flex;justify-content:space-between;align-items:center;">
@@ -36932,24 +39792,24 @@ ${JSON.stringify(state.characterData, null, 2)}
                 <span style="font-size:11px;background:${statusColor};color:#fff;padding:2px 6px;border-radius:4px;">${quest['状态'] || '进行中'}</span>
             </div>
             
-            <div style="font-size:13px;line-height:1.5;margin-bottom:15px;color:#ccc;">
+            <div style="font-size:13px;line-height:1.5;margin-bottom:15px;color:var(--dnd-text-main);">
                 ${quest['目标描述'] || '暂无描述'}
             </div>
             
             ${quest['当前进度'] ? `
-            <div style="margin-bottom:10px;padding:6px 8px;background:rgba(197, 160, 89, 0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
-                <div style="font-size:11px;color:#888;margin-bottom:2px;">当前进度</div>
+            <div style="margin-bottom:10px;padding:6px 8px;background:var(--dnd-bg-tertiary);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:2px;">当前进度</div>
                 <div style="font-size:12px;color:var(--dnd-text-main);">${quest['当前进度']}</div>
             </div>` : ''}
             
-            <div style="font-size:12px;color:#aaa;background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;">
+            <div style="font-size:12px;color:var(--dnd-text-dim);background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
                     <div><strong>发布者:</strong> ${quest['发布者']||'-'}</div>
                     <div><strong>类型:</strong> ${quest['类型']||'-'}</div>
                     <div><strong>时限:</strong> ${quest['时限']||'无限制'}</div>
                     <div><strong>难度:</strong> ${quest['难度']||'-'}</div>
                 </div>
-                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #444;color:var(--dnd-text-highlight);">
+                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);color:var(--dnd-text-highlight);">
                     <strong>${ICONS.TROPHY} 奖励:</strong> ${quest['奖励']||'-'}
                 </div>
             </div>
@@ -37124,8 +39984,8 @@ ${JSON.stringify(state.characterData, null, 2)}
             return;
         }
         
-        let html = `<div class="dnd-resource-consumption" style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;border:1px dashed rgba(255,255,255,0.1);">
-            <div style="font-size:11px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+        let html = `<div class="dnd-resource-consumption" style="margin-top:10px;padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;border:1px dashed var(--dnd-border-subtle);">
+            <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
                 <span><i class="fa-solid fa-bolt"></i> 本场战斗消耗</span>
                 <span class="dnd-clickable" style="cursor:pointer;color:var(--dnd-text-dim);font-size:14px;line-height:1;" title="重置统计" onclick="window.DND_Dashboard_UI.initResourceTracker(); window.DND_Dashboard_UI.renderHUD();"><i class="fa-solid fa-sync"></i></span>
             </div>`;
@@ -37133,7 +39993,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         if (hasSlots) {
             html += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px;">`;
             for (const [level, used] of Object.entries(consumption.spellSlots)) {
-                html += `<span style="font-size:10px;color:#e74c3c;background:rgba(231, 76, 60, 0.1);padding:1px 4px;border-radius:2px;">${level}: -${used}</span>`;
+                html += `<span style="font-size:10px;color:var(--dnd-accent-red);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;">${level}: -${used}</span>`;
             }
             html += `</div>`;
         }
@@ -37141,7 +40001,7 @@ ${JSON.stringify(state.characterData, null, 2)}
         if (hasRes) {
             html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">`;
             for (const [name, used] of Object.entries(consumption.classResources)) {
-                html += `<span style="font-size:10px;color:#e67e22;background:rgba(230, 126, 34, 0.1);padding:1px 4px;border-radius:2px;">${name}: -${used}</span>`;
+                html += `<span style="font-size:10px;color:var(--dnd-text-highlight);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;">${name}: -${used}</span>`;
             }
             html += `</div>`;
         }
@@ -37244,8 +40104,8 @@ ${JSON.stringify(state.characterData, null, 2)}
                 
                 // 样式处理
                 const style = isDisabled
-                    ? "background:rgba(0,0,0,0.3);border:1px solid #333;color:#666;padding:8px;border-radius:4px;cursor:not-allowed;"
-                    : "background:rgba(255,255,255,0.05);border:1px solid #555;color:#ccc;padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;";
+                    ? "background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-dim);padding:8px;border-radius:4px;cursor:not-allowed;"
+                    : "background:var(--dnd-bg-input);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;";
                 
                 const action = isDisabled
                     ? ""
@@ -37253,11 +40113,11 @@ ${JSON.stringify(state.characterData, null, 2)}
                     
                 const mouseOver = isDisabled
                     ? ""
-                    : `onmouseover="this.style.borderColor='var(--dnd-border-gold)';this.style.color='#fff';this.style.background='rgba(255,255,255,0.1)'"`;
+                    : `onmouseover="this.style.borderColor='var(--dnd-border-gold)';this.style.color='var(--dnd-text-highlight)';this.style.background='var(--dnd-bg-tertiary)'"`;
                     
                 const mouseOut = isDisabled
                     ? ""
-                    : `onmouseout="this.style.borderColor='#555';this.style.color='#ccc';this.style.background='rgba(255,255,255,0.05)'"`;
+                    : `onmouseout="this.style.borderColor='var(--dnd-border-inner)';this.style.color='var(--dnd-text-main)';this.style.background='var(--dnd-bg-input)'"`;
 
                 html += `
                     <button class="dnd-clickable" style="${style}" ${mouseOver} ${mouseOut} ${action}>
@@ -37437,33 +40297,33 @@ ${JSON.stringify(state.characterData, null, 2)}
         const html = `
             <div style="border-bottom:1px solid ${color};padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:${color};font-size:16px;display:flex;justify-content:space-between;">
                 <span>${unit['单位名称']}</span>
-                <span style="font-size:12px;background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;color:#fff;">${unit['阵营']}</span>
+                <span style="font-size:12px;background:var(--dnd-bg-tertiary);padding:2px 6px;border-radius:4px;color:var(--dnd-text-main);">${unit['阵营']}</span>
             </div>
             
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;font-size:13px;">
-                <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">
-                    <div style="color:#888;font-size:11px;">HP 状态</div>
-                    <div style="font-weight:bold;color:#fff;">${hpStr}</div>
+                <div style="background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
+                    <div style="color:var(--dnd-text-dim);font-size:11px;">HP 状态</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-main);">${hpStr}</div>
                 </div>
-                <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">
-                    <div style="color:#888;font-size:11px;">先攻 / 位置</div>
-                    <div style="font-weight:bold;color:#fff;">${unit['先攻/位置'] || '-'}</div>
+                <div style="background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
+                    <div style="color:var(--dnd-text-dim);font-size:11px;">先攻 / 位置</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-main);">${unit['先攻/位置'] || '-'}</div>
                 </div>
             </div>
 
             <div style="margin-bottom:10px;">
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">防御 / 抗性</div>
-                <div style="color:#fff;font-size:13px;background:rgba(255,255,255,0.05);padding:5px;border-radius:3px;">${unit['防御/抗性'] || '无'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">防御 / 抗性</div>
+                <div style="color:var(--dnd-text-main);font-size:13px;background:var(--dnd-bg-input);padding:5px;border-radius:3px;">${unit['防御/抗性'] || '无'}</div>
             </div>
             
             <div style="margin-bottom:10px;">
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">附着状态</div>
-                <div style="color:#e6dcca;font-size:13px;background:rgba(255,255,255,0.05);padding:5px;border-radius:3px;">${unit['附着状态'] || '无'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">附着状态</div>
+                <div style="color:var(--dnd-text-header);font-size:13px;background:var(--dnd-bg-input);padding:5px;border-radius:3px;">${unit['附着状态'] || '无'}</div>
             </div>
 
             <div>
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">回合资源</div>
-                <div style="color:#ccc;font-size:12px;line-height:1.4;">${unit['回合资源'] || '-'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">回合资源</div>
+                <div style="color:var(--dnd-text-main);font-size:12px;line-height:1.4;">${unit['回合资源'] || '-'}</div>
             </div>
         `;
         
@@ -37493,7 +40353,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             // 尝试显示提示而不是直接退出
             const html = `<div style="padding:15px;text-align:center;">
                 <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']}</div>
-                <div style="color:#888;">该角色暂无已学习的技能或法术。</div>
+                <div style="color:var(--dnd-text-dim);">该角色暂无已学习的技能或法术。</div>
             </div>`;
             this.showItemDetailPopup(html, event.clientX, event.clientY);
             return;
@@ -37528,7 +40388,7 @@ ${JSON.stringify(state.characterData, null, 2)}
 
         if (skills) skills.forEach(s => processAbility(s));
         
-        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']} 的技能</div>`;
+        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']} 的技能</div>`;
         html += `<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">`;
         
         let hasSkills = false;
@@ -37536,7 +40396,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             if (grouped[type].length === 0) return;
             hasSkills = true;
             
-            html += `<div style="font-size:12px;color:#888;border-bottom:1px dashed #444;margin-top:5px;">${type}</div>`;
+            html += `<div style="font-size:12px;color:var(--dnd-text-dim);border-bottom:1px dashed var(--dnd-border-subtle);margin-top:5px;">${type}</div>`;
             grouped[type].forEach(s => {
                 const rawName = s._displayName || '未命名';
                 const safeName = rawName.replace(/'/g, "\\'").replace(/"/g, '"');
@@ -37557,17 +40417,17 @@ ${JSON.stringify(state.characterData, null, 2)}
                 }
                 
                 html += `
-                    <div class="dnd-clickable" style="padding:6px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
+                    <div class="dnd-clickable" style="padding:6px;background:var(--dnd-bg-input);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
                         onclick="${onClick}">
                         <span style="color:var(--dnd-text-main);">${icon} ${rawName}</span>
-                        <span style="font-size:10px;color:#aaa;">${s['射程']||'-'}</span>
+                        <span style="font-size:10px;color:var(--dnd-text-dim);">${s['射程']||'-'}</span>
                     </div>
                 `;
             });
         });
         
         if (!hasSkills) {
-            html += `<div style="color:#888;text-align:center;padding:10px;">无技能显示</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">无技能显示</div>`;
         }
 
         html += `</div>`;
@@ -37586,6 +40446,26 @@ ${JSON.stringify(state.characterData, null, 2)}
 
 
 const ExplorationMapManager = {
+    getAIRequestOptions: async (maxTokens = 4096) => {
+        const aiSettings = await SettingsManager.getAISettings();
+
+        if (aiSettings.provider === 'database') {
+            if (!TavernAPI.getDatabaseAIStatus().available) {
+                throw new Error('当前数据库 API 未提供 AI 调用能力，请先更新数据库插件或切回自定义 API');
+            }
+            return { maxTokens, useDatabaseAPI: true };
+        }
+
+        if (!aiSettings.apiConfig.url || !aiSettings.apiConfig.model) {
+            throw new Error('请先在设置中配置 API 地址和模型');
+        }
+
+        return {
+            maxTokens,
+            customConfig: aiSettings.apiConfig
+        };
+    },
+
     // Prompts
     prompts: {
         structure: (theme) => `你是一个资深DND地牢架构师。请根据主题设计一个紧凑、真实的地牢平面图结构。
@@ -37753,18 +40633,13 @@ ${structureJSON}
 
     // 2. Generate Structure (Step 1)
     generateStructure: async (locationName, description) => {
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         const theme = `${locationName}。${description || ''}`;
         const prompt = ExplorationMapManager.prompts.structure(theme);
+        const requestOptions = await ExplorationMapManager.getAIRequestOptions(4000);
         
         Logger.info('[ExplorationMap] Generating structure for:', locationName);
         
-        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], {
-            customConfig: apiConfig,
-            maxTokens: 4000
-        });
+        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], requestOptions);
 
         // Parse JSON
         let jsonStr = response;
@@ -37820,17 +40695,12 @@ ${structureJSON}
 
     // 3. Generate SVG (Step 2)
     generateSVG: async (locationName, structureJSON) => {
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         const prompt = ExplorationMapManager.prompts.svg(structureJSON);
+        const requestOptions = await ExplorationMapManager.getAIRequestOptions(8192);
         
         Logger.info('[ExplorationMap] Generating SVG for:', locationName);
         
-        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], {
-            customConfig: apiConfig,
-            maxTokens: 8192 // High tokens for SVG
-        });
+        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], requestOptions);
 
         // Extract SVG
         let svgContent = response;
@@ -37964,10 +40834,10 @@ ${structureJSON}
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
         }
 
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         try {
+            const structureRequestOptions = await ExplorationMapManager.getAIRequestOptions(2000);
+            const svgRequestOptions = await ExplorationMapManager.getAIRequestOptions(8192);
+
             // Step 1: Get Structure (From Table or Generate)
             let jsonStr = null;
             
@@ -37981,10 +40851,7 @@ ${structureJSON}
             if (!jsonStr) {
                 Logger.info('[BattleMap] Generating new structure for:', locationName);
                 const structurePrompt = ExplorationMapManager.prompts.battleStructure(locationName + " " + description, width, height);
-                const structureRes = await TavernAPI.generate([{ role: 'user', content: structurePrompt }], {
-                    customConfig: apiConfig,
-                    maxTokens: 2000
-                });
+                const structureRes = await TavernAPI.generate([{ role: 'user', content: structurePrompt }], structureRequestOptions);
                 
                 jsonStr = structureRes;
                 const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/) || jsonStr.match(/```\s*([\s\S]*?)\s*```/);
@@ -38002,10 +40869,7 @@ ${structureJSON}
             // Step 2: Generate SVG
             Logger.info('[BattleMap] Generating SVG...');
             const svgPrompt = ExplorationMapManager.prompts.battleSVG(jsonStr);
-            const svgRes = await TavernAPI.generate([{ role: 'user', content: svgPrompt }], {
-                customConfig: apiConfig,
-                maxTokens: 8192
-            });
+            const svgRes = await TavernAPI.generate([{ role: 'user', content: svgPrompt }], svgRequestOptions);
 
             let svgContent = svgRes;
             const codeBlockMatch = svgContent.match(/```(?:xml|svg|html)?\s*([\s\S]*?)\s*```/i);
@@ -38095,7 +40959,7 @@ ${structureJSON}
         
         // 缩放指示器
         if ($container.find('.dnd-map-zoom-indicator').length === 0) {
-            $container.append(`<div class="dnd-map-zoom-indicator" style="position:absolute;top:2px;right:4px;font-size:8px;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.4);padding:1px 3px;border-radius:2px;pointer-events:none;z-index:31;">100%</div>`);
+            $container.append(`<div class="dnd-map-zoom-indicator" style="position:absolute;top:2px;right:4px;font-size:8px;color:var(--dnd-text-dim);background:var(--dnd-bg-secondary);padding:1px 3px;border-radius:2px;pointer-events:none;z-index:31;">100%</div>`);
         }
         const updateIndicator = () => {
             $container.find('.dnd-map-zoom-indicator').text(`${Math.round(state.scale * 100)}%`);
@@ -38294,7 +41158,7 @@ ${structureJSON}
                 $el.empty();
                 $el.css({
                     position: 'relative',
-                    background: '#0a0a0c',
+                    background: 'var(--dnd-bg-main)',
                     overflow: 'hidden'
                 });
                 
@@ -38320,8 +41184,8 @@ ${structureJSON}
             const containerId = 'dnd-exploration-map-loader';
             // 如果内容为空，显示加载中
             if ($innerMap.is(':empty')) {
-                    $innerMap.html(`<div id="${containerId}" style="display:flex;align-items:center;justify-content:center;color:#666;flex-direction:column;gap:5px;">
-                    <div class="dnd-spinner" style="width:20px;height:20px;border:2px solid #333;border-top:2px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
+                    $innerMap.html(`<div id="${containerId}" style="display:flex;align-items:center;justify-content:center;color:var(--dnd-text-dim);flex-direction:column;gap:5px;">
+                    <div class="dnd-spinner" style="width:20px;height:20px;border:2px solid var(--dnd-border-subtle);border-top:2px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
                     <div style="font-size:10px;">加载地图...</div>
                 </div>`);
             }
@@ -38381,11 +41245,13 @@ ${structureJSON}
                         } catch(e) { console.warn('Auto-zoom failed', e); }
                     }, 50);
 
+                    const safeLocationArg = JSON.stringify(locationName);
+
                     // 添加控制层 (悬浮显示) - 添加到外层 $el
                     if ($el.find('.dnd-map-controls').length === 0) {
                         const overlayHtml = `
                             <div class="dnd-map-controls" style="position:absolute;top:5px;right:5px;display:flex;gap:5px;opacity:0;transition:opacity 0.2s;z-index:10;">
-                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
+                                <button type="button" onclick='window.DND_Dashboard_UI.regenerateMap(${safeLocationArg}, "svg")' title="保持结构重绘图片" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
                             </div>
                         `;
                         $el.append(overlayHtml);
@@ -38399,17 +41265,17 @@ ${structureJSON}
                 } else if (mapResult.type === 'error' && mapResult.message.includes('结构')) {
                     // 尚未生成
                         $innerMap.html(`
-                        <div style="text-align:center;color:#888;">
+                        <div style="text-align:center;color:var(--dnd-text-dim);">
                             <div style="font-size:24px;margin-bottom:5px;">${ICONS.MAP}</div>
                             <div style="font-size:10px;margin-bottom:10px;">${mapResult.message}</div>
                         </div>
                     `);
                 } else {
                         // 其他错误
-                        $innerMap.html(`<div style="color:#e74c3c;font-size:10px;padding:10px;text-align:center;">${mapResult.message}</div>`);
+                        $innerMap.html(`<div style="color:var(--dnd-accent-red);font-size:10px;padding:10px;text-align:center;">${mapResult.message}</div>`);
                 }
             } catch (e) {
-                $innerMap.html(`<div style="color:#e74c3c;font-size:10px;">加载错误: ${e.message}</div>`);
+                $innerMap.html(`<div style="color:var(--dnd-accent-red);font-size:10px;">加载错误: ${e.message}</div>`);
             }
             
             return;
@@ -38422,7 +41288,7 @@ ${structureJSON}
         const encounters = DataManager.getTable('COMBAT_Encounter');
         
         if (!mapData) {
-            $el.html('<div style="color:#666;display:flex;align-items:center;justify-content:center;height:100%;">无战斗数据</div>');
+            $el.html('<div style="color:var(--dnd-text-dim);display:flex;align-items:center;justify-content:center;height:100%;">无战斗数据</div>');
             return;
         }
 
@@ -38445,26 +41311,34 @@ ${structureJSON}
         const mapHeight = rows * cellSize;
         const offsetX = (containerSize - mapWidth) / 2;
         const offsetY = (containerSize - mapHeight) / 2;
+        const cachedCombatLocationName = $el.data('combat-location-name');
+        const combatLocationChanged = cachedCombatLocationName && cachedCombatLocationName !== locationName;
 
         // 2. 检查或初始化内部容器 (Static Layer)
         let $innerMap = $el.find('.dnd-minimap-inner');
         let needsFullRedraw = false;
 
-        // 如果尺寸变了，或者容器不存在，则全量重绘
+        // 如果尺寸或场景变了，或者容器不存在，则全量重绘
         if ($innerMap.length === 0 ||
             parseFloat($innerMap.data('cols')) !== cols ||
-            parseFloat($innerMap.data('rows')) !== rows) {
+            parseFloat($innerMap.data('rows')) !== rows ||
+            combatLocationChanged) {
             
             $el.empty(); // 彻底清空
             needsFullRedraw = true;
             
             $innerMap = $(`<div class="dnd-minimap-inner"
-                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:#1a1a1c;"
+                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:var(--dnd-bg-secondary);"
                 data-cell-size="${cellSize}" data-cols="${cols}" data-rows="${rows}"></div>`);
             $el.append($innerMap);
 
             // [新增] 战斗底图层 (Background Layer)
-            const bgId = `dnd-battle-bg-${locationName.replace(/\s+/g,'_')}`;
+            // [修复] 安全转义场景名称中的 CSS 选择器特殊字符，防止查询失败
+            const sanitizeId = (name) => {
+                // 移除或替换所有非安全字符，生成合法的 CSS ID
+                return 'bg-' + name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '-').replace(/^-+|-+$/g, '');
+            };
+            const bgId = sanitizeId(locationName);
             // 移除 opacity 限制，移除滤镜，确保亮度正常
             $innerMap.append(`<div id="${bgId}" class="dnd-battle-bg-container" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;"></div>`);
             
@@ -38474,21 +41348,23 @@ ${structureJSON}
                     const $bg = $innerMap.find(`#${bgId}`);
                     $bg.html(res.content);
                     // 强制 SVG 拉伸适应 Grid
-                    $bg.find('svg').css({
+                    const $svg = $bg.find('svg');
+                    $svg.attr('preserveAspectRatio', 'none');
+                    $svg.css({
                         width: '100%',
-                        height: '100%',
-                        preserveAspectRatio: 'none'
+                        height: '100%'
                         // 移除滤镜，防止过暗
                     });
                 }
             });
 
             // 绘制 Grid (SVG)
+            // [修复] 移除内联 opacity，使用 CSS 类控制；使用更明亮的边框颜色呈现透明线条效果
             const gridSvg = `
-                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;opacity:0.3;z-index:5;">
+                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5;">
                     <defs>
                         <pattern id="miniGrid" width="${cellSize}" height="${cellSize}" patternUnits="userSpaceOnUse">
-                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="var(--dnd-border-inner)" stroke-width="1"/>
                         </pattern>
                     </defs>
                     <rect width="100%" height="100%" fill="url(#miniGrid)"/>
@@ -38514,11 +41390,12 @@ ${structureJSON}
 
                 let el = '';
                 if (item['类型'] === 'Wall') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:#3a3a3a;border:1px solid #555;z-index:1;"></div>`;
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);z-index:1;"></div>`;
                 } else if (item['类型'] === 'Terrain') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(46, 204, 113, 0.2);border:1px dashed rgba(46, 204, 113, 0.4);z-index:0;"></div>`;
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:var(--dnd-bg-tertiary);border:1px dashed var(--dnd-accent-green);z-index:0;"></div>`;
                 } else if (item['类型'] === 'Zone') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(155, 89, 182, 0.25);border:2px solid rgba(155, 89, 182, 0.5);border-radius:50%;z-index:2;"></div>`;
+                    // [修复] 移除灰色填充，仅保留高亮边框作为透明区域指示
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:transparent;border:2px solid var(--dnd-text-highlight);border-radius:50%;z-index:2;"></div>`;
                 }
                 if (el) $innerMap.append(el);
             });
@@ -38550,23 +41427,26 @@ ${structureJSON}
 
             // 绑定缩放 (仅在创建时绑定一次)
             this.bindMapZoom($el, $innerMap);
+            $el.data('combat-location-name', locationName);
             
             // UI Overlay (Round Info + Controls)
+            const safeLocationArg = JSON.stringify(locationName);
             $el.append(`
                 <div class="dnd-hud-overlay" style="pointer-events:none;z-index:30;">
-                    <div style="position:absolute;top:2px;left:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">A1</div>
-                    <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">${String.fromCharCode(64 + Math.min(cols, 26))}${rows}</div>
-                    <div id="dnd-map-round-info" style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--dnd-text-highlight);background:rgba(0,0,0,0.5);padding:0 4px;border-radius:2px;">第 ${round} 回合</div>
+                    <div style="position:absolute;top:2px;left:4px;font-size:9px;color:var(--dnd-text-dim);text-shadow:1px 1px 2px var(--dnd-bg-main);">${String.fromCharCode(64 + 1)}1</div>
+                    <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:var(--dnd-text-dim);text-shadow:1px 1px 2px var(--dnd-bg-main);">${String.fromCharCode(64 + Math.min(cols, 26))}${rows}</div>
+                    <div id="dnd-map-round-info" style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--dnd-text-highlight);background:var(--dnd-bg-secondary);padding:0 4px;border-radius:2px;">第 ${round} 回合</div>
                     
                     <!-- Battle Map Controls -->
                     <div class="dnd-map-controls" style="position:absolute;top:2px;right:2px;display:flex;gap:2px;pointer-events:auto;opacity:0.8;">
-                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
+                        <button type="button" onclick='window.DND_Dashboard_UI.regenerateMap(${safeLocationArg}, "svg")' title="生成/刷新 战斗底图" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
                     </div>
                 </div>
             `);
         } else {
             // 仅更新回合数
             $el.find('#dnd-map-round-info').text(`第 ${round} 回合`);
+            $el.data('combat-location-name', locationName);
         }
 
         // 3. 增量更新 Token (Dynamic Layer)
@@ -38589,8 +41469,8 @@ ${structureJSON}
             const isActive = enc ? enc['是否为当前行动者'] === '是' : false;
 
             const tokenSize = Math.max(cellSize * size.w - 2, 4);
-            const bgColor = isEnemy ? '#c0392b' : '#27ae60';
-            const borderColor = isActive ? '#ffdb85' : 'transparent';
+            const bgColor = isEnemy ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)';
+            const borderColor = isActive ? 'var(--dnd-border-gold)' : 'transparent';
             
             // 生成唯一且合法的 DOM ID
             const safeId = 'dnd-token-' + item['单位名称'].replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_');
@@ -38618,27 +41498,28 @@ ${structureJSON}
                 
             } else {
                 // 创建新 Token
-                // [新增] 尝试解析正确的 Avatar Key (CHAR_ID)
-                let avatarKey = item['单位名称'];
+                // [新增] 优先携带完整身份上下文，以便头像按聊天 + CHAR_ID 绑定
+                let avatarIdentity = { '单位名称': item['单位名称'] };
                 if (partyData) {
                     const match = partyData.find(p => p['姓名'] === item['单位名称']);
                     if (match) {
-                        avatarKey = match['CHAR_ID'] || match['PC_ID'] || match['姓名'];
+                        avatarIdentity = match;
                     }
                 }
+                const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, item['单位名称']);
                 
                 const initialToken = this.getNameInitial(item['单位名称']);
                 const uid = `token-content-${safeId}`;
                 
                 $token = $(`<div id="${safeId}" class="dnd-minimap-token ${isActive ? 'active' : ''}" title="${item['单位名称']}">
-                    <div id="${uid}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;font-size:${Math.floor(tokenSize*0.6)}px;text-shadow:0 0 2px #000;pointer-events:none;">
+                    <div id="${uid}" data-avatar-key="${avatarInfo.domKey}" title="${item['单位名称']}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:var(--dnd-btn-text);font-size:${Math.floor(tokenSize*0.6)}px;text-shadow:0 0 2px var(--dnd-bg-main);pointer-events:none;">
                         ${initialToken}
                     </div>
                 </div>`);
                 $token.css(targetCss);
                 
                 // [新增] 异步加载头像
-                setTimeout(() => this.loadAvatarAsync(avatarKey, uid), 0);
+                setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, item['单位名称']), 0);
                 
                 // 绑定点击事件
                 const self = this;
@@ -38694,7 +41575,8 @@ ${structureJSON}
             const vPxX = (sourcePos.x - 1) * cellSize;
             const vPxY = (sourcePos.y - 1) * cellSize;
             
-            const ghostHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${vPxX}px;top:${vPxY}px;width:${cellSize}px;height:${cellSize}px;border:2px dashed var(--dnd-text-highlight);border-radius:50%;background:rgba(255, 219, 133, 0.2);pointer-events:none;z-index:20;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;">👻</div>`;
+            // [修复] 移除灰色填充，仅保留虚线边框作为透明覆盖层
+            const ghostHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${vPxX}px;top:${vPxY}px;width:${cellSize}px;height:${cellSize}px;border:2px dashed var(--dnd-text-highlight);border-radius:50%;background:transparent;pointer-events:none;z-index:20;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dnd-btn-text);">👻</div>`;
             $innerMap.append(ghostHtml);
 
             if (realPos) {
@@ -38721,7 +41603,8 @@ ${structureJSON}
             const srcPxX = (sourcePos.x - 1) * cellSize + cellSize / 2;
             const srcPxY = (sourcePos.y - 1) * cellSize + cellSize / 2;
             
-            const rangeHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${srcPxX - rangePx}px;top:${srcPxY - rangePx}px;width:${rangePx * 2}px;height:${rangePx * 2}px;border:2px solid var(--dnd-accent-green);background:rgba(46, 204, 113, 0.1);border-radius:50%;pointer-events:none;z-index:25;box-shadow: 0 0 15px rgba(46, 204, 113, 0.3);"></div>`;
+            // [修复] 使用正确的 box-shadow 语法，使用绿色光晕匹配边框颜色
+            const rangeHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${srcPxX - rangePx}px;top:${srcPxY - rangePx}px;width:${rangePx * 2}px;height:${rangePx * 2}px;border:2px solid var(--dnd-accent-green);background:transparent;border-radius:50%;pointer-events:none;z-index:25;box-shadow: 0 0 10px rgba(58, 107, 74, 0.4);"></div>`;
             $innerMap.append(rangeHtml);
         }
     },
@@ -38752,16 +41635,16 @@ ${structureJSON}
              const $bg = $('.dnd-minimap-inner');
              if ($bg.length) {
                  // Add loading overlay to map only
-                 $bg.append(`<div id="dnd-map-loading-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;color:#fff;">
+                 $bg.append(`<div id="dnd-map-loading-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:var(--dnd-bg-secondary);z-index:100;display:flex;align-items:center;justify-content:center;color:var(--dnd-text-main);">
                     <div style="text-align:center;">
-                        <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;margin:0 auto 5px;"></div>
+                        <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid var(--dnd-border-subtle);border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;margin:0 auto 5px;"></div>
                         <div style="font-size:10px;">AI 正在构筑战场...</div>
                     </div>
                  </div>`);
              }
         } else {
-             $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;flex-direction:column;gap:5px;">
-                <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
+             $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--dnd-text-main);flex-direction:column;gap:5px;">
+                <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid var(--dnd-border-subtle);border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
                 <div style="font-size:11px;">AI 正在绘图...</div>
             </div>`);
         }
@@ -38867,10 +41750,10 @@ ${structureJSON}
         // --- B. 普通模式 (点击空地) ---
         // 显示简易菜单: "移动到这里"
         const menuHtml = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:5px;">
                 <i class="fa-solid fa-location-dot"></i> 位置: ${String.fromCharCode(64 + gridX)}${gridY}
             </div>
-            <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:rgba(46, 204, 113, 0.2);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;"
+            <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;color:var(--dnd-text-main);"
                 onclick="window.DND_Dashboard_UI.executeAction('move', { x: ${gridX}, y: ${gridY} }); window.DND_Dashboard_UI.hideDetailPopup();">
                 👣 移动到此
             </div>
@@ -38898,9 +41781,9 @@ ${structureJSON}
         if (!spell) return;
         
         const html = `
-            <div style="color:var(--dnd-text-highlight);font-weight:bold;border-bottom:1px solid #444;margin-bottom:5px;padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
-                <span>${spell['法术名称']} <span style="font-size:10px;color:#888;font-weight:normal">(${spell['环阶'] === '0' || spell['环阶'] === 0 ? '戏法' : spell['环阶']+'环'})</span></span>
-                <button class="dnd-clickable" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
+            <div style="color:var(--dnd-text-highlight);font-weight:bold;border-bottom:1px solid var(--dnd-border-subtle);margin-bottom:5px;padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
+                <span>${spell['法术名称']} <span style="font-size:10px;color:var(--dnd-text-dim);font-weight:normal">(${spell['环阶'] === '0' || spell['环阶'] === 0 ? '戏法' : spell['环阶']+'环'})</span></span>
+                <button class="dnd-clickable" style="background:var(--dnd-btn-primary);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
                     onclick="window.DND_Dashboard_UI.prepareCast(
                         '${spell['法术名称']}',
                         '${spell['射程']||'接触'}',
@@ -38909,13 +41792,13 @@ ${structureJSON}
                     <i class="fa-solid fa-bolt"></i> 施放
                 </button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:#aaa;margin-bottom:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:var(--dnd-text-dim);margin-bottom:8px;">
                 <div>时间: ${spell['施法时间']||'-'}</div>
                 <div>射程: ${spell['射程']||'-'}</div>
                 <div>成分: ${spell['成分']||'-'}</div>
                 <div>持续: ${spell['持续时间']||'-'}</div>
             </div>
-            <div style="line-height:1.4;color:#ccc;">${spell['效果描述']||'无描述'}</div>
+            <div style="line-height:1.4;color:var(--dnd-text-main);">${spell['效果描述']||'无描述'}</div>
         `;
         
         this.showItemDetailPopup(html, event.clientX, event.clientY);
@@ -38938,7 +41821,7 @@ ${structureJSON}
                             align-items: center;
                             margin-right: 10px;
                             margin-top: 8px;
-                            background: rgba(0,0,0,0.2);
+                            background: var(--dnd-bg-tertiary);
                             min-width: 34px;
                             vertical-align: top;
                         }
@@ -38980,9 +41863,9 @@ ${structureJSON}
                         .dnd-spell-pip {
                             width: 10px;
                             height: 10px;
-                            background: #222;
-                            border: 1px solid #000;
-                            box-shadow: inset 0 0 2px #000;
+                            background: var(--dnd-bg-secondary);
+                            border: 1px solid var(--dnd-border-subtle);
+                            box-shadow: inset 0 0 2px var(--dnd-border-subtle);
                             transition: all 0.2s;
                         }
                         .dnd-spell-group.mini .dnd-spell-pip {
@@ -38990,9 +41873,9 @@ ${structureJSON}
                             height: 6px;
                         }
                         .dnd-spell-pip.available {
-                            background: linear-gradient(135deg, #3498db, #2980b9);
-                            border-color: #5dade2;
-                            box-shadow: 0 0 5px rgba(52, 152, 219, 0.6);
+                            background: linear-gradient(135deg, var(--dnd-accent), var(--dnd-text-highlight));
+                            border-color: var(--dnd-border-gold);
+                            box-shadow: 0 0 5px var(--dnd-selected-bg);
                         }
                     </style>
                 `;
@@ -39039,7 +41922,7 @@ ${structureJSON}
             return html;
         } catch(e) {
             console.error('Spell slot format error:', e);
-            return '<span style="color:#8a2c2c">资源解析错误</span>';
+            return '<span style="color:var(--dnd-accent-red)">资源解析错误</span>';
         }
     },
 
@@ -39056,13 +41939,13 @@ ${structureJSON}
             byLevel[level].push(s);
         });
         
-        let html = `<div style="font-weight:bold;color:#aab;border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-book"></i> 法术书</div>`;
+        let html = `<div style="font-weight:bold;color:var(--dnd-text-header);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-book"></i> 法术书</div>`;
         
         // 搜索和筛选
         html += `
             <div style="display:flex;gap:5px;margin-bottom:10px;">
-                <input type="text" id="dnd-spell-search" placeholder="搜索法术..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterSpells()">
-                <select id="dnd-spell-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterSpells()">
+                <input type="text" id="dnd-spell-search" placeholder="搜索法术..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterSpells()">
+                <select id="dnd-spell-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterSpells()">
                     <option value="">全部环阶</option>
                     ${Object.keys(byLevel).sort().map(l => `<option value="${l}">${l}</option>`).join('')}
                 </select>
@@ -39072,18 +41955,18 @@ ${structureJSON}
         html += `<div style="max-height:300px;overflow-y:auto;" id="dnd-spell-list">`;
         
         Object.keys(byLevel).sort().forEach(lvl => {
-            html += `<div class="dnd-spell-group-header" data-level="${lvl}" style="color:var(--dnd-text-highlight);font-size:12px;margin:8px 0 4px 0;border-bottom:1px dashed #444;">${lvl}</div>`;
+            html += `<div class="dnd-spell-group-header" data-level="${lvl}" style="color:var(--dnd-text-highlight);font-size:12px;margin:8px 0 4px 0;border-bottom:1px dashed var(--dnd-border-subtle);">${lvl}</div>`;
             byLevel[lvl].forEach(s => {
                 const isPrep = s['已准备'] === '是' || s['已准备'] === true || lvl === '戏法';
                 const prepIcon = isPrep ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-regular fa-circle"></i>';
                 const safeName = (s['法术名称'] || '').replace(/'/g, "\\'");
                 html += `
                     <div class="dnd-spell-item" data-name="${s['法术名称']}" data-level="${lvl}" style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;cursor:pointer;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
                         onmouseout="this.style.background='transparent'"
                         onclick="window.DND_Dashboard_UI.handleSpellClick('${safeName}', event)">
-                        <span style="color:${isPrep ? '#e6dcca' : '#888'}">${prepIcon} ${s['法术名称']}</span>
-                        <span style="color:#666;font-size:10px;">${s['施法时间']}</span>
+                        <span style="color:${isPrep ? 'var(--dnd-text-main)' : 'var(--dnd-text-dim)'}">${prepIcon} ${s['法术名称']}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:10px;">${s['施法时间']}</span>
                     </div>
                 `;
             });
@@ -39142,20 +42025,20 @@ ${structureJSON}
         const poolData = this.getDicePoolData();
         const poolCount = poolData ? poolData.length : 0;
         const poolStatus = poolCount >= 15 ? 'good' : (poolCount >= 6 ? 'warning' : 'low');
-        const statusColor = poolStatus === 'good' ? 'var(--dnd-accent-green)' : (poolStatus === 'warning' ? '#e67e22' : 'var(--dnd-accent-red)');
+        const statusColor = poolStatus === 'good' ? 'var(--dnd-accent-green)' : (poolStatus === 'warning' ? 'var(--dnd-text-highlight)' : 'var(--dnd-accent-red)');
         const statusText = poolStatus === 'good' ? '充足' : (poolStatus === 'warning' ? '适中' : '不足');
         
         let html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                 <span>${ICONS.DICE} 快速投掷</span>
-                <span style="font-size:11px;color:${statusColor};background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">
+                <span style="font-size:11px;color:${statusColor};background:var(--dnd-bg-tertiary);padding:2px 6px;border-radius:3px;">
                     池: ${poolCount} (${statusText})
                 </span>
             </div>
             
             <!-- 骰子池可视化 -->
-            <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;margin-bottom:12px;">
-                <div style="font-size:11px;color:#888;margin-bottom:6px;display:flex;justify-content:space-between;">
+            <div style="background:var(--dnd-bg-tertiary);padding:8px;border-radius:4px;margin-bottom:12px;">
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:6px;display:flex;justify-content:space-between;">
                     <span>预投骰子池</span>
                     <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">${ICONS.SYNC} 补充</span>
                 </div>
@@ -39164,15 +42047,15 @@ ${structureJSON}
                         const d20 = row.D20 || row[7] || '?';
                         const isNat20 = d20 == 20;
                         const isNat1 = d20 == 1;
-                        const bgColor = isNat20 ? 'var(--dnd-accent-green)' : (isNat1 ? 'var(--dnd-accent-red)' : 'rgba(255,255,255,0.1)');
+                        const bgColor = isNat20 ? 'var(--dnd-accent-green)' : (isNat1 ? 'var(--dnd-accent-red)' : 'var(--dnd-bg-secondary)');
                         const textColor = (isNat20 || isNat1) ? '#fff' : 'var(--dnd-text-main)';
                         return `<div title="D20:${d20} D12:${row.D12||row[6]||'?'} D10:${row.D10||row[5]||'?'}" 
-                            style="width:22px;height:22px;background:${bgColor};border:1px solid #555;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${textColor};font-weight:bold;cursor:help;">
+                            style="width:22px;height:22px;background:${bgColor};border:1px solid var(--dnd-border-inner);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${textColor};font-weight:bold;cursor:help;">
                             ${d20}
                         </div>`;
-                    }).join('') : '<div style="color:#666;font-size:11px;">骰子池为空</div>'}
+                    }).join('') : '<div style="color:var(--dnd-text-dim);font-size:11px;">骰子池为空</div>'}
                 </div>
-                <div style="font-size:10px;color:#666;margin-top:4px;">显示 D20 值 (悬停查看其他骰子)</div>
+                <div style="font-size:10px;color:var(--dnd-text-dim);margin-top:4px;">显示 D20 值 (悬停查看其他骰子)</div>
             </div>
             
             <!-- 快速投掷按钮 -->
@@ -39188,16 +42071,16 @@ ${structureJSON}
             <div style="margin-top:8px;">
                 <button class="dnd-dice-btn" data-sides="100" style="
                     width:100%;
-                    background:linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1));
-                    border:1px solid #9b59b6;
-                    color:#bb8fce;
+                    background:var(--dnd-bg-secondary);
+                    border:1px solid var(--dnd-border-gold);
+                    color:var(--dnd-text-highlight);
                     padding:8px;
                     border-radius:4px;
                     cursor:pointer;
                     transition:all 0.2s;
                     font-size:12px;
-                " onmouseover="this.style.background='rgba(155, 89, 182, 0.3)'" 
-                onmouseout="this.style.background='linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1))'"
+                " onmouseover="this.style.background='var(--dnd-bg-tertiary)'" 
+                onmouseout="this.style.background='var(--dnd-bg-secondary)'"
                 onclick="window.DND_Dashboard_UI.rollDice(100, event)">
                     ${ICONS.TARGET} D100 (百分骰)
                 </button>
@@ -39205,7 +42088,7 @@ ${structureJSON}
             
             <!-- 自定义投掷 -->
             <div class="dnd-dice-custom-area">
-                <div style="font-size:11px;color:#888;margin-bottom:5px;">自定义投掷</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:5px;">自定义投掷</div>
                 <div class="dnd-dice-input-row">
                     <input type="text" id="dnd-custom-dice" placeholder="2d6+3" class="dnd-dice-input">
                     <button onclick="window.DND_Dashboard_UI.rollCustomDice()" class="dnd-dice-submit-btn">投掷</button>
@@ -39263,7 +42146,7 @@ ${structureJSON}
         // 显示加载状态
         const $poolArea = $('#dnd-detail-popup-el').find('.dnd-dice-pool-visual');
         if ($poolArea.length) {
-            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
+            $poolArea.html('<div style="text-align:center;color:var(--dnd-text-dim);padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
         }
         
         // 强制补充
@@ -39301,19 +42184,19 @@ ${structureJSON}
         if (isNat20) {
             specialClass = 'dnd-nat20-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 24px var(--dnd-accent-green), 0 0 48px var(--dnd-selected-bg);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-text-highlight);margin-top:8px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">大成功！NATURAL 20!</div>
             </div>`;
         } else if (isNat1) {
             specialClass = 'dnd-nat1-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
-                <div class="dnd-text-reveal" style="font-size:16px;color:#e74c3c;margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 24px var(--dnd-accent-red), 0 0 48px var(--dnd-selected-bg);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
+                <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-accent-red);margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
             </div>`;
         } else {
             resultHtml = `<div style="text-align:center;padding:15px;">
-                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">${ICONS.DICE} ${result}</div>
-                <div style="font-size:12px;color:#888;margin-top:5px;">D${sides} 投掷结果</div>
+                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px var(--dnd-selected-bg);">${ICONS.DICE} ${result}</div>
+                <div style="font-size:12px;color:var(--dnd-text-dim);margin-top:5px;">D${sides} 投掷结果</div>
             </div>`;
         }
         
@@ -39321,7 +42204,7 @@ ${structureJSON}
         const $popup = $('#dnd-detail-popup-el');
         if ($popup.length) {
             // 在现有内容前插入结果
-            const $result = $(`<div class="dnd-roll-result ${specialClass}" style="margin-bottom:10px;background:linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3));border-radius:8px;border:1px solid var(--dnd-border-gold);box-shadow:0 4px 15px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);">${resultHtml}</div>`);
+            const $result = $(`<div class="dnd-roll-result ${specialClass}" style="margin-bottom:10px;background:linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-bg-tertiary));border-radius:8px;border:1px solid var(--dnd-border-gold);box-shadow:0 4px 12px var(--dnd-border-inner), inset 0 1px 0 var(--dnd-border-gold);">${resultHtml}</div>`);
             
             // 移除之前的结果
             $popup.find('.dnd-roll-result').remove();
@@ -39381,13 +42264,13 @@ ${structureJSON}
             
             const resultHtml = `<div style="text-align:center;padding:15px;">
                 <div style="font-size:32px;color:var(--dnd-text-highlight);">${ICONS.DICE} ${total}</div>
-                <div style="font-size:11px;color:#888;margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
             </div>`;
             
             const $popup = $('#dnd-detail-popup-el');
             if ($popup.length) {
                 $popup.find('.dnd-roll-result').remove();
-                const $result = $(`<div class="dnd-roll-result" style="margin-bottom:10px;background:rgba(0,0,0,0.4);border-radius:6px;border:1px solid var(--dnd-border-gold);">${resultHtml}</div>`);
+                const $result = $(`<div class="dnd-roll-result" style="margin-bottom:10px;background:var(--dnd-bg-secondary);border-radius:6px;border:1px solid var(--dnd-border-gold);">${resultHtml}</div>`);
                 $popup.find('> div').first().after($result);
                 $result.css({ opacity: 0, transform: 'scale(0.8)' });
                 setTimeout(() => {
@@ -39505,14 +42388,14 @@ ${structureJSON}
         
         // 构建 HTML
         const html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:10px;margin-bottom:15px;text-align:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:10px;margin-bottom:15px;text-align:center;">
                 添加快捷方式
             </div>
             
-            <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-subtle);">
                 <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">${ICONS.BACKPACK} 物品</div>
-                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SPARKLES} 技能</div>
-                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SCROLL} 法书</div>
+                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:var(--dnd-text-dim);">${ICONS.SPARKLES} 技能</div>
+                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:var(--dnd-text-dim);">${ICONS.SCROLL} 法书</div>
             </div>
             
             <div id="dnd-quick-tab-items" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
@@ -39520,10 +42403,10 @@ ${structureJSON}
                     const name = i['物品名称'];
                     const id = i['物品ID'] || name;
                     // 使用 data 属性传递数据，避免 HTML 生成错误
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;"
                             data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="backpack" data-level=""
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">${name}</div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无物品</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无物品</div>'}
             </div>
             
             <div id="dnd-quick-tab-skills" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:none;flex-direction:column;gap:5px;">
@@ -39532,24 +42415,24 @@ ${structureJSON}
                     const level = s['环阶'] || s['等级'] || '';
                     const levelLabel = (level && level !== '0' && level !== '戏法') ? `(${level}环)` : '';
                     
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
                             data-type="skill" data-name="${esc(name)}" data-id="" data-icon="sparkles" data-level="${esc(level)}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
-                            <span>${name}</span> <span style="font-size:11px;color:#888;">${levelLabel}</span>
+                            <span>${name}</span> <span style="font-size:11px;color:var(--dnd-text-dim);">${levelLabel}</span>
                             </div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无技能</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无技能</div>'}
             </div>
             
             <div id="dnd-quick-tab-spells" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:none;flex-direction:column;gap:5px;">
                 ${spells.map(s => {
                     const name = s['法术名称'];
                     const level = s['环阶'] === '0' || s['环阶'] === 0 ? '戏法' : (s['环阶']+'环');
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
                             data-type="skill" data-name="${esc(name)}" data-id="" data-icon="scroll" data-level="${esc(s['环阶'])}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
-                            <span>${name}</span><span style="color:#888;font-size:11px;">${level}</span>
+                            <span>${name}</span><span style="color:var(--dnd-text-dim);font-size:11px;">${level}</span>
                             </div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无法术</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无法术</div>'}
             </div>
         `;
         
@@ -39561,8 +42444,8 @@ ${structureJSON}
 
     switchQuickTab(tabName) {
         const { $ } = getCore();
-        $('.dnd-tab-btn').css({borderBottomColor:'transparent', color:'#888'}).removeClass('active');
-        $(`.dnd-tab-btn[data-tab="${tabName}"]`).css({borderBottomColor:'var(--dnd-border-gold)', color:'#fff'}).addClass('active');
+        $('.dnd-tab-btn').css({borderBottomColor:'transparent', color:'var(--dnd-text-dim)'}).removeClass('active');
+        $(`.dnd-tab-btn[data-tab="${tabName}"]`).css({borderBottomColor:'var(--dnd-border-gold)', color:'var(--dnd-text-main)'}).addClass('active');
         
         $('.dnd-quick-tab-content').hide();
         $(`#dnd-quick-tab-${tabName}`).css('display', 'flex');
@@ -39620,7 +42503,7 @@ ${structureJSON}
         // 反馈提示
         const { $ } = getCore();
         const $hud = $('#dnd-mini-hud');
-        const $toast = $('<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(46, 204, 113, 0.9);color:white;padding:5px 10px;border-radius:4px;font-size:12px;z-index:9999;">已添加</div>');
+        const $toast = $('<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:var(--dnd-bg-tertiary);color:var(--dnd-text-main);padding:5px 10px;border-radius:4px;font-size:12px;z-index:9999;border:1px solid var(--dnd-border-gold);">已添加</div>');
         $hud.append($toast);
         setTimeout(() => $toast.fadeOut(500, () => $toast.remove()), 1000);
     },
@@ -39703,7 +42586,7 @@ ${structureJSON}
                             : `我以 ${i} 级使用了技能：${slot.data.name}`;
                             
                         html += `
-                            <button class="dnd-clickable" style="background:rgba(255,255,255,0.05);border:1px solid #555;color:#ccc;padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;"
+                            <button class="dnd-clickable" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;"
                                 onclick="window.DND_Dashboard_UI.fillChatInput('${chatText}'); window.DND_Dashboard_UI.hideDetailPopup();">
                                 ${i} ${isSpell ? '环' : '级'}
                             </button>
@@ -39773,125 +42656,6 @@ try {
     console.error('[DND Dashboard] Failed to expose UIRenderer:', e);
 }
 
-;// ./src/features/TemplateSync.js
-// src/features/TemplateSync.js
-
-
-
-
-
-
-/**
- * 模板自动同步模块
- * 
- * 当插件版本更新时，自动从 GitHub 拉取最新配套模板，
- * 弹窗询问用户是否导入到神·数据库中。
- */
-const TemplateSync = {
-    /**
-     * 初始化：检查是否需要同步模板
-     * 需要在 API 可用之后调用
-     */
-    init: async () => {
-        try {
-            const currentVersion = CONFIG.TEMPLATE_SYNC.CURRENT_VERSION;
-            const syncedVersion = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION);
-
-            Logger.debug('[TemplateSync] 当前版本:', currentVersion, '已同步版本:', syncedVersion);
-
-            // 版本相同，无需同步
-            if (syncedVersion === currentVersion) {
-                Logger.debug('[TemplateSync] 模板已是最新版本，跳过同步');
-                return;
-            }
-
-            // 检查 API 是否可用
-            const { getDB } = getCore();
-            const api = getDB();
-            if (!api || !api.importTemplateFromData) {
-                Logger.warn('[TemplateSync] 数据库 API 不可用或不支持 importTemplateFromData，跳过模板同步');
-                return;
-            }
-
-            // 版本不同，弹窗确认
-            const isFirstTime = !syncedVersion;
-            const message = isFirstTime
-                ? `检测到首次使用 DND 仪表盘 v${currentVersion}，是否导入配套模板？\n\n导入模板后，数据库将使用最新的表格结构，确保仪表盘功能正常运行。`
-                : `DND 仪表盘已从 v${syncedVersion} 更新到 v${currentVersion}，是否导入最新配套模板？\n\n新版本可能包含表格结构调整，建议导入以确保兼容性。`;
-
-            const confirmed = await NotificationSystem.confirm(message, {
-                title: isFirstTime ? '导入配套模板' : '模板更新可用',
-                confirmText: '导入模板',
-                cancelText: '跳过',
-                type: 'info'
-            });
-
-            if (!confirmed) {
-                Logger.info('[TemplateSync] 用户跳过模板导入');
-                // 即使跳过也记录版本，避免每次启动都弹窗
-                await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION, currentVersion);
-                return;
-            }
-
-            // 用户确认，开始拉取并导入
-            await TemplateSync._fetchAndImport(currentVersion);
-
-        } catch (err) {
-            Logger.error('[TemplateSync] 初始化失败:', err);
-        }
-    },
-
-    /**
-     * 从远程拉取模板并导入
-     */
-    _fetchAndImport: async (version) => {
-        try {
-            NotificationSystem.info('正在从 GitHub 获取最新模板...', '模板同步');
-
-            // 添加时间戳防止缓存
-            const url = CONFIG.TEMPLATE_SYNC.REMOTE_URL + '?t=' + Date.now();
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const templateData = await response.json();
-
-            // 基本校验
-            if (!templateData || !templateData.mate || templateData.mate.type !== 'chatSheets') {
-                throw new Error('模板数据格式无效：缺少 mate.type=chatSheets');
-            }
-
-            const sheetCount = Object.keys(templateData).filter(k => k.startsWith('sheet_')).length;
-            if (sheetCount === 0) {
-                throw new Error('模板数据格式无效：没有找到任何 sheet');
-            }
-
-            Logger.info(`[TemplateSync] 模板获取成功，包含 ${sheetCount} 个表格`);
-
-            // 调用数据库 API 导入模板
-            const { getDB } = getCore();
-            const api = getDB();
-            const result = await api.importTemplateFromData(templateData);
-
-            if (result && result.success) {
-                // 记录已同步的版本
-                await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION, version);
-                NotificationSystem.success(`模板导入成功 (${sheetCount} 个表格)`, '模板同步');
-                Logger.info(`[TemplateSync] 模板 v${version} 导入成功`);
-            } else {
-                const errMsg = result ? result.message : '未知错误';
-                throw new Error('API 导入失败: ' + errMsg);
-            }
-
-        } catch (err) {
-            Logger.error('[TemplateSync] 拉取/导入模板失败:', err);
-            NotificationSystem.error(`模板同步失败: ${err.message}\n\n你可以稍后在设置中手动导入模板。`, '模板同步');
-        }
-    }
-};
-
 ;// ./src/index.js
 // src/index.js
 
@@ -39935,7 +42699,7 @@ const TemplateSync = {
             return;
         }
 
-        const tryInit = () => {
+        const tryInit = async () => {
             const api = getDB();
             Logger.debug('tryInit - API 状态:', !!api, 'body 存在:', !!$('body').length);
             
@@ -39963,8 +42727,8 @@ const TemplateSync = {
                 });
 
                 UIRenderer.init();
-                ThemeManager.init(); // [修复] 初始化主题
-                StyleManager.init(); // [新增] 初始化风格管理器
+                await ThemeManager.init(); // 先应用保存的配色
+                await StyleManager.init(); // 再应用保存的风格，确保风格作为最终基底生效
                 
                 // [新增] 异步加载设置 (覆盖默认/localStorage配置)
                 DBAdapter.getSetting(CONFIG.STORAGE_KEYS.PRESET_CONFIG).then(saved => {
@@ -39994,6 +42758,9 @@ const TemplateSync = {
                 
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
+
+                    // 初始化模板同步（首次运行/版本升级时确认导入内置模板）
+                    TemplateSync.init();
                     
                     // 尝试迁移旧数据以释放空间
                     setTimeout(() => DBAdapter.migrateFromLocalStorage(), 5000);
@@ -40008,9 +42775,6 @@ const TemplateSync = {
                         // 初始渲染一次 HUD
                         setTimeout(UIRenderer.renderHUD, 1000);
                     }
-
-                    // [新增] 延迟检查模板同步 (等待 UI 和通知系统就绪)
-                    setTimeout(() => TemplateSync.init(), 3000);
                 } else if (initAttempts < MAX_ATTEMPTS) {
                     initAttempts++;
                     setTimeout(tryInit, 1000);

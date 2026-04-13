@@ -8,6 +8,26 @@ import { DBAdapter } from '../core/DBAdapter.js';
 import { TavernSettingsSync } from '../core/TavernSettingsSync.js';
 
 export const ExplorationMapManager = {
+    getAIRequestOptions: async (maxTokens = 4096) => {
+        const aiSettings = await SettingsManager.getAISettings();
+
+        if (aiSettings.provider === 'database') {
+            if (!TavernAPI.getDatabaseAIStatus().available) {
+                throw new Error('当前数据库 API 未提供 AI 调用能力，请先更新数据库插件或切回自定义 API');
+            }
+            return { maxTokens, useDatabaseAPI: true };
+        }
+
+        if (!aiSettings.apiConfig.url || !aiSettings.apiConfig.model) {
+            throw new Error('请先在设置中配置 API 地址和模型');
+        }
+
+        return {
+            maxTokens,
+            customConfig: aiSettings.apiConfig
+        };
+    },
+
     // Prompts
     prompts: {
         structure: (theme) => `你是一个资深DND地牢架构师。请根据主题设计一个紧凑、真实的地牢平面图结构。
@@ -175,18 +195,13 @@ ${structureJSON}
 
     // 2. Generate Structure (Step 1)
     generateStructure: async (locationName, description) => {
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         const theme = `${locationName}。${description || ''}`;
         const prompt = ExplorationMapManager.prompts.structure(theme);
+        const requestOptions = await ExplorationMapManager.getAIRequestOptions(4000);
         
         Logger.info('[ExplorationMap] Generating structure for:', locationName);
         
-        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], {
-            customConfig: apiConfig,
-            maxTokens: 4000
-        });
+        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], requestOptions);
 
         // Parse JSON
         let jsonStr = response;
@@ -242,17 +257,12 @@ ${structureJSON}
 
     // 3. Generate SVG (Step 2)
     generateSVG: async (locationName, structureJSON) => {
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         const prompt = ExplorationMapManager.prompts.svg(structureJSON);
+        const requestOptions = await ExplorationMapManager.getAIRequestOptions(8192);
         
         Logger.info('[ExplorationMap] Generating SVG for:', locationName);
         
-        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], {
-            customConfig: apiConfig,
-            maxTokens: 8192 // High tokens for SVG
-        });
+        const response = await TavernAPI.generate([{ role: 'user', content: prompt }], requestOptions);
 
         // Extract SVG
         let svgContent = response;
@@ -386,10 +396,10 @@ ${structureJSON}
             if (cachedSVG) return { type: 'svg', content: cachedSVG };
         }
 
-        const apiConfig = await SettingsManager.getAPIConfig();
-        if (!apiConfig.url || !apiConfig.key) throw new Error("请先在设置中配置 API Key");
-
         try {
+            const structureRequestOptions = await ExplorationMapManager.getAIRequestOptions(2000);
+            const svgRequestOptions = await ExplorationMapManager.getAIRequestOptions(8192);
+
             // Step 1: Get Structure (From Table or Generate)
             let jsonStr = null;
             
@@ -403,10 +413,7 @@ ${structureJSON}
             if (!jsonStr) {
                 Logger.info('[BattleMap] Generating new structure for:', locationName);
                 const structurePrompt = ExplorationMapManager.prompts.battleStructure(locationName + " " + description, width, height);
-                const structureRes = await TavernAPI.generate([{ role: 'user', content: structurePrompt }], {
-                    customConfig: apiConfig,
-                    maxTokens: 2000
-                });
+                const structureRes = await TavernAPI.generate([{ role: 'user', content: structurePrompt }], structureRequestOptions);
                 
                 jsonStr = structureRes;
                 const jsonMatch = jsonStr.match(/```json\s*([\s\S]*?)\s*```/) || jsonStr.match(/```\s*([\s\S]*?)\s*```/);
@@ -424,10 +431,7 @@ ${structureJSON}
             // Step 2: Generate SVG
             Logger.info('[BattleMap] Generating SVG...');
             const svgPrompt = ExplorationMapManager.prompts.battleSVG(jsonStr);
-            const svgRes = await TavernAPI.generate([{ role: 'user', content: svgPrompt }], {
-                customConfig: apiConfig,
-                maxTokens: 8192
-            });
+            const svgRes = await TavernAPI.generate([{ role: 'user', content: svgPrompt }], svgRequestOptions);
 
             let svgContent = svgRes;
             const codeBlockMatch = svgContent.match(/```(?:xml|svg|html)?\s*([\s\S]*?)\s*```/i);

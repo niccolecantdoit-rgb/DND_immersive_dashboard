@@ -117,6 +117,50 @@ export const TavernSettingsSync = {
             return false;
         }
     },
+
+    /**
+     * Get SillyTavern context safely
+     */
+    _getTavernContext: function() {
+        try {
+            const win = window.parent || window;
+            if (!win.SillyTavern?.getContext) return null;
+            return win.SillyTavern.getContext();
+        } catch (e) {
+            return null;
+        }
+    },
+
+    /**
+     * Get current chat id for chat-scoped storage
+     */
+    getCurrentChatId: function() {
+        try {
+            const win = window.parent || window;
+            const ctx = this._getTavernContext();
+            const directChatId = win.SillyTavern?.chatId;
+            const fallbackChatId = typeof win.SillyTavern?.getCurrentChatId === 'function'
+                ? win.SillyTavern.getCurrentChatId()
+                : null;
+            const candidates = [
+                ctx?.chatId,
+                ctx?.chat_id,
+                ctx?.chat?.chat_id,
+                ctx?.chat?.id,
+                directChatId,
+                fallbackChatId,
+                win.chat?.chat_id,
+                win.chat?.id,
+                ctx?.groupId ? `group:${ctx.groupId}` : null,
+                ctx?.group_id ? `group:${ctx.group_id}` : null
+            ];
+
+            const match = candidates.find(value => value !== undefined && value !== null && String(value).trim());
+            return match ? String(match) : null;
+        } catch (e) {
+            return null;
+        }
+    },
     
     /**
      * Get reference to Tavern's extension_settings

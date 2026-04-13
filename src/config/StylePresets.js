@@ -732,11 +732,17 @@ export const STYLE_PRESETS = {
                 'letter-spacing': '0.25em',
                 'font-family': '"Orbitron", monospace'
             },
-            /* ====== 面板/弹窗 - 全息投影面板 ====== */
-            '.dnd-panel, .dnd-dialog': {
+            /* ====== 面板 - 全息投影面板 ====== */
+            '.dnd-panel': {
                 'border': '2px solid #00f3ff',
                 'border-radius': '0',
                 'clip-path': 'polygon(15px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0 calc(100% - 15px), 0 15px)',
+                'box-shadow': '0 0 40px rgba(0, 243, 255, 0.3), 0 0 80px rgba(255, 0, 255, 0.15), inset 0 0 50px rgba(0, 243, 255, 0.05)'
+            },
+            /* ====== 对话框 - 不使用 clip-path 裁切 ====== */
+            '.dnd-dialog': {
+                'border': '2px solid #00f3ff',
+                'border-radius': '8px',
                 'box-shadow': '0 0 40px rgba(0, 243, 255, 0.3), 0 0 80px rgba(255, 0, 255, 0.15), inset 0 0 50px rgba(0, 243, 255, 0.05)'
             },
             /* ====== 输入框 - 终端输入 ====== */
@@ -4492,6 +4498,1281 @@ export const STYLE_PRESETS = {
             size: { min: 40, max: 100 },
             animated: true
         }
+    },
+
+    // 9. 玫瑰庭院 (优雅、浪漫) - 玫瑰粉、深色背景、成熟优雅
+    'rose-garden': {
+        meta: {
+            id: 'rose-garden',
+            name: '玫瑰庭院',
+            icon: '<i class="fa-solid fa-heart"></i>',
+            description: '优雅成熟的玫瑰粉色风格，深色背景上的浪漫气息',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#1a0f14',
+            '--dnd-bg-panel-start': '#2a1520',
+            '--dnd-bg-panel-end': '#1a0f14',
+            '--dnd-text-main': '#f0e0e6',
+            '--dnd-text-header': '#ffb6c1',
+            '--dnd-text-highlight': '#ffd1dc',
+            '--dnd-text-dim': '#b08090',
+            '--dnd-accent': '#e8508f',
+            '--dnd-accent-hover': '#ff6b9d',
+            '--dnd-border-gold': '#c07080',
+            '--dnd-border-inner': '#8a4050',
+            '--dnd-bg-card-start': 'rgba(42, 21, 32, 0.95)',
+            '--dnd-bg-card-end': 'rgba(26, 15, 20, 0.98)',
+            '--dnd-btn-primary': '#b04060',
+            '--dnd-btn-primary-hover': '#d05080',
+            '--dnd-btn-text': '#f0e0e6'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'soft', clipPath: 'none' },
+            card: { shape: 'elegant', decoration: 'roses' },
+            effects: { texture: 'silk', innerGlow: 'rose', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'normal' },
+            decorations: { corners: 'flourish', dividers: 'ornate', headers: 'banner' },
+            buttons: { style: 'elegant', shape: 'rounded' },
+            progressBars: { style: 'rose', animated: true }
+        },
+        typography: {
+            '--dnd-font-serif': '"Cinzel", "Palatino Linotype", "Book Antiqua", serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-font-size-header': '1.15rem',
+            '--dnd-font-weight-header': '600',
+            '--dnd-letter-spacing': '0.04em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+            '--dnd-animation-bloom': 'rose-bloom 4s ease-in-out infinite'
+        },
+        interactiveStates: {
+            hover: {
+                brightness: 1.1,
+                scale: 1.02,
+                lift: '-4px',
+                shadow: '0 10px 30px rgba(232, 80, 143, 0.25), 0 0 15px rgba(255, 182, 193, 0.15)',
+                borderColor: '#c07080',
+                glow: 'drop-shadow(0 0 6px rgba(232, 80, 143, 0.4))',
+                transition: '0.3s ease-out'
+            },
+            cardHover: {
+                transform: 'translateY(-6px) scale(1.015)',
+                shadow: '0 18px 40px rgba(26, 15, 20, 0.6), 0 0 25px rgba(232, 80, 143, 0.2), inset 0 0 20px rgba(255, 182, 193, 0.05)',
+                borderColor: '#e8508f'
+            },
+            buttonHover: {
+                brightness: 1.18,
+                transform: 'translateY(-2px) scale(1.03)',
+                shadow: '0 6px 20px rgba(176, 64, 96, 0.5), 0 0 12px rgba(232, 80, 143, 0.3)'
+            },
+            active: {
+                scale: 0.97,
+                brightness: 0.92,
+                transform: 'translateY(1px) scale(0.97)',
+                shadow: '0 2px 8px rgba(0,0,0,0.4), inset 0 1px 3px rgba(0,0,0,0.2)'
+            },
+            buttonActive: {
+                transform: 'translateY(2px) scale(0.98)',
+                shadow: '0 1px 4px rgba(0,0,0,0.4), inset 0 2px 5px rgba(0,0,0,0.3)'
+            },
+            selected: {
+                background: 'linear-gradient(90deg, rgba(232, 80, 143, 0.25), rgba(192, 112, 128, 0.15), transparent)',
+                borderColor: '#ffd1dc',
+                borderWidth: '2px',
+                glow: '0 0 15px rgba(232, 80, 143, 0.35)',
+                textColor: '#ffd1dc'
+            },
+            navActive: {
+                background: 'linear-gradient(90deg, rgba(232, 80, 143, 0.3), rgba(192, 112, 128, 0.2), transparent)',
+                border: '3px solid #c07080',
+                indicator: '#e8508f'
+            },
+            focus: {
+                borderColor: '#e8508f',
+                shadow: '0 0 0 3px rgba(232, 80, 143, 0.3)',
+                outline: 'none'
+            },
+            disabled: {
+                opacity: 0.45,
+                cursor: 'not-allowed',
+                filter: 'grayscale(0.5) brightness(0.7)'
+            },
+            iconHover: {
+                glow: 'drop-shadow(0 0 8px rgba(232, 80, 143, 0.7)) drop-shadow(0 0 15px rgba(255, 182, 193, 0.4))',
+                scale: 1.15
+            },
+            inputFocus: {
+                border: '#c07080',
+                shadow: '0 0 12px rgba(232, 80, 143, 0.3), inset 0 0 8px rgba(192, 112, 128, 0.1)'
+            }
+        },
+        overrides: {
+            /* ====== 卡片 - 玫瑰花瓣形态 ====== */
+            '.dnd-char-card': {
+                'box-shadow': '0 8px 30px rgba(26, 15, 20, 0.6), inset 0 0 40px rgba(232, 80, 143, 0.08), 0 0 20px rgba(255, 182, 193, 0.1)',
+                'border': '2px solid #8a4050',
+                'border-radius': '16px',
+                'background': 'linear-gradient(135deg, rgba(42, 21, 32, 0.95) 0%, rgba(35, 18, 26, 0.97) 50%, rgba(26, 15, 20, 0.98) 100%)'
+            },
+            '.dnd-card-header': {
+                'border-bottom': '2px solid #8a4050',
+                'background': 'linear-gradient(to right, rgba(232, 80, 143, 0.2), rgba(138, 64, 80, 0.15), rgba(255, 182, 193, 0.15))',
+                'border-radius': '14px 14px 0 0',
+                'padding': '14px 18px',
+                'position': 'relative'
+            },
+            '.dnd-card-body': {
+                'background': 'radial-gradient(ellipse at bottom right, rgba(232, 80, 143, 0.05), transparent 70%)',
+                'padding': '16px'
+            },
+            /* ====== 导航栏 - 玫瑰藤蔓 ====== */
+            '.dnd-nav-sidebar': {
+                'background': 'linear-gradient(180deg, #2a1520 0%, #1a0f14 100%)',
+                'border-right': '3px solid #8a4050',
+                'box-shadow': '3px 0 15px rgba(26, 15, 20, 0.5)'
+            },
+            '.dnd-nav-item': {
+                'border-radius': '0 12px 12px 0',
+                'margin': '4px 0',
+                'padding': '12px 20px',
+                'border-left': '4px solid transparent',
+                'background': 'rgba(232, 80, 143, 0.03)',
+                'transition': 'all 0.3s ease-out'
+            },
+            '.dnd-nav-item:hover': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.2), rgba(192, 112, 128, 0.1), transparent)',
+                'border-left-color': '#c07080',
+                'padding-left': '24px'
+            },
+            '.dnd-nav-item.active': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.3), rgba(192, 112, 128, 0.15), transparent)',
+                'box-shadow': 'inset 4px 0 0 #e8508f, 0 0 20px rgba(232, 80, 143, 0.2)',
+                'border-left-color': '#e8508f'
+            },
+            /* ====== 进度条 - 玫瑰花茎 ====== */
+            '.dnd-bar-container': {
+                'background': 'linear-gradient(180deg, rgba(26, 15, 20, 0.8), rgba(42, 21, 32, 0.6))',
+                'border': '1px solid #8a4050',
+                'border-radius': '10px',
+                'height': '10px',
+                'box-shadow': 'inset 0 1px 4px rgba(0,0,0,0.4)'
+            },
+            '.dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #8a4050 0%, #b04060 40%, #e8508f 70%, #ff6b9d 100%)',
+                'box-shadow': '0 0 10px rgba(232, 80, 143, 0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+                'border-radius': '8px'
+            },
+            '.dnd-bar-hp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #6a3040 0%, #903050 40%, #c04060 70%, #903050 100%)'
+            },
+            '.dnd-bar-exp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #5a3050 0%, #804070 40%, #b050a0 70%, #804070 100%)'
+            },
+            /* ====== 按钮 - 玫瑰花蕾 ====== */
+            '.dnd-btn, .dnd-action-btn': {
+                'border': '2px solid #8a4050',
+                'background': 'linear-gradient(135deg, #3a1a24 0%, #2a1520 100%)',
+                'box-shadow': 'inset 0 1px 0 rgba(255,255,255,0.1), 0 3px 8px rgba(0,0,0,0.4)',
+                'border-radius': '12px',
+                'font-family': '"Cinzel", serif',
+                'position': 'relative',
+                'overflow': 'hidden'
+            },
+            '.dnd-btn:hover, .dnd-action-btn:hover': {
+                'background': 'linear-gradient(135deg, #4a2a34 0%, #3a1a24 100%)',
+                'border-color': '#c07080',
+                'box-shadow': '0 0 15px rgba(232, 80, 143, 0.3), 0 5px 12px rgba(0,0,0,0.4)'
+            },
+            '.dnd-btn:active, .dnd-action-btn:active': {
+                'background': 'linear-gradient(135deg, #2a1520 0%, #1a0f14 100%)',
+                'box-shadow': 'inset 0 2px 4px rgba(0,0,0,0.4)'
+            },
+            /* ====== 属性行 - 玫瑰花瓣纹理 ====== */
+            '.dnd-stat-row': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.1), rgba(138, 64, 80, 0.1), rgba(232, 80, 143, 0.05))',
+                'border': '1px solid rgba(138, 64, 80, 0.3)',
+                'border-radius': '8px',
+                'padding': '8px 12px',
+                'margin': '4px 0'
+            },
+            '.dnd-stat-row:hover': {
+                'background': 'linear-gradient(90deg, rgba(232, 80, 143, 0.15), rgba(138, 64, 80, 0.15), rgba(232, 80, 143, 0.1))'
+            },
+            /* ====== 标题样式 - 玫瑰铭文 ====== */
+            '.dnd-title, .dnd-char-name': {
+                'text-shadow': '0 2px 10px rgba(232, 80, 143, 0.4), 0 0 20px rgba(255, 182, 193, 0.2)',
+                'font-family': '"Cinzel", "Palatino Linotype", serif',
+                'letter-spacing': '0.05em'
+            },
+            /* ====== 面板/弹窗 - 玫瑰窗格 ====== */
+            '.dnd-panel, .dnd-dialog': {
+                'border': '2px solid #8a4050',
+                'border-radius': '20px',
+                'box-shadow': '0 10px 40px rgba(26, 15, 20, 0.6), inset 0 0 50px rgba(232, 80, 143, 0.05)'
+            },
+            '#dnd-mini-hud': {
+                'border': '2px solid #8a4050',
+                'border-radius': '14px',
+                'background': 'linear-gradient(180deg, rgba(42, 21, 32, 0.98), rgba(26, 15, 20, 0.99))'
+            },
+            /* ====== 输入框 ====== */
+            '.dnd-input, .dnd-select, .dnd-textarea': {
+                'background': 'rgba(26, 15, 20, 0.8)',
+                'border': '1px solid #8a4050',
+                'border-radius': '8px',
+                'color': '#f0e0e6'
+            },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': {
+                'border-color': '#c07080',
+                'box-shadow': '0 0 12px rgba(232, 80, 143, 0.3), inset 0 0 6px rgba(192, 112, 128, 0.1)'
+            },
+            /* ====== 表格 ====== */
+            '.dnd-table th': {
+                'background': 'linear-gradient(180deg, #3a1a24, #2a1520)',
+                'border-bottom': '2px solid #c07080',
+                'color': '#ffb6c1'
+            },
+            '.dnd-table td': {
+                'border-bottom': '1px solid rgba(138, 64, 80, 0.3)'
+            },
+            '.dnd-table tr:hover td': {
+                'background': 'rgba(232, 80, 143, 0.1)'
+            },
+            /* ====== 徽章 ====== */
+            '.dnd-badge': {
+                'background': 'linear-gradient(135deg, #8a4050, #5a3040)',
+                'border': '1px solid #c07080',
+                'border-radius': '8px'
+            }
+        },
+        customCSS: `
+            /* ====== 玫瑰庭院皮肤 - 浪漫优雅动画与装饰 ====== */
+            
+            /* 玫瑰绽放光效 */
+            @keyframes rose-bloom {
+                0%, 100% {
+                    box-shadow: 0 8px 30px rgba(26, 15, 20, 0.6), inset 0 0 40px rgba(232, 80, 143, 0.08), 0 0 20px rgba(255, 182, 193, 0.1);
+                    filter: brightness(1);
+                }
+                50% {
+                    box-shadow: 0 8px 35px rgba(26, 15, 20, 0.65), inset 0 0 50px rgba(232, 80, 143, 0.12), 0 0 30px rgba(255, 182, 193, 0.18);
+                    filter: brightness(1.02);
+                }
+            }
+            
+            /* 花瓣飘落动画 */
+            @keyframes petal-fall {
+                0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+                10% { opacity: 0.8; }
+                100% { transform: translateY(100px) rotate(180deg); opacity: 0; }
+            }
+            
+            /* 玫瑰脉动 */
+            @keyframes rose-pulse {
+                0%, 100% { opacity: 0.6; transform: scale(1); }
+                50% { opacity: 0.9; transform: scale(1.05); }
+            }
+            
+            /* 丝绸光泽流动 */
+            @keyframes silk-shimmer {
+                0% { transform: translateX(-100%); }
+                50%, 100% { transform: translateX(100%); }
+            }
+            
+            /* 卡片 - 玫瑰花瓣形态 */
+            .dnd-char-card {
+                position: relative;
+                animation: rose-bloom 5s ease-in-out infinite;
+            }
+            
+            /* 外发光边框 - 玫瑰光晕 */
+            .dnd-char-card::before {
+                content: "";
+                position: absolute;
+                top: -3px; left: -3px; right: -3px; bottom: -3px;
+                background: linear-gradient(135deg, rgba(232, 80, 143, 0.3) 0%, transparent 25%, transparent 75%, rgba(255, 182, 193, 0.2) 100%);
+                border-radius: 18px;
+                pointer-events: none;
+                z-index: -1;
+                filter: blur(3px);
+            }
+            
+            /* 丝绸纹理叠加 */
+            .dnd-char-card::after {
+                content: "";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='silk'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23silk)' opacity='0.03'/%3E%3C/svg%3E");
+                pointer-events: none;
+                border-radius: inherit;
+                z-index: 0;
+            }
+            
+            /* 卡片头部 - 玫瑰装饰 */
+            .dnd-card-header::before {
+                content: "❀";
+                position: absolute;
+                left: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #e8508f;
+                font-size: 14px;
+                opacity: 0.7;
+                animation: rose-pulse 3s ease-in-out infinite;
+            }
+            
+            .dnd-card-header::after {
+                content: "❀";
+                position: absolute;
+                right: 12px; top: 50%;
+                transform: translateY(-50%) scaleX(-1);
+                color: #c07080;
+                font-size: 14px;
+                opacity: 0.7;
+                animation: rose-pulse 3s ease-in-out infinite 0.5s;
+            }
+            
+            /* 导航项 - 玫瑰藤蔓效果 */
+            .dnd-nav-item::before {
+                content: "";
+                position: absolute;
+                left: 0; top: 50%;
+                transform: translateY(-50%);
+                width: 0; height: 3px;
+                background: linear-gradient(90deg, #e8508f, #ff6b9d);
+                transition: width 0.3s ease-out;
+                border-radius: 0 3px 3px 0;
+            }
+            
+            .dnd-nav-item:hover::before {
+                width: 20px;
+            }
+            
+            .dnd-nav-item.active::before {
+                width: 30px;
+                box-shadow: 0 0 10px rgba(232, 80, 143, 0.5);
+            }
+            
+            .dnd-nav-item.active::after {
+                content: "❧";
+                position: absolute;
+                right: 12px;
+                color: #e8508f;
+                font-size: 12px;
+            }
+            
+            /* 按钮 - 丝绸光泽效果 */
+            .dnd-btn::before,
+            .dnd-action-btn::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -100%;
+                width: 50%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+                transition: left 0.5s ease;
+            }
+            
+            .dnd-btn:hover::before,
+            .dnd-action-btn:hover::before {
+                left: 100%;
+            }
+            
+            /* 进度条 - 玫瑰流动效果 */
+            .dnd-bar-fill {
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .dnd-bar-fill::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -50%; width: 50%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+                animation: silk-shimmer 2.5s ease-in-out infinite;
+            }
+            
+            /* 分隔线 - 玫瑰藤 */
+            .dnd-divider {
+                height: 2px;
+                background: linear-gradient(90deg, transparent, #8a4050, #c07080, #8a4050, transparent);
+                position: relative;
+                margin: 12px 0;
+            }
+            
+            .dnd-divider::before {
+                content: "✿";
+                position: absolute;
+                left: 50%; top: 50%;
+                transform: translate(-50%, -50%);
+                background: #1a0f14;
+                padding: 0 10px;
+                color: #e8508f;
+                font-size: 12px;
+            }
+            
+            /* 面板角落 - 玫瑰花纹装饰 */
+            .dnd-panel::before,
+            .dnd-dialog::before {
+                content: "❧";
+                position: absolute;
+                top: 8px; left: 10px;
+                color: #c07080;
+                font-size: 16px;
+                opacity: 0.6;
+            }
+            
+            .dnd-panel::after,
+            .dnd-dialog::after {
+                content: "❧";
+                position: absolute;
+                bottom: 8px; right: 10px;
+                color: #c07080;
+                font-size: 16px;
+                opacity: 0.6;
+                transform: rotate(180deg);
+            }
+            
+            /* 滚动条 - 玫瑰风格 */
+            .dnd-content-area::-webkit-scrollbar {
+                width: 10px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-track {
+                background: rgba(26, 15, 20, 0.5);
+                border-left: 1px solid #8a4050;
+                border-radius: 5px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb {
+                background: linear-gradient(to bottom, #8a4050, #b04060, #8a4050);
+                border-radius: 5px;
+                border: 1px solid #5a3040;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(to bottom, #b04060, #e8508f, #b04060);
+            }
+            
+            /* 图标容器 - 玫瑰徽章 */
+            .dnd-icon-circle {
+                border-radius: 50%;
+                border: 2px solid #c07080;
+                background: radial-gradient(circle at 30% 30%, #3a1a24, #1a0f14);
+                box-shadow: 0 0 15px rgba(232, 80, 143, 0.3);
+            }
+            
+            /* 头像框 - 椭圆玫瑰框 */
+            .dnd-avatar {
+                border-radius: 60% 40% 50% 50% / 50% 50% 40% 60%;
+                border: 2px solid #c07080;
+                box-shadow: 0 0 15px rgba(232, 80, 143, 0.3), 0 0 30px rgba(255, 182, 193, 0.15);
+            }
+            
+            /* 工具提示 */
+            .dnd-tooltip {
+                background: linear-gradient(135deg, #2a1520, #1a0f14);
+                border: 1px solid #c07080;
+                border-radius: 10px;
+                box-shadow: 0 5px 20px rgba(26, 15, 20, 0.6);
+            }
+            
+            /* 悬浮光效 */
+            .dnd-char-card:hover {
+                box-shadow: 0 12px 40px rgba(26, 15, 20, 0.7), inset 0 0 50px rgba(232, 80, 143, 0.1), 0 0 30px rgba(255, 182, 193, 0.2);
+            }
+        `,
+        background: {
+            type: 'particles',
+            colors: ['rgba(232, 80, 143, 0.6)', 'rgba(255, 182, 193, 0.5)', 'rgba(192, 112, 128, 0.4)', 'rgba(255, 255, 255, 0.3)'],
+            minSize: 2,
+            maxSize: 6,
+            count: 25,
+            speed: 0.04,
+            shape: 'circle',
+            glow: true
+        }
+    },
+
+    // 10. 可爱童话 (童趣、温馨) - 柔和圆润、温馨可爱
+    'kawaii-dreams': {
+        meta: {
+            id: 'kawaii-dreams',
+            name: '可爱童话',
+            icon: '<i class="fa-solid fa-star"></i>',
+            description: '温馨可爱的童话风格，柔和圆润的视觉效果',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#FDF2F8',
+            '--dnd-bg-panel-start': '#FDF2F8',
+            '--dnd-bg-panel-end': '#FCE7F3',
+            '--dnd-text-main': '#9D174D',
+            '--dnd-text-header': '#BE185D',
+            '--dnd-text-highlight': '#DB2777',
+            '--dnd-text-dim': '#9F1239',
+            '--dnd-accent': '#F472B6',
+            '--dnd-accent-hover': '#F9A8D4',
+            '--dnd-border-gold': '#FBCFE8',
+            '--dnd-border-inner': '#F9A8D4',
+            '--dnd-border-subtle': '#FBCFE8',
+            '--dnd-bg-card-start': 'rgba(255, 255, 255, 0.95)',
+            '--dnd-bg-card-end': 'rgba(253, 242, 248, 0.98)',
+            '--dnd-bg-input': '#FFF7FB',
+            '--dnd-bg-secondary': '#FFF7FB',
+            '--dnd-bg-tertiary': '#FCE7F3',
+            '--dnd-btn-primary': '#F472B6',
+            '--dnd-btn-primary-hover': '#F9A8D4',
+            '--dnd-btn-text': '#FFFFFF',
+            '--dnd-accent-blue': '#EC4899',
+            '--dnd-accent-red': '#BE123C',
+            '--dnd-accent-green': '#059669',
+            '--dnd-selected-glow': '0 0 10px rgba(244, 114, 182, 0.4)',
+            // Logo/进度条/HUD 相关浅色变量
+            '--dnd-logo-bg-start': '#F9A8D4',
+            '--dnd-logo-bg-end': '#F472B6',
+            '--dnd-bar-bg': 'rgba(251, 207, 232, 0.6)',
+            '--dnd-bar-hp-start': '#DB2777',
+            '--dnd-bar-hp-end': '#EC4899',
+            '--dnd-bar-exp-start': '#BE185D',
+            '--dnd-bar-exp-end': '#DB2777'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'bubbly', decoration: 'stars' },
+            effects: { texture: 'soft', innerGlow: 'candy', borderGlow: 'pastel', overlay: 'gradient' },
+            layout: { density: 'normal' },
+            decorations: { corners: 'sparkles', dividers: 'dots', headers: 'ribbon' },
+            buttons: { style: 'candy', shape: 'pill' },
+            progressBars: { style: 'bubble', animated: true }
+        },
+        typography: {
+            '--dnd-font-serif': '"Nunito", "Comic Sans MS", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-font-size-header': '1.1rem',
+            '--dnd-font-weight-header': '600',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            '--dnd-animation-float': 'kawaii-float 4s ease-in-out infinite',
+            '--dnd-animation-sparkle': 'sparkle 2s ease-in-out infinite'
+        },
+        interactiveStates: {
+            hover: {
+                brightness: 1.05,
+                scale: 1.03,
+                lift: '-5px',
+                shadow: '0 12px 35px rgba(244, 114, 182, 0.25), 0 0 20px rgba(251, 207, 232, 0.3)',
+                borderColor: '#F472B6',
+                glow: 'drop-shadow(0 0 8px rgba(244, 114, 182, 0.5))',
+                transition: '0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            },
+            cardHover: {
+                transform: 'translateY(-8px) scale(1.02) rotate(-1deg)',
+                shadow: '0 20px 50px rgba(244, 114, 182, 0.2), 0 0 30px rgba(251, 207, 232, 0.3), inset 0 0 25px rgba(255, 255, 255, 0.3)',
+                borderColor: '#F472B6'
+            },
+            buttonHover: {
+                brightness: 1.1,
+                transform: 'translateY(-3px) scale(1.05)',
+                shadow: '0 8px 25px rgba(244, 114, 182, 0.4), 0 0 15px rgba(249, 168, 212, 0.3)'
+            },
+            active: {
+                scale: 0.95,
+                brightness: 0.95,
+                transform: 'translateY(2px) scale(0.95)',
+                shadow: '0 2px 8px rgba(159, 18, 57, 0.15), inset 0 2px 6px rgba(159, 18, 57, 0.1)'
+            },
+            buttonActive: {
+                transform: 'translateY(3px) scale(0.97)',
+                shadow: '0 1px 4px rgba(159, 18, 57, 0.15), inset 0 3px 8px rgba(159, 18, 57, 0.1)'
+            },
+            selected: {
+                background: 'linear-gradient(90deg, rgba(244, 114, 182, 0.25), rgba(251, 207, 232, 0.2), transparent)',
+                borderColor: '#F472B6',
+                borderWidth: '2px',
+                glow: '0 0 20px rgba(244, 114, 182, 0.3)',
+                textColor: '#BE185D'
+            },
+            navActive: {
+                background: 'linear-gradient(90deg, rgba(244, 114, 182, 0.3), rgba(251, 207, 232, 0.2), transparent)',
+                border: '3px solid #F472B6',
+                indicator: '#DB2777'
+            },
+            focus: {
+                borderColor: '#F472B6',
+                shadow: '0 0 0 4px rgba(244, 114, 182, 0.25)',
+                outline: 'none'
+            },
+            disabled: {
+                opacity: 0.5,
+                cursor: 'not-allowed',
+                filter: 'grayscale(0.3) brightness(0.9)'
+            },
+            iconHover: {
+                glow: 'drop-shadow(0 0 10px rgba(244, 114, 182, 0.7)) drop-shadow(0 0 20px rgba(251, 207, 232, 0.5))',
+                scale: 1.2
+            },
+            inputFocus: {
+                border: '#F472B6',
+                shadow: '0 0 15px rgba(244, 114, 182, 0.25), inset 0 0 10px rgba(251, 207, 232, 0.15)'
+            }
+        },
+        overrides: {
+            /* ====== 卡片 - 气泡形态 ====== */
+            '.dnd-char-card': {
+                'box-shadow': '0 10px 40px rgba(244, 114, 182, 0.15), inset 0 0 50px rgba(255, 255, 255, 0.3), 0 0 25px rgba(251, 207, 232, 0.2)',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '24px',
+                'background': 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(253, 242, 248, 0.97) 50%, rgba(252, 231, 243, 0.98) 100%)'
+            },
+            '.dnd-card-header': {
+                'border-bottom': '2px solid #F9A8D4',
+                'background': 'linear-gradient(to right, rgba(244, 114, 182, 0.2), rgba(251, 207, 232, 0.15), rgba(249, 168, 212, 0.2))',
+                'border-radius': '22px 22px 0 0',
+                'padding': '14px 18px',
+                'position': 'relative'
+            },
+            '.dnd-card-body': {
+                'background': 'radial-gradient(ellipse at bottom right, rgba(244, 114, 182, 0.08), transparent 70%)',
+                'padding': '16px'
+            },
+            /* ====== 导航栏 - 糖果条纹 ====== */
+            '.dnd-nav-sidebar': {
+                'background': 'linear-gradient(180deg, #FDF2F8 0%, #FCE7F3 100%)',
+                'border-right': '3px solid #F9A8D4',
+                'box-shadow': '3px 0 20px rgba(244, 114, 182, 0.1)'
+            },
+            '.dnd-nav-item': {
+                'border-radius': '0 16px 16px 0',
+                'margin': '4px 0',
+                'padding': '12px 20px',
+                'border-left': '4px solid transparent',
+                'background': 'rgba(244, 114, 182, 0.05)',
+                'transition': 'all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)'
+            },
+            '.dnd-nav-item:hover': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.15), rgba(251, 207, 232, 0.1), transparent)',
+                'border-left-color': '#F472B6',
+                'transform': 'translateX(5px)'
+            },
+            '.dnd-nav-item.active': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.25), rgba(251, 207, 232, 0.15), transparent)',
+                'box-shadow': 'inset 4px 0 0 #DB2777, 0 0 25px rgba(244, 114, 182, 0.15)',
+                'border-left-color': '#DB2777',
+                'transform': 'translateX(8px)'
+            },
+            /* ====== 进度条 - 气泡糖 ====== */
+            '.dnd-bar-container': {
+                'background': 'linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(253, 242, 248, 0.7))',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '12px',
+                'height': '14px',
+                'box-shadow': 'inset 0 2px 6px rgba(244, 114, 182, 0.1)'
+            },
+            '.dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #EC4899 0%, #F472B6 30%, #F9A8D4 60%, #FBCFE8 100%)',
+                'box-shadow': '0 0 15px rgba(244, 114, 182, 0.4), inset 0 2px 0 rgba(255,255,255,0.4)',
+                'border-radius': '10px'
+            },
+            '.dnd-bar-hp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #DB2777 0%, #EC4899 30%, #F472B6 60%, #EC4899 100%)'
+            },
+            '.dnd-bar-exp .dnd-bar-fill': {
+                'background': 'linear-gradient(90deg, #BE185D 0%, #DB2777 30%, #EC4899 60%, #DB2777 100%)'
+            },
+            /* ====== 按钮 - 糖果按钮 ====== */
+            '.dnd-btn, .dnd-action-btn': {
+                'border': '2px solid #F472B6',
+                'background': 'linear-gradient(135deg, #FDF2F8 0%, #FCE7F3 100%)',
+                'box-shadow': 'inset 0 2px 0 rgba(255,255,255,0.5), 0 4px 12px rgba(244, 114, 182, 0.2)',
+                'border-radius': '20px',
+                'font-family': '"Nunito", sans-serif',
+                'position': 'relative',
+                'overflow': 'hidden',
+                'color': '#9D174D'
+            },
+            '.dnd-btn:hover, .dnd-action-btn:hover': {
+                'background': 'linear-gradient(135deg, #FFFFFF 0%, #FDF2F8 100%)',
+                'border-color': '#DB2777',
+                'box-shadow': '0 0 20px rgba(244, 114, 182, 0.25), 0 6px 18px rgba(244, 114, 182, 0.15)'
+            },
+            '.dnd-btn:active, .dnd-action-btn:active': {
+                'background': 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)',
+                'box-shadow': 'inset 0 3px 8px rgba(244, 114, 182, 0.2)'
+            },
+            /* ====== 属性行 - 点点糖 ====== */
+            '.dnd-stat-row': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.1), rgba(251, 207, 232, 0.1), rgba(244, 114, 182, 0.05))',
+                'border': '1px solid rgba(249, 168, 212, 0.4)',
+                'border-radius': '12px',
+                'padding': '8px 12px',
+                'margin': '4px 0'
+            },
+            '.dnd-stat-row:hover': {
+                'background': 'linear-gradient(90deg, rgba(244, 114, 182, 0.15), rgba(251, 207, 232, 0.12), rgba(244, 114, 182, 0.08))',
+                'transform': 'scale(1.01)'
+            },
+            /* ====== 标题样式 - 可爱字体 ====== */
+            '.dnd-title, .dnd-char-name': {
+                'text-shadow': '0 2px 12px rgba(244, 114, 182, 0.3), 0 0 25px rgba(251, 207, 232, 0.2)',
+                'font-family': '"Nunito", sans-serif',
+                'letter-spacing': '0.03em'
+            },
+            /* ====== 面板/弹窗 - 糖果盒 ====== */
+            '.dnd-panel, .dnd-dialog': {
+                'border': '2px solid #F9A8D4',
+                'border-radius': '28px',
+                'box-shadow': '0 12px 50px rgba(244, 114, 182, 0.15), inset 0 0 60px rgba(255, 255, 255, 0.2)'
+            },
+            '#dnd-mini-hud': {
+                'border': '2px solid #F9A8D4',
+                'border-radius': '18px',
+                'background': 'linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(253, 242, 248, 0.99))'
+            },
+            /* ====== 输入框 ====== */
+            '.dnd-input, .dnd-select, .dnd-textarea': {
+                'background': 'rgba(255, 255, 255, 0.9)',
+                'border': '2px solid #F9A8D4',
+                'border-radius': '12px',
+                'color': '#9D174D'
+            },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': {
+                'border-color': '#F472B6',
+                'box-shadow': '0 0 15px rgba(244, 114, 182, 0.2), inset 0 0 8px rgba(251, 207, 232, 0.15)'
+            },
+            /* ====== 表格 ====== */
+            '.dnd-table th': {
+                'background': 'linear-gradient(180deg, #FCE7F3, #FBCFE8)',
+                'border-bottom': '2px solid #F472B6',
+                'color': '#BE185D'
+            },
+            '.dnd-table td': {
+                'border-bottom': '1px solid rgba(249, 168, 212, 0.4)'
+            },
+            '.dnd-table tr:hover td': {
+                'background': 'rgba(244, 114, 182, 0.1)'
+            },
+            /* ====== 徽章 ====== */
+            '.dnd-badge': {
+                'background': 'linear-gradient(135deg, #F472B6, #EC4899)',
+                'border': '2px solid #FBCFE8',
+                'border-radius': '12px',
+                'box-shadow': '0 2px 8px rgba(244, 114, 182, 0.25)'
+            }
+        },
+        customCSS: `
+            /* ====== 可爱童话皮肤 - 温馨可爱动画与装饰 ====== */
+            
+            /* 可爱浮动动画 */
+            @keyframes kawaii-float {
+                0%, 100% { transform: translateY(0) rotate(0deg); }
+                25% { transform: translateY(-3px) rotate(0.5deg); }
+                50% { transform: translateY(0) rotate(0deg); }
+                75% { transform: translateY(-2px) rotate(-0.5deg); }
+            }
+            
+            /* 星星闪烁 */
+            @keyframes sparkle {
+                0%, 100% { opacity: 0.5; transform: scale(0.8); }
+                50% { opacity: 1; transform: scale(1.2); }
+            }
+            
+            /* 气泡弹跳 */
+            @keyframes bubble-bounce {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+            }
+            
+            /* 糖果光泽流动 */
+            @keyframes candy-shimmer {
+                0% { left: -100%; }
+                50%, 100% { left: 100%; }
+            }
+            
+            /* 彩虹渐变 */
+            @keyframes rainbow-shift {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            /* 卡片 - 气泡形态 */
+            .dnd-char-card {
+                position: relative;
+                animation: kawaii-float 5s ease-in-out infinite;
+            }
+            
+            /* 外发光边框 - 糖果光晕 */
+            .dnd-char-card::before {
+                content: "";
+                position: absolute;
+                top: -4px; left: -4px; right: -4px; bottom: -4px;
+                background: linear-gradient(135deg, rgba(244, 114, 182, 0.3) 0%, rgba(251, 207, 232, 0.25) 25%, rgba(236, 72, 153, 0.25) 50%, rgba(244, 114, 182, 0.2) 75%, rgba(251, 207, 232, 0.3) 100%);
+                border-radius: 27px;
+                pointer-events: none;
+                z-index: -1;
+                filter: blur(4px);
+                animation: bubble-bounce 4s ease-in-out infinite;
+            }
+            
+            /* 星星纹理叠加 */
+            .dnd-char-card::after {
+                content: "";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: radial-gradient(circle at 20% 20%, rgba(219, 39, 119, 0.08) 1px, transparent 1px),
+                            radial-gradient(circle at 80% 40%, rgba(244, 114, 182, 0.06) 1px, transparent 1px),
+                            radial-gradient(circle at 40% 70%, rgba(219, 39, 119, 0.08) 1px, transparent 1px),
+                            radial-gradient(circle at 70% 80%, rgba(244, 114, 182, 0.06) 1px, transparent 1px);
+                background-size: 60px 60px;
+                pointer-events: none;
+                border-radius: inherit;
+                z-index: 0;
+            }
+            
+            /* 卡片头部 - 星星装饰 */
+            .dnd-card-header::before {
+                content: "✦";
+                position: absolute;
+                left: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #DB2777;
+                font-size: 14px;
+                animation: sparkle 2s ease-in-out infinite;
+            }
+            
+            .dnd-card-header::after {
+                content: "✦";
+                position: absolute;
+                right: 12px; top: 50%;
+                transform: translateY(-50%);
+                color: #F472B6;
+                font-size: 14px;
+                animation: sparkle 2s ease-in-out infinite 0.5s;
+            }
+            
+            /* 导航项 - 星星效果 */
+            .dnd-nav-item::before {
+                content: "";
+                position: absolute;
+                left: 0; top: 50%;
+                transform: translateY(-50%);
+                width: 0; height: 4px;
+                background: linear-gradient(90deg, #F472B6, #F9A8D4, #EC4899);
+                transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+                border-radius: 0 4px 4px 0;
+            }
+            
+            .dnd-nav-item:hover::before {
+                width: 25px;
+            }
+            
+            .dnd-nav-item.active::before {
+                width: 35px;
+                box-shadow: 0 0 12px rgba(244, 114, 182, 0.4);
+            }
+            
+            .dnd-nav-item.active::after {
+                content: "★";
+                position: absolute;
+                right: 12px;
+                color: #DB2777;
+                font-size: 14px;
+                animation: sparkle 1.5s ease-in-out infinite;
+            }
+            
+            /* 按钮 - 糖果光泽效果 */
+            .dnd-btn::before,
+            .dnd-action-btn::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -100%;
+                width: 60%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                transition: left 0.6s ease;
+            }
+            
+            .dnd-btn:hover::before,
+            .dnd-action-btn:hover::before {
+                left: 120%;
+            }
+            
+            /* 进度条 - 气泡流动效果 */
+            .dnd-bar-fill {
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .dnd-bar-fill::before {
+                content: "";
+                position: absolute;
+                top: 0; left: -60%; width: 60%; height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                animation: candy-shimmer 2s ease-in-out infinite;
+            }
+            
+            /* 进度条气泡装饰 */
+            .dnd-bar-container::after {
+                content: "";
+                position: absolute;
+                top: 2px; left: 2px;
+                width: 8px; height: 8px;
+                background: radial-gradient(circle, rgba(255,255,255,0.5), transparent);
+                border-radius: 50%;
+                animation: bubble-bounce 2s ease-in-out infinite;
+            }
+            
+            /* 分隔线 - 点点线 */
+            .dnd-divider {
+                height: 4px;
+                background: repeating-linear-gradient(90deg, #F9A8D4, #F9A8D4 8px, transparent 8px, transparent 16px);
+                position: relative;
+                margin: 15px 0;
+                border-radius: 2px;
+            }
+            
+            .dnd-divider::before {
+                content: "★";
+                position: absolute;
+                left: 50%; top: 50%;
+                transform: translate(-50%, -50%);
+                background: #FDF2F8;
+                padding: 0 12px;
+                color: #DB2777;
+                font-size: 14px;
+            }
+            
+            /* 面板角落 - 星星装饰 */
+            .dnd-panel::before,
+            .dnd-dialog::before {
+                content: "✦";
+                position: absolute;
+                top: 10px; left: 12px;
+                color: #F472B6;
+                font-size: 18px;
+                animation: sparkle 3s ease-in-out infinite;
+            }
+            
+            .dnd-panel::after,
+            .dnd-dialog::after {
+                content: "✦";
+                position: absolute;
+                bottom: 10px; right: 12px;
+                color: #F472B6;
+                font-size: 18px;
+                animation: sparkle 3s ease-in-out infinite 0.75s;
+            }
+            
+            /* 滚动条 - 糖果风格 */
+            .dnd-content-area::-webkit-scrollbar {
+                width: 12px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-track {
+                background: rgba(253, 242, 248, 0.8);
+                border-left: 2px solid #F9A8D4;
+                border-radius: 6px;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb {
+                background: linear-gradient(to bottom, #F472B6, #F9A8D4, #F472B6);
+                border-radius: 6px;
+                border: 2px solid #FDF2F8;
+            }
+            
+            .dnd-content-area::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(to bottom, #EC4899, #F472B6, #EC4899);
+            }
+            
+            /* 图标容器 - 糖果徽章 */
+            .dnd-icon-circle {
+                border-radius: 50%;
+                border: 3px solid #F9A8D4;
+                background: radial-gradient(circle at 30% 30%, #FCE7F3, #FDF2F8);
+                box-shadow: 0 0 18px rgba(244, 114, 182, 0.25), inset 0 0 10px rgba(251, 207, 232, 0.2);
+            }
+            
+            /* 头像框 - 圆润气泡形 */
+            .dnd-avatar {
+                border-radius: 50%;
+                border: 3px solid #F9A8D4;
+                box-shadow: 0 0 20px rgba(244, 114, 182, 0.25), 0 0 40px rgba(251, 207, 232, 0.15);
+            }
+            
+            /* 工具提示 */
+            .dnd-tooltip {
+                background: linear-gradient(135deg, #FFFFFF, #FDF2F8);
+                border: 2px solid #F9A8D4;
+                border-radius: 14px;
+                box-shadow: 0 6px 25px rgba(244, 114, 182, 0.15);
+                color: #9D174D;
+            }
+            
+            .dnd-tooltip::before {
+                content: "✦";
+                position: absolute;
+                top: 6px; left: 10px;
+                color: #DB2777;
+                font-size: 12px;
+            }
+            
+            /* 悬浮弹跳效果 */
+            .dnd-char-card:hover {
+                animation: kawaii-float 2s ease-in-out infinite, bubble-bounce 1s ease-in-out;
+            }
+            
+            /* 可爱的微动效果 */
+            .dnd-btn:hover {
+                animation: bubble-bounce 0.5s ease-in-out;
+            }
+        `,
+        background: {
+            type: 'particles',
+            colors: ['rgba(244, 114, 182, 0.6)', 'rgba(251, 207, 232, 0.5)', 'rgba(236, 72, 153, 0.4)', 'rgba(255, 255, 255, 0.7)'],
+            minSize: 2,
+            maxSize: 8,
+            count: 30,
+            speed: 0.06,
+            shape: 'circle',
+            glow: true
+        }
+    },
+
+    // 11. 草莓毛毡 - 温暖草莓红毛毡风格，手工缝线质感
+    'strawberry-felt': {
+        meta: {
+            id: 'strawberry-felt',
+            name: '草莓毛毡',
+            icon: '<i class="fa-solid fa-heart"></i>',
+            description: '温暖的草莓红毛毡风格，带有手工缝线和软糯质感',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#2a1a1a',
+            '--dnd-bg-panel-start': '#3a2828',
+            '--dnd-bg-panel-end': '#2a1a1a',
+            '--dnd-text-main': '#f5e6e0',
+            '--dnd-text-header': '#ffcdd2',
+            '--dnd-text-highlight': '#ffb4ab',
+            '--dnd-text-dim': '#b08888',
+            '--dnd-accent': '#e85a71',
+            '--dnd-accent-hover': '#f48fb1',
+            '--dnd-border-gold': '#d4a373',
+            '--dnd-border-inner': '#8b6f6f',
+            '--dnd-bg-card-start': 'rgba(58, 40, 40, 0.95)',
+            '--dnd-bg-card-end': 'rgba(42, 26, 26, 0.97)',
+            '--dnd-btn-primary': '#c06c6c',
+            '--dnd-btn-primary-hover': '#e07a7a',
+            '--dnd-btn-text': '#fff0f0'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'rectangle', decoration: 'simple' },
+            effects: { texture: 'fabric', innerGlow: 'subtle', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'spacious' },
+            decorations: { dividers: 'dashed', corners: 'none' },
+            buttons: { style: 'filled', shape: 'pill' },
+            progressBars: { shape: 'rounded', style: 'solid' }
+        },
+        typography: {
+            '--dnd-font-serif': '"Quicksand", "Nunito", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+        },
+        interactiveStates: {
+            hover: { brightness: 1.1, scale: 1.02, lift: '-4px', shadow: '0 10px 30px rgba(232, 90, 113, 0.25)', borderColor: '#d4a373', glow: 'drop-shadow(0 0 6px rgba(232, 90, 113, 0.4))', transition: '0.35s ease-out' },
+            cardHover: { transform: 'translateY(-6px) scale(1.015)', shadow: '0 18px 45px rgba(42, 26, 26, 0.55)', borderColor: '#ffb4ab' },
+            buttonHover: { brightness: 1.18, transform: 'translateY(-2px) scale(1.03)', shadow: '0 6px 20px rgba(232, 90, 113, 0.4)' },
+            active: { scale: 0.97, brightness: 0.92, transform: 'translateY(1px) scale(0.97)', shadow: '0 2px 8px rgba(42, 26, 26, 0.4)' },
+            buttonActive: { transform: 'translateY(2px) scale(0.98)', shadow: '0 1px 4px rgba(42, 26, 26, 0.3)' },
+            selected: { background: 'linear-gradient(90deg, rgba(232, 90, 113, 0.3), transparent)', borderColor: '#ffb4ab', borderWidth: '2px', glow: '0 0 18px rgba(232, 90, 113, 0.35)', textColor: '#ffb4ab' },
+            navActive: { background: 'linear-gradient(90deg, rgba(232, 90, 113, 0.35), transparent)', border: '3px solid #d4a373', indicator: '#e85a71' },
+            focus: { borderColor: '#e85a71', shadow: '0 0 0 3px rgba(232, 90, 113, 0.25)', outline: 'none' },
+            disabled: { opacity: 0.45, cursor: 'not-allowed', filter: 'grayscale(0.5) brightness(0.7)' },
+            iconHover: { glow: 'drop-shadow(0 0 8px rgba(232, 90, 113, 0.7))', scale: 1.15 },
+            inputFocus: { border: '#e85a71', shadow: '0 0 12px rgba(232, 90, 113, 0.35)' }
+        },
+        overrides: {
+            '.dnd-char-card': { 'border-radius': '20px', 'border': '2px solid #8b6f6f', 'box-shadow': '0 8px 30px rgba(42, 26, 26, 0.5), inset 0 0 40px rgba(232, 90, 113, 0.08)', 'background': 'linear-gradient(135deg, rgba(58, 40, 40, 0.95), rgba(42, 26, 26, 0.98))' },
+            '.dnd-card-header': { 'border-bottom': '2px dashed #8b6f6f', 'background': 'linear-gradient(to right, rgba(232, 90, 113, 0.15), rgba(212, 163, 115, 0.1))', 'border-radius': '18px 18px 0 0', 'padding': '14px 18px', 'position': 'relative' },
+            '.dnd-card-body': { 'background': 'radial-gradient(ellipse at bottom right, rgba(232, 90, 113, 0.06), transparent 70%)', 'padding': '16px' },
+            '.dnd-nav-sidebar': { 'background': 'linear-gradient(180deg, #3a2828, #2a1a1a)', 'border-right': '2px solid #8b6f6f' },
+            '.dnd-nav-item': { 'border-radius': '0 16px 16px 0', 'margin': '4px 0', 'padding': '12px 20px', 'border-left': '4px solid transparent', 'background': 'rgba(232, 90, 113, 0.03)', 'transition': 'all 0.35s ease-out' },
+            '.dnd-nav-item:hover': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.18), transparent)', 'border-left-color': '#d4a373', 'padding-left': '24px' },
+            '.dnd-nav-item.active': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.28), transparent)', 'border-left-color': '#e85a71', 'box-shadow': 'inset 4px 0 0 #ffb4ab' },
+            '.dnd-bar-container': { 'background': 'linear-gradient(180deg, rgba(42, 26, 26, 0.8), rgba(58, 40, 40, 0.6))', 'border': '1px solid #8b6f6f', 'border-radius': '12px', 'height': '10px' },
+            '.dnd-bar-fill': { 'background': 'linear-gradient(90deg, #c06c6c, #e85a71 40%, #f48fb1 70%, #e85a71)', 'box-shadow': '0 0 10px rgba(232, 90, 113, 0.5)', 'border-radius': '10px' },
+            '.dnd-bar-hp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #a05050, #c06c6c 40%, #e07a7a 70%, #c06c6c)' },
+            '.dnd-bar-exp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #b08060, #d4a373 40%, #e6c9a8 70%, #d4a373)' },
+            '.dnd-btn, .dnd-action-btn': { 'border': '2px solid #8b6f6f', 'background': 'linear-gradient(135deg, #4a3535, #3a2828)', 'box-shadow': '0 3px 8px rgba(42, 26, 26, 0.4)', 'border-radius': '16px', 'font-family': '"Quicksand", sans-serif', 'position': 'relative', 'overflow': 'hidden' },
+            '.dnd-btn:hover, .dnd-action-btn:hover': { 'background': 'linear-gradient(135deg, #5a4040, #4a3535)', 'border-color': '#d4a373', 'box-shadow': '0 0 15px rgba(232, 90, 113, 0.3)' },
+            '.dnd-btn:active, .dnd-action-btn:active': { 'background': 'linear-gradient(135deg, #3a2828, #2a1a1a)', 'box-shadow': 'inset 0 2px 4px rgba(42, 26, 26, 0.4)' },
+            '.dnd-stat-row': { 'background': 'linear-gradient(90deg, rgba(232, 90, 113, 0.1), rgba(139, 111, 111, 0.15))', 'border': '1px solid rgba(139, 111, 111, 0.35)', 'border-radius': '10px', 'padding': '8px 12px', 'margin': '4px 0' },
+            '.dnd-title, .dnd-char-name': { 'text-shadow': '0 2px 10px rgba(232, 90, 113, 0.35)', 'font-family': '"Quicksand", sans-serif', 'letter-spacing': '0.04em' },
+            '.dnd-panel, .dnd-dialog': { 'border': '2px solid #8b6f6f', 'border-radius': '24px', 'box-shadow': '0 12px 45px rgba(42, 26, 26, 0.6)' },
+            '#dnd-mini-hud': { 'border': '2px solid #8b6f6f', 'border-radius': '18px', 'background': 'linear-gradient(180deg, rgba(58, 40, 40, 0.98), rgba(42, 26, 26, 0.99))' },
+            '.dnd-input, .dnd-select, .dnd-textarea': { 'background': 'rgba(42, 26, 26, 0.8)', 'border': '2px solid #8b6f6f', 'border-radius': '12px', 'color': '#f5e6e0' },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': { 'border-color': '#e85a71', 'box-shadow': '0 0 12px rgba(232, 90, 113, 0.4)' },
+            '.dnd-table th': { 'background': 'linear-gradient(180deg, #4a3535, #3a2828)', 'border-bottom': '2px solid #e85a71', 'color': '#ffcdd2' },
+            '.dnd-table td': { 'border-bottom': '1px solid rgba(139, 111, 111, 0.35)' },
+            '.dnd-table tr:hover td': { 'background': 'rgba(232, 90, 113, 0.1)' },
+            '.dnd-badge': { 'background': 'linear-gradient(135deg, #8b6f6f, #6b5050)', 'border': '2px solid #d4a373', 'border-radius': '10px' }
+        },
+        customCSS: `
+            @keyframes felt-pulse {
+                0%, 100% { box-shadow: 0 8px 30px rgba(42, 26, 26, 0.5), inset 0 0 40px rgba(232, 90, 113, 0.08); filter: brightness(1); }
+                50% { box-shadow: 0 8px 35px rgba(42, 26, 26, 0.55), inset 0 0 50px rgba(232, 90, 113, 0.12); filter: brightness(1.02); }
+            }
+            @keyframes stitch-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+            @keyframes soft-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+            .dnd-char-card { position: relative; animation: felt-pulse 5s ease-in-out infinite; }
+            .dnd-char-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='felt'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.08' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23felt)' opacity='0.06'/%3E%3C/svg%3E"); pointer-events: none; border-radius: inherit; z-index: 0; }
+            .dnd-char-card::after { content: ""; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px; border: 1px dashed rgba(212, 163, 115, 0.35); border-radius: 14px; pointer-events: none; z-index: 1; animation: stitch-glow 3s ease-in-out infinite; }
+            .dnd-card-header::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); }
+            .dnd-card-header::after { content: ""; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: #d4a373; border-radius: 50%; opacity: 0.6; }
+            .dnd-nav-item::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 0; height: 3px; background: linear-gradient(90deg, #e85a71, #d4a373); transition: width 0.35s ease-out; border-radius: 0 3px 3px 0; }
+            .dnd-nav-item:hover::before { width: 20px; }
+            .dnd-nav-item.active::before { width: 28px; box-shadow: 0 0 10px rgba(232, 90, 113, 0.4); }
+            .dnd-nav-item.active::after { content: ""; position: absolute; right: 12px; width: 8px; height: 8px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); animation: soft-float 2s ease-in-out infinite; }
+            .dnd-btn::before, .dnd-action-btn::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 1px dashed rgba(212, 163, 115, 0.25); border-radius: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+            .dnd-btn:hover::before, .dnd-action-btn:hover::before { opacity: 1; }
+            .dnd-bar-fill::before { content: ""; position: absolute; top: 0; left: -50%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: stitch-glow 2.5s ease-in-out infinite; }
+            .dnd-divider { height: 0; border-top: 2px dashed #8b6f6f; position: relative; margin: 12px 0; }
+            .dnd-divider::before { content: ""; position: absolute; left: 50%; top: -4px; transform: translateX(-50%); width: 12px; height: 12px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.5); }
+            .dnd-panel::before, .dnd-dialog::before { content: ""; position: absolute; top: 10px; left: 12px; width: 12px; height: 12px; background: #e85a71; border-radius: 50%; box-shadow: 0 0 8px rgba(232, 90, 113, 0.4); }
+            .dnd-panel::after, .dnd-dialog::after { content: ""; position: absolute; bottom: 10px; right: 12px; width: 12px; height: 12px; background: #d4a373; border-radius: 50%; opacity: 0.6; }
+            .dnd-icon-circle { border-radius: 50%; border: 2px solid #d4a373; background: radial-gradient(circle at 30% 30%, #4a3535, #2a1a1a); box-shadow: 0 0 15px rgba(232, 90, 113, 0.3); }
+            .dnd-avatar { border-radius: 50%; border: 3px solid #d4a373; box-shadow: 0 0 18px rgba(232, 90, 113, 0.3); }
+            .dnd-tooltip { background: linear-gradient(135deg, #3a2828, #2a1a1a); border: 2px solid #d4a373; border-radius: 14px; }
+            .dnd-char-card:hover { box-shadow: 0 12px 40px rgba(42, 26, 26, 0.6), inset 0 0 50px rgba(232, 90, 113, 0.1), 0 0 30px rgba(212, 163, 115, 0.25); }
+        `,
+        background: { type: 'particles', colors: ['rgba(232, 90, 113, 0.6)', 'rgba(212, 163, 115, 0.5)', 'rgba(255, 180, 171, 0.4)'], minSize: 2, maxSize: 7, count: 25, speed: 0.04, shape: 'circle', glow: true }
+    },
+
+    // 12. 桃粉手作 - 棉麻布艺风格，蜜桃粉温暖质感
+    'peach-craft': {
+        meta: {
+            id: 'peach-craft',
+            name: '桃粉手作',
+            icon: '<i class="fa-solid fa-gem"></i>',
+            description: '棉麻布艺风格的蜜桃粉主题，带有编织纹理和温暖质感',
+            author: 'System'
+        },
+        colors: {
+            '--dnd-bg-main': '#2d1f1a',
+            '--dnd-bg-panel-start': '#3d2a22',
+            '--dnd-bg-panel-end': '#2d1f1a',
+            '--dnd-text-main': '#fff0e6',
+            '--dnd-text-header': '#ffe4d6',
+            '--dnd-text-highlight': '#ffab91',
+            '--dnd-text-dim': '#b89a8a',
+            '--dnd-accent': '#ff8a65',
+            '--dnd-accent-hover': '#ffab91',
+            '--dnd-border-gold': '#d7a87a',
+            '--dnd-border-inner': '#8a7060',
+            '--dnd-bg-card-start': 'rgba(61, 42, 34, 0.95)',
+            '--dnd-bg-card-end': 'rgba(45, 31, 26, 0.97)',
+            '--dnd-btn-primary': '#d4836a',
+            '--dnd-btn-primary-hover': '#e89b82',
+            '--dnd-btn-text': '#fff8f0'
+        },
+        morphology: {
+            border: { style: 'solid', width: '2px', outerStyle: 'none' },
+            corners: { style: 'rounded', clipPath: 'none' },
+            card: { shape: 'rectangle', decoration: 'simple' },
+            effects: { texture: 'fabric', innerGlow: 'subtle', borderGlow: 'subtle', overlay: 'gradient' },
+            layout: { density: 'spacious' },
+            decorations: { dividers: 'dashed', corners: 'none' },
+            buttons: { style: 'filled', shape: 'pill' },
+            progressBars: { shape: 'rounded', style: 'solid' }
+        },
+        typography: {
+            '--dnd-font-serif': '"Nunito Sans", "Segoe UI", sans-serif',
+            '--dnd-font-size-base': '0.95rem',
+            '--dnd-letter-spacing': '0.02em'
+        },
+        animations: {
+            '--dnd-transition-fast': '0.2s ease-out',
+            '--dnd-transition-normal': '0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+        },
+        interactiveStates: {
+            hover: { brightness: 1.1, scale: 1.02, lift: '-4px', shadow: '0 10px 30px rgba(255, 138, 101, 0.25)', borderColor: '#d7a87a', glow: 'drop-shadow(0 0 6px rgba(255, 138, 101, 0.4))', transition: '0.35s ease-out' },
+            cardHover: { transform: 'translateY(-6px) scale(1.015)', shadow: '0 18px 45px rgba(45, 31, 26, 0.55)', borderColor: '#ffab91' },
+            buttonHover: { brightness: 1.18, transform: 'translateY(-2px) scale(1.03)', shadow: '0 6px 20px rgba(255, 138, 101, 0.4)' },
+            active: { scale: 0.97, brightness: 0.92, transform: 'translateY(1px) scale(0.97)', shadow: '0 2px 8px rgba(45, 31, 26, 0.4)' },
+            buttonActive: { transform: 'translateY(2px) scale(0.98)', shadow: '0 1px 4px rgba(45, 31, 26, 0.3)' },
+            selected: { background: 'linear-gradient(90deg, rgba(255, 138, 101, 0.3), transparent)', borderColor: '#ffab91', borderWidth: '2px', glow: '0 0 18px rgba(255, 138, 101, 0.35)', textColor: '#ffab91' },
+            navActive: { background: 'linear-gradient(90deg, rgba(255, 138, 101, 0.35), transparent)', border: '3px solid #d7a87a', indicator: '#ff8a65' },
+            focus: { borderColor: '#ff8a65', shadow: '0 0 0 3px rgba(255, 138, 101, 0.25)', outline: 'none' },
+            disabled: { opacity: 0.45, cursor: 'not-allowed', filter: 'grayscale(0.5) brightness(0.7)' },
+            iconHover: { glow: 'drop-shadow(0 0 8px rgba(255, 138, 101, 0.7))', scale: 1.15 },
+            inputFocus: { border: '#ff8a65', shadow: '0 0 12px rgba(255, 138, 101, 0.35)' }
+        },
+        overrides: {
+            '.dnd-char-card': { 'border-radius': '18px', 'border': '2px solid #8a7060', 'box-shadow': '0 8px 30px rgba(45, 31, 26, 0.5), inset 0 0 40px rgba(255, 138, 101, 0.08)', 'background': 'linear-gradient(135deg, rgba(61, 42, 34, 0.95), rgba(45, 31, 26, 0.98))' },
+            '.dnd-card-header': { 'border-bottom': '2px solid #8a7060', 'background': 'linear-gradient(to right, rgba(255, 138, 101, 0.12), rgba(215, 168, 122, 0.1))', 'border-radius': '16px 16px 0 0', 'padding': '14px 18px', 'position': 'relative' },
+            '.dnd-card-body': { 'background': 'radial-gradient(ellipse at bottom right, rgba(255, 138, 101, 0.06), transparent 70%)', 'padding': '16px' },
+            '.dnd-nav-sidebar': { 'background': 'linear-gradient(180deg, #3d2a22, #2d1f1a)', 'border-right': '2px solid #8a7060' },
+            '.dnd-nav-item': { 'border-radius': '0 14px 14px 0', 'margin': '4px 0', 'padding': '12px 20px', 'border-left': '4px solid transparent', 'background': 'rgba(255, 138, 101, 0.03)', 'transition': 'all 0.35s ease-out' },
+            '.dnd-nav-item:hover': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.15), transparent)', 'border-left-color': '#d7a87a', 'padding-left': '24px' },
+            '.dnd-nav-item.active': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.25), transparent)', 'border-left-color': '#ff8a65', 'box-shadow': 'inset 4px 0 0 #ffab91' },
+            '.dnd-bar-container': { 'background': 'linear-gradient(180deg, rgba(45, 31, 26, 0.8), rgba(61, 42, 34, 0.6))', 'border': '1px solid #8a7060', 'border-radius': '10px', 'height': '10px' },
+            '.dnd-bar-fill': { 'background': 'linear-gradient(90deg, #d4836a, #ff8a65 40%, #ffab91 70%, #ff8a65)', 'box-shadow': '0 0 10px rgba(255, 138, 101, 0.5)', 'border-radius': '8px' },
+            '.dnd-bar-hp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #b06050, #d4836a 40%, #e89b82 70%, #d4836a)' },
+            '.dnd-bar-exp .dnd-bar-fill': { 'background': 'linear-gradient(90deg, #a07050, #d7a87a 40%, #e8c8a8 70%, #d7a87a)' },
+            '.dnd-btn, .dnd-action-btn': { 'border': '2px solid #8a7060', 'background': 'linear-gradient(135deg, #4a3530, #3d2a22)', 'box-shadow': '0 3px 8px rgba(45, 31, 26, 0.4)', 'border-radius': '14px', 'font-family': '"Nunito Sans", sans-serif', 'position': 'relative', 'overflow': 'hidden' },
+            '.dnd-btn:hover, .dnd-action-btn:hover': { 'background': 'linear-gradient(135deg, #5a4538, #4a3530)', 'border-color': '#d7a87a', 'box-shadow': '0 0 15px rgba(255, 138, 101, 0.3)' },
+            '.dnd-btn:active, .dnd-action-btn:active': { 'background': 'linear-gradient(135deg, #3d2a22, #2d1f1a)', 'box-shadow': 'inset 0 2px 4px rgba(45, 31, 26, 0.4)' },
+            '.dnd-stat-row': { 'background': 'linear-gradient(90deg, rgba(255, 138, 101, 0.1), rgba(138, 112, 96, 0.15))', 'border': '1px solid rgba(138, 112, 96, 0.35)', 'border-radius': '10px', 'padding': '8px 12px', 'margin': '4px 0' },
+            '.dnd-title, .dnd-char-name': { 'text-shadow': '0 2px 10px rgba(255, 138, 101, 0.35)', 'font-family': '"Nunito Sans", sans-serif', 'letter-spacing': '0.04em' },
+            '.dnd-panel, .dnd-dialog': { 'border': '2px solid #8a7060', 'border-radius': '22px', 'box-shadow': '0 12px 45px rgba(45, 31, 26, 0.6)' },
+            '#dnd-mini-hud': { 'border': '2px solid #8a7060', 'border-radius': '16px', 'background': 'linear-gradient(180deg, rgba(61, 42, 34, 0.98), rgba(45, 31, 26, 0.99))' },
+            '.dnd-input, .dnd-select, .dnd-textarea': { 'background': 'rgba(45, 31, 26, 0.8)', 'border': '2px solid #8a7060', 'border-radius': '10px', 'color': '#fff0e6' },
+            '.dnd-input:focus, .dnd-select:focus, .dnd-textarea:focus': { 'border-color': '#ff8a65', 'box-shadow': '0 0 12px rgba(255, 138, 101, 0.4)' },
+            '.dnd-table th': { 'background': 'linear-gradient(180deg, #4a3530, #3d2a22)', 'border-bottom': '2px solid #ff8a65', 'color': '#ffe4d6' },
+            '.dnd-table td': { 'border-bottom': '1px solid rgba(138, 112, 96, 0.35)' },
+            '.dnd-table tr:hover td': { 'background': 'rgba(255, 138, 101, 0.1)' },
+            '.dnd-badge': { 'background': 'linear-gradient(135deg, #8a7060, #6a5545)', 'border': '2px solid #d7a87a', 'border-radius': '10px' }
+        },
+        customCSS: `
+            @keyframes linen-wave {
+                0%, 100% { box-shadow: 0 8px 30px rgba(45, 31, 26, 0.5), inset 0 0 40px rgba(255, 138, 101, 0.08); filter: brightness(1); }
+                50% { box-shadow: 0 8px 35px rgba(45, 31, 26, 0.55), inset 0 0 50px rgba(255, 138, 101, 0.1); filter: brightness(1.02); }
+            }
+            @keyframes weave-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 100% 50%; } }
+            @keyframes soft-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+            .dnd-char-card { position: relative; animation: linen-wave 5s ease-in-out infinite; }
+            .dnd-char-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(215, 168, 122, 0.03) 2px, rgba(215, 168, 122, 0.03) 4px), repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(215, 168, 122, 0.03) 2px, rgba(215, 168, 122, 0.03) 4px); pointer-events: none; border-radius: inherit; z-index: 0; }
+            .dnd-char-card::after { content: ""; position: absolute; top: 6px; left: 6px; right: 6px; bottom: 6px; border: 1px solid rgba(215, 168, 122, 0.2); border-radius: 14px; pointer-events: none; z-index: 1; }
+            .dnd-card-header::before { content: ""; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 12px; height: 14px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); }
+            .dnd-card-header::after { content: ""; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 12px; height: 14px; background: #d7a87a; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; opacity: 0.6; }
+            .dnd-nav-item::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 0; height: 3px; background: repeating-linear-gradient(90deg, #ff8a65, #ff8a65 4px, #d7a87a 4px, #d7a87a 8px); transition: width 0.35s ease-out; border-radius: 0 3px 3px 0; }
+            .dnd-nav-item:hover::before { width: 22px; }
+            .dnd-nav-item.active::before { width: 30px; box-shadow: 0 0 10px rgba(255, 138, 101, 0.4); }
+            .dnd-nav-item.active::after { content: ""; position: absolute; right: 12px; width: 10px; height: 12px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); animation: soft-bob 2s ease-in-out infinite; }
+            .dnd-btn::before, .dnd-action-btn::before { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(215, 168, 122, 0.1) 2px, rgba(215, 168, 122, 0.1) 4px); border-radius: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+            .dnd-btn:hover::before, .dnd-action-btn:hover::before { opacity: 1; }
+            .dnd-bar-fill::before { content: ""; position: absolute; top: 0; left: -50%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: weave-shimmer 3s ease-in-out infinite; }
+            .dnd-divider { height: 3px; background: repeating-linear-gradient(90deg, #8a7060, #8a7060 6px, transparent 6px, transparent 12px); position: relative; margin: 12px 0; }
+            .dnd-divider::before { content: ""; position: absolute; left: 50%; top: -4px; transform: translateX(-50%); width: 14px; height: 14px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.5); }
+            .dnd-panel::before, .dnd-dialog::before { content: ""; position: absolute; top: 10px; left: 12px; width: 14px; height: 16px; background: #ff8a65; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; box-shadow: 0 0 8px rgba(255, 138, 101, 0.4); }
+            .dnd-panel::after, .dnd-dialog::after { content: ""; position: absolute; bottom: 10px; right: 12px; width: 14px; height: 16px; background: #d7a87a; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; opacity: 0.6; }
+            .dnd-icon-circle { border-radius: 50%; border: 2px solid #d7a87a; background: radial-gradient(circle at 30% 30%, #4a3530, #2d1f1a); box-shadow: 0 0 15px rgba(255, 138, 101, 0.3); }
+            .dnd-avatar { border-radius: 50%; border: 3px solid #d7a87a; box-shadow: 0 0 18px rgba(255, 138, 101, 0.3); }
+            .dnd-tooltip { background: linear-gradient(135deg, #3d2a22, #2d1f1a); border: 2px solid #d7a87a; border-radius: 14px; }
+        `,
+        background: { type: 'particles', colors: ['rgba(255, 138, 101, 0.6)', 'rgba(215, 168, 122, 0.5)', 'rgba(255, 171, 145, 0.4)'], minSize: 2, maxSize: 7, count: 25, speed: 0.04, shape: 'circle', glow: true }
     }
 };
 

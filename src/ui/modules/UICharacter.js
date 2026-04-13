@@ -8,47 +8,198 @@ import { CONFIG } from '../../config/Config.js';
 import { DiceManager } from '../../data/DiceManager.js';
 import { NotificationSystem } from './UIUtils.js';
 import { TavernSettingsSync } from '../../core/TavernSettingsSync.js';
+import { TemplateSync } from '../../features/TemplateSync.js';
 import { ICONS } from '../SVGIcons.js';
 
+const getAvatarValue = (value) => {
+    if (value === undefined || value === null) return null;
+    const normalized = String(value).trim();
+    return normalized || null;
+};
+
+const uniqueAvatarValues = (values) => {
+    const result = [];
+    const seen = new Set();
+
+    values.forEach(value => {
+        const normalized = getAvatarValue(value);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        result.push(normalized);
+    });
+
+    return result;
+};
+
+const normalizeAvatarIdentity = (avatarIdentity, fallbackName = '') => {
+    if (avatarIdentity && typeof avatarIdentity === 'object' && !Array.isArray(avatarIdentity)) {
+        return {
+            CHAR_ID: getAvatarValue(avatarIdentity['CHAR_ID'] ?? avatarIdentity.CHAR_ID ?? avatarIdentity.charId),
+            PC_ID: getAvatarValue(avatarIdentity['PC_ID'] ?? avatarIdentity.PC_ID ?? avatarIdentity.pcId),
+            姓名: getAvatarValue(avatarIdentity['姓名'] ?? avatarIdentity.name ?? fallbackName),
+            单位名称: getAvatarValue(avatarIdentity['单位名称'] ?? avatarIdentity.unitName),
+            legacyKey: getAvatarValue(avatarIdentity.legacyKey ?? avatarIdentity.rawKey)
+        };
+    }
+
+    return {
+        CHAR_ID: null,
+        PC_ID: null,
+        姓名: getAvatarValue(fallbackName),
+        单位名称: null,
+        legacyKey: getAvatarValue(avatarIdentity)
+    };
+};
+
+const buildAvatarScopedKey = (chatId, identityType, identityValue) => {
+    const scope = encodeURIComponent(getAvatarValue(chatId) || 'global');
+    const type = encodeURIComponent(getAvatarValue(identityType) || 'legacy');
+    const value = encodeURIComponent(getAvatarValue(identityValue) || 'unknown');
+    return `chat_avatar__${scope}__${type}__${value}`;
+};
+
+const resolveAvatarStorageInfo = (avatarIdentity, fallbackName = '') => {
+    const identity = normalizeAvatarIdentity(avatarIdentity, fallbackName);
+    const displayName = identity.姓名 || identity.单位名称 || identity.legacyKey || getAvatarValue(fallbackName) || '角色';
+    const canonicalType = identity.CHAR_ID
+        ? 'char'
+        : identity.PC_ID
+            ? 'pc'
+            : identity.姓名
+                ? 'name'
+                : identity.单位名称
+                    ? 'unit'
+                    : identity.legacyKey
+                        ? 'legacy'
+                        : null;
+    const canonicalValue = identity.CHAR_ID || identity.PC_ID || identity.姓名 || identity.单位名称 || identity.legacyKey;
+    const chatId = TavernSettingsSync.getCurrentChatId() || 'global';
+    const canonicalKey = canonicalValue ? buildAvatarScopedKey(chatId, canonicalType, canonicalValue) : null;
+    const legacyRawKeys = uniqueAvatarValues([
+        identity.CHAR_ID,
+        identity.PC_ID,
+        identity.姓名,
+        identity.单位名称,
+        identity.legacyKey
+    ]);
+
+    return {
+        identity,
+        displayName,
+        chatId,
+        canonicalKey,
+        canonicalChatKey: canonicalKey ? `avatar_${canonicalKey}` : null,
+        canonicalLocalStorageKey: canonicalKey ? `dnd_avatar_${canonicalKey}` : null,
+        legacyRawKeys,
+        legacyChatKeys: legacyRawKeys.map(key => `avatar_${key}`),
+        legacyLocalStorageKeys: legacyRawKeys.map(key => `dnd_avatar_${key}`),
+        domKey: canonicalKey || buildAvatarScopedKey(chatId, 'legacy', displayName)
+    };
+};
+
+const persistCanonicalAvatar = async (avatarInfo, base64Data) => {
+    if (!avatarInfo?.canonicalKey || !base64Data) return false;
+    await TavernSettingsSync.saveToChat(avatarInfo.canonicalChatKey, base64Data);
+    return await DBAdapter.put(avatarInfo.canonicalKey, base64Data);
+};
+
+const removeLocalAvatarKey = (key) => {
+    try {
+        if (key) localStorage.removeItem(key);
+    } catch (e) {}
+};
+
 export default {
+    resolveAvatarIdentity(avatarIdentity, fallbackName = '') {
+        return normalizeAvatarIdentity(avatarIdentity, fallbackName);
+    },
+
+    resolveAvatarStorageKeys(avatarIdentity, fallbackName = '') {
+        return resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+    },
+
     // 头像存储管理 (使用 IndexedDB + Chat Metadata)
     avatarStorage: {
-        get: async (charId) => {
-            // 1. 优先尝试 Chat Metadata (跟随聊天文件)
-            const chatVal = TavernSettingsSync.getFromChat(`avatar_${charId}`);
-            if (chatVal) return chatVal;
+        get: async (avatarIdentity, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+            if (!avatarInfo.canonicalKey) return null;
 
-            // 2. 尝试 IndexedDB (本地缓存)
-            let val = await DBAdapter.get(charId);
-            // 兼容旧版 localStorage (迁移数据)
-            if (!val) {
-                const old = localStorage.getItem(`dnd_avatar_${charId}`);
-                if (old) {
-                    await DBAdapter.put(charId, old);
-                    localStorage.removeItem(`dnd_avatar_${charId}`); // 迁移后删除
-                    val = old;
-                }
+            // 1. 优先尝试新的聊天作用域主键
+            const canonicalChatVal = TavernSettingsSync.getFromChat(avatarInfo.canonicalChatKey);
+            if (canonicalChatVal) {
+                await DBAdapter.put(avatarInfo.canonicalKey, canonicalChatVal);
+                return canonicalChatVal;
             }
-            return val;
+
+            const canonicalDbVal = await DBAdapter.get(avatarInfo.canonicalKey);
+            if (canonicalDbVal) {
+                await TavernSettingsSync.saveToChat(avatarInfo.canonicalChatKey, canonicalDbVal);
+                return canonicalDbVal;
+            }
+
+            // 2. 回退到旧版 Chat Metadata Key
+            for (const legacyChatKey of avatarInfo.legacyChatKeys) {
+                const legacyChatVal = TavernSettingsSync.getFromChat(legacyChatKey);
+                if (!legacyChatVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyChatVal);
+                return legacyChatVal;
+            }
+
+            // 3. 回退到旧版 IndexedDB Key
+            for (const legacyKey of avatarInfo.legacyRawKeys) {
+                const legacyDbVal = await DBAdapter.get(legacyKey);
+                if (!legacyDbVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyDbVal);
+                return legacyDbVal;
+            }
+
+            // 4. 回退到旧版 localStorage Key，并迁移到新主键
+            for (const legacyStorageKey of avatarInfo.legacyLocalStorageKeys) {
+                const legacyLocalVal = localStorage.getItem(legacyStorageKey);
+                if (!legacyLocalVal) continue;
+
+                await persistCanonicalAvatar(avatarInfo, legacyLocalVal);
+                removeLocalAvatarKey(legacyStorageKey);
+                return legacyLocalVal;
+            }
+
+            return null;
         },
-        set: async (charId, base64Data) => {
-            // 保存到 Chat Metadata
-            await TavernSettingsSync.saveToChat(`avatar_${charId}`, base64Data);
-            // 保存到 IndexedDB
-            return await DBAdapter.put(charId, base64Data);
+        set: async (avatarIdentity, base64Data, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+            return await persistCanonicalAvatar(avatarInfo, base64Data);
         },
-        remove: async (charId) => {
-            // 从 Chat Metadata 移除
-            await TavernSettingsSync.deleteFromChat(`avatar_${charId}`);
-            // 从 IndexedDB 移除
-            return await DBAdapter.delete(charId);
+        remove: async (avatarIdentity, fallbackName = '') => {
+            const avatarInfo = resolveAvatarStorageInfo(avatarIdentity, fallbackName);
+
+            if (avatarInfo.canonicalChatKey) {
+                await TavernSettingsSync.deleteFromChat(avatarInfo.canonicalChatKey);
+            }
+            if (avatarInfo.canonicalKey) {
+                await DBAdapter.delete(avatarInfo.canonicalKey);
+            }
+            removeLocalAvatarKey(avatarInfo.canonicalLocalStorageKey);
+
+            for (const legacyChatKey of avatarInfo.legacyChatKeys) {
+                await TavernSettingsSync.deleteFromChat(legacyChatKey);
+            }
+            for (const legacyKey of avatarInfo.legacyRawKeys) {
+                await DBAdapter.delete(legacyKey);
+            }
+            for (const legacyStorageKey of avatarInfo.legacyLocalStorageKeys) {
+                removeLocalAvatarKey(legacyStorageKey);
+            }
+
+            return true;
         }
     },
 
     // 异步加载头像
-    async loadAvatarAsync(charId, elemId) {
+    async loadAvatarAsync(avatarIdentity, elemId, fallbackName = '') {
         const { $ } = getCore();
-        const base64 = await this.avatarStorage.get(charId);
+        const base64 = await this.avatarStorage.get(avatarIdentity, fallbackName);
         if (base64) {
             const $el = $(`#${elemId}`);
             if ($el.length) {
@@ -67,26 +218,30 @@ export default {
     },
 
     // 生成头像HTML (异步模式)
-    renderAvatar(name, charId, size = 40) {
+    renderAvatar(name, avatarIdentity, size = 40) {
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, name);
         const initial = this.getNameInitial(name);
         const fontSize = Math.floor(size * 0.5);
+        const rawIdentityKey = avatarInfo.identity.CHAR_ID || avatarInfo.identity.PC_ID || avatarInfo.identity.legacyKey || avatarInfo.displayName;
         // 生成唯一ID以便异步填充
-        const uid = `avatar-${charId}-${Math.random().toString(36).substr(2, 9)}`;
+        const uid = `avatar-${avatarInfo.domKey.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Math.random().toString(36).substr(2, 9)}`;
         
         // 触发异步加载
-        setTimeout(() => this.loadAvatarAsync(charId, uid), 0);
+        setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, name), 0);
 
         // 返回占位符 (显示首字母)
         return `
-            <div id="${uid}" class="dnd-avatar-container" data-char-id="${charId}" style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1px solid var(--dnd-border-gold);flex-shrink:0;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="${name}">
+            <div id="${uid}" class="dnd-avatar-container" data-char-id="${rawIdentityKey || ''}" data-avatar-key="${avatarInfo.domKey}" style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;border:1px solid var(--dnd-border-gold);flex-shrink:0;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;" title="${name}">
                 <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:${fontSize}px;">${initial}</span>
             </div>
         `;
     },
 
     // 显示头像上传对话框
-    showAvatarUploadDialog(charId, charName) {
+    showAvatarUploadDialog(avatarIdentity, charName) {
         const { $, window: coreWin } = getCore();
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, charName);
+        const displayName = charName || avatarInfo.displayName;
         
         // 移除已存在的对话框
         $('#dnd-avatar-upload-dialog').remove();
@@ -110,8 +265,8 @@ export default {
         // "onclick="window.DND_Dashboard_UI.showAvatarUploadDialog..."
         // So it can be async.
         
-        this.avatarStorage.get(charId).then(storedAvatar => {
-            const initial = this.getNameInitial(charName);
+        this.avatarStorage.get(avatarIdentity, displayName).then(storedAvatar => {
+            const initial = this.getNameInitial(displayName);
             
             // 检测是否为移动端
             const isMobileDialog = (coreWin.innerWidth || $(coreWin).width()) < 768;
@@ -140,7 +295,7 @@ export default {
                     box-shadow: 0 10px 40px rgba(0,0,0,0.8);
                 ">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-inner);padding-bottom:10px;">
-                        <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${charName}</span>
+                        <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">设置头像 - ${displayName}</span>
                         <span id="dnd-avatar-dialog-close" style="cursor:pointer;color:#888;font-size:18px;" title="关闭"><i class="fa-solid fa-times"></i></span>
                     </div>
                     
@@ -224,14 +379,14 @@ export default {
                     
                     // 压缩图片
                     self.compressImage(base64, 150, (compressedBase64) => {
-                        // 保存到 localStorage
-                        self.avatarStorage.set(charId, compressedBase64).then(success => {
+                        // 保存头像
+                        self.avatarStorage.set(avatarIdentity, compressedBase64, displayName).then(success => {
                             if (success) {
                                 // 更新预览
                                 $('#dnd-avatar-preview').html(`<img src="${compressedBase64}" style="width:100%;height:100%;object-fit:cover;">`);
                                 
                                 // 更新页面上所有该角色的头像
-                                self.refreshAvatars(charId);
+                                self.refreshAvatars(avatarIdentity, displayName);
                                 
                                 // 关闭对话框
                                 setTimeout(() => {
@@ -253,19 +408,21 @@ export default {
                     type: 'danger'
                 });
                 if (confirmed) {
-                    this.avatarStorage.remove(charId);
-                    this.refreshAvatars(charId);
+                    await this.avatarStorage.remove(avatarIdentity, displayName);
+                    this.refreshAvatars(avatarIdentity, displayName);
                     $('#dnd-avatar-upload-dialog, #dnd-avatar-dialog-backdrop').remove();
                 }
             });
         });
     },
-
+    
     // 刷新页面上指定角色的所有头像
-    refreshAvatars(charId) {
+    refreshAvatars(avatarIdentity, fallbackName = '') {
         const { $ } = getCore();
-        this.avatarStorage.get(charId).then(storedAvatar => {
-            $(`.dnd-avatar-container[data-char-id="${charId}"]`).each(function() {
+        const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, fallbackName);
+
+        this.avatarStorage.get(avatarIdentity, fallbackName).then(storedAvatar => {
+            $(`[data-avatar-key="${avatarInfo.domKey}"]`).each(function() {
                 const $container = $(this);
                 const size = $container.width();
                 const fontSize = Math.floor(size * 0.5);
@@ -387,7 +544,8 @@ export default {
         else if (memRes) res = memRes.find(r => r['CHAR_ID'] === charId) || {};
         
         // 构建 HTML
-        const detailAvatarHtml = this.renderAvatar(char['姓名'], charId, 48);
+        const avatarIdentity = char;
+        const detailAvatarHtml = this.renderAvatar(char['姓名'], avatarIdentity, 48);
         
         // [新增] 只有当是主角或队友时，才显示上传按钮
         const party = DataManager.getPartyData();
@@ -396,7 +554,7 @@ export default {
         let html = `
             <div class="dnd-detail-header">
                 <div style="display:flex;align-items:center;gap:15px;flex:1;overflow:hidden;">
-                    <div style="position:relative;cursor:pointer;" class="dnd-avatar-wrapper" onclick="${isPartyMember ? `window.DND_Dashboard_UI.showAvatarUploadDialog('${charId}', '${char['姓名']}')` : ''}" title="${isPartyMember ? '点击修改头像' : ''}">
+                    <div style="position:relative;cursor:${isPartyMember ? 'pointer' : 'default'};" class="dnd-avatar-wrapper" title="${isPartyMember ? '点击修改头像' : ''}">
                         ${detailAvatarHtml}
                         ${isPartyMember ? `<div style="position:absolute;bottom:-2px;right:-2px;background:#333;border:1px solid var(--dnd-border-gold);border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dnd-text-highlight);">📷</div>` : ''}
                     </div>
@@ -496,6 +654,13 @@ export default {
                 $(this).find('span').text('▲');
             }
         });
+
+        if (isPartyMember) {
+            $card.find('.dnd-avatar-wrapper').on('click', (e) => {
+                e.stopPropagation();
+                this.showAvatarUploadDialog(avatarIdentity, char['姓名']);
+            });
+        }
 
         // ========== 智能定位逻辑 ==========
         const { window: coreWin } = getCore();
@@ -786,7 +951,7 @@ export default {
 
                 // 如果仍未初始化 (无存档或解析失败)，则使用默认值
                 if (!this._charCreatorState) {
-                    let apiConfig = { url: '', key: '', model: '' };
+                    let apiConfig = { provider: 'plugin', url: '', key: '', model: '' };
                     
                     // [新增] 获取世界书内容
                     const worldInfo = await TavernAPI.getEnabledWorldInfo();
@@ -804,17 +969,20 @@ export default {
                         useWorldInfo: true
                     };
                     
-                    // 异步加载全局 API 配置 (仅在全新开始时加载)
-                    SettingsManager.getAPIConfig().then(config => {
-                        if (config && config.url) {
-                            if (this._charCreatorState) {
-                                this._charCreatorState.apiConfig = config;
-                            }
-                        }
-                        // 加载配置后刷新显示
-                        this.renderCharacterCreationPanel($container);
-                    });
-                    return; // 等待回调刷新
+                }
+
+                // 无论是恢复会话还是全新开始，都强制同步一次最新的全局 API 配置
+                const latestApiConfig = await SettingsManager.getAPIConfig();
+                if (this._charCreatorState && latestApiConfig) {
+                    this._charCreatorState.apiConfig = {
+                        provider: 'plugin',
+                        url: '',
+                        key: '',
+                        model: '',
+                        ...(this._charCreatorState.apiConfig || {}),
+                        ...latestApiConfig
+                    };
+                    this.saveCreatorState();
                 }
                 
                 // 状态已就绪，刷新显示
@@ -1308,7 +1476,13 @@ export default {
             // 更新本地状态以确保同步
             state.apiConfig = currentConfig;
 
-            if (!state.apiConfig.url || !state.apiConfig.model) {
+            if (state.apiConfig.provider === 'database') {
+                if (!TavernAPI.getDatabaseAIStatus().available) {
+                    NotificationSystem.warning('当前数据库插件未提供 AI 调用接口，请先更新数据库插件或切回自定义 API', '配置缺失');
+                    this.renderPanel('settings');
+                    return;
+                }
+            } else if (!state.apiConfig.url || !state.apiConfig.model) {
                 NotificationSystem.warning('请先在设置中配置 API 地址和模型', '配置缺失');
                 // Use global reference for cross-module call if needed, but this is mixin
                 // UIRenderer is 'this' when called
@@ -1612,11 +1786,31 @@ ${JSON.stringify(state.characterData, null, 2)}
                 messages.push({ role: msg.role, content: msg.content });
             });
             
+            // 每次发送前都同步一次最新的全局 API 配置，确保设置页切换立即生效
+            const latestApiConfig = await SettingsManager.getAPIConfig();
+            if (latestApiConfig) {
+                state.apiConfig = {
+                    provider: 'plugin',
+                    url: '',
+                    key: '',
+                    model: '',
+                    ...(state.apiConfig || {}),
+                    ...latestApiConfig
+                };
+            }
+
             // 调用 API
-            const response = await TavernAPI.generate(messages, {
-                customConfig: state.apiConfig,
+            const requestOptions = {
                 maxTokens: 4096 // 增加最大 Token 数以防止截断
-            });
+            };
+
+            if (state.apiConfig?.provider === 'database') {
+                requestOptions.useDatabaseAPI = true;
+            } else {
+                requestOptions.customConfig = state.apiConfig;
+            }
+
+            const response = await TavernAPI.generate(messages, requestOptions);
             
             // 处理响应
             if (response) {
@@ -1690,10 +1884,12 @@ ${JSON.stringify(state.characterData, null, 2)}
     },
 
     // 完成角色创建，保存数据
-    async finalizeCharacterCreation() {
+    async finalizeCharacterCreation(options = {}) {
         const { $ } = getCore();
         const state = this._charCreatorState;
         const data = state.characterData;
+
+        const { _retrying = false } = options || {};
         
         if (!data || !data.name) {
             NotificationSystem.warning('角色数据不完整，无法保存');
@@ -1729,6 +1925,77 @@ ${JSON.stringify(state.characterData, null, 2)}
             const skillLinkTable = findTable('CHARACTER_Skills');
             const featLibTable = findTable('FEAT_Library');
             const featLinkTable = findTable('CHARACTER_Feats');
+
+            const spells = data.spells || [];
+            const features = data.features || [];
+
+            // 模板表格有效性检查（缺失/损坏时引导导入，并在成功后自动重试保存）
+            const isTableStructValid = (table, requiredHeaders = []) => {
+                if (!table) return false;
+                if (!Array.isArray(table.content) || table.content.length === 0) return false;
+                const headers = table.content[0];
+                if (!Array.isArray(headers) || headers.length === 0) return false;
+                return requiredHeaders.every(h => headers.includes(h));
+            };
+
+            const templateIssues = [];
+            if (!isTableStructValid(mainTable, ['CHAR_ID'])) {
+                templateIssues.push('角色注册表 (CHARACTER_Registry) 缺失或结构异常（缺少表头或 CHAR_ID 列）');
+            }
+
+            if (spells.length > 0) {
+                if (!isTableStructValid(skillLibTable, ['SKILL_ID', '技能名称'])) {
+                    templateIssues.push('法术/技能库 (SKILL_Library) 缺失或结构异常（缺少表头或 SKILL_ID/技能名称 列）');
+                }
+                if (!isTableStructValid(skillLinkTable, ['CHAR_ID', 'SKILL_ID'])) {
+                    templateIssues.push('角色-法术/技能关联表 (CHARACTER_Skills) 缺失或结构异常（缺少表头或 CHAR_ID/SKILL_ID 列）');
+                }
+            }
+
+            if (features.length > 0) {
+                if (!isTableStructValid(featLibTable, ['FEAT_ID', '专长名称'])) {
+                    templateIssues.push('专长/特性库 (FEAT_Library) 缺失或结构异常（缺少表头或 FEAT_ID/专长名称 列）');
+                }
+                if (!isTableStructValid(featLinkTable, ['CHAR_ID', 'FEAT_ID'])) {
+                    templateIssues.push('角色-专长/特性关联表 (CHARACTER_Feats) 缺失或结构异常（缺少表头或 CHAR_ID/FEAT_ID 列）');
+                }
+            }
+
+            if (templateIssues.length > 0) {
+                // 已重试仍失败：避免无限循环
+                if (_retrying) {
+                    throw new Error(`模板表格仍缺失或结构异常，无法保存：\n- ${templateIssues.join('\n- ')}`);
+                }
+
+                const confirmed = await NotificationSystem.confirm(
+                    `检测到当前数据库缺少/损坏 DND 仪表盘配套模板，导致无法保存角色。\n\n问题：\n- ${templateIssues.join('\n- ')}\n\n是否立即导入配套模板，并在导入成功后自动重试本次保存？`,
+                    {
+                        title: '需要导入配套模板',
+                        confirmText: '导入并重试',
+                        cancelText: '取消保存',
+                        type: 'warning'
+                    }
+                );
+
+                if (!confirmed) {
+                    NotificationSystem.warning('已取消保存：缺少或损坏配套模板');
+                    return;
+                }
+
+                const imported = await TemplateSync.manualImport({
+                    skipConfirm: true,
+                    confirmTitle: '导入配套模板',
+                    confirmMessage: '角色保存需要更新配套模板结构，是否继续导入内置模板？'
+                });
+
+                if (!imported) {
+                    NotificationSystem.error('模板导入未完成，已取消本次保存。', '角色创建');
+                    return;
+                }
+
+                NotificationSystem.info('模板导入完成，正在重试保存...', '角色创建');
+                return await this.finalizeCharacterCreation({ _retrying: true });
+            }
             
             if (!mainTable) throw new Error('找不到角色注册表 (CHARACTER_Registry)');
             
@@ -1841,7 +2108,6 @@ ${JSON.stringify(state.characterData, null, 2)}
             if (resTable) updateOrInsert(resTable, charId);
 
             // 处理技能和法术
-            const spells = data.spells || [];
             if (spells.length > 0 && skillLibTable && skillLinkTable) {
                 const linkHeaders = skillLinkTable.content[0];
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');
@@ -1946,7 +2212,6 @@ ${JSON.stringify(state.characterData, null, 2)}
             }
 
             // 处理专长和特性
-            const features = data.features || [];
             if (features.length > 0 && featLibTable && featLinkTable) {
                 const linkHeaders = featLinkTable.content[0];
                 const charIdIdx = linkHeaders.indexOf('CHAR_ID');

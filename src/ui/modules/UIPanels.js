@@ -64,18 +64,18 @@ export default {
         
         // [新增] 队伍工具栏 - 导入/导出按钮
         const $toolbar = $(`
-            <div class="dnd-party-toolbar" style="display:flex;gap:10px;margin-bottom:15px;padding:10px;background:rgba(0,0,0,0.3);border-radius:6px;border:1px solid var(--dnd-border-inner);">
+            <div class="dnd-party-toolbar" style="display:flex;gap:10px;margin-bottom:15px;padding:10px;background:var(--dnd-bg-secondary);border-radius:6px;border:1px solid var(--dnd-border-inner);">
                 <div style="flex:1;display:flex;align-items:center;gap:10px;">
                     <span style="font-weight:bold;color:var(--dnd-text-highlight);"><i class="fa-solid fa-users"></i> 冒险队伍</span>
-                    <span style="font-size:12px;color:#888;">(${party.length} 名成员)</span>
+                    <span style="font-size:12px;color:var(--dnd-text-dim);">(${party.length} 名成员)</span>
                 </div>
-                <button class="dnd-btn dnd-clickable dnd-export-party-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-gold);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-export-party-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-gold);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-download"></i> 导出队伍
                 </button>
-                <button class="dnd-btn dnd-clickable dnd-import-party-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-import-party-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-upload"></i> 导入队伍
                 </button>
-                <button class="dnd-btn dnd-clickable dnd-import-fvtt-btn" style="background:#1a1a1c;border:1px solid var(--dnd-border-inner);color:#e67e22;padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
+                <button class="dnd-btn dnd-clickable dnd-import-fvtt-btn" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-highlight);padding:6px 12px;border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:5px;">
                     <i class="fa-solid fa-file-import"></i> 导入 FVTT
                 </button>
             </div>
@@ -125,15 +125,14 @@ export default {
             const statsObj = DataManager.parseValue(char['属性值'], 'stats') || {};
 
             if (Object.keys(statsObj).length > 0) {
-                statsHtml = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; background:rgba(0,0,0,0.2); padding:5px; border-radius:4px;">';
+                statsHtml = '<div style="display:flex; justify-content:space-between; margin-bottom:10px; background:var(--dnd-bg-secondary); padding:5px; border-radius:4px;">';
                 Object.keys(statsObj).forEach(k => {
-                    statsHtml += `<div style="text-align:center;"><div style="font-size:10px;color:#888">${k}</div><div style="font-weight:bold">${statsObj[k]}</div></div>`;
+                    statsHtml += `<div style="text-align:center;"><div style="font-size:10px;color:var(--dnd-text-dim)">${k}</div><div style="font-weight:bold">${statsObj[k]}</div></div>`;
                 });
                 statsHtml += '</div>';
             }
 
-            const charId = char['PC_ID'] || char['CHAR_ID'] || char['姓名'];
-            const avatarHtml = this.renderAvatar(char['姓名'], charId, 40);
+            const avatarHtml = this.renderAvatar(char['姓名'], char, 40);
             
             // 解析熟练技能 (用于悬浮提示)
             let skillTooltip = '点击查看详情';
@@ -202,7 +201,7 @@ export default {
                             </div>
                         </div>` : ''}
                         
-                        <div style="margin-top:5px;font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        <div style="margin-top:5px;font-size:12px;color:var(--dnd-text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                             ${char['外貌描述'] || '无描述'}
                         </div>
                     </div>
@@ -233,7 +232,7 @@ export default {
         const $list = $('<div style="display:flex;flex-direction:column;gap:15px;"></div>');
 
         quests.forEach((q, index) => {
-            const statusColor = q['状态'] === '已完成' ? '#3a6b4a' : (q['状态'] === '已失败' ? '#8a2c2c' : '#c5a059');
+            const statusColor = q['状态'] === '已完成' ? 'var(--dnd-accent-green)' : (q['状态'] === '已失败' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-highlight)');
             
             const itemHtml = `
                 <div class="dnd-anim-entry" style="animation-delay:${index * 0.05}s; background:var(--dnd-bg-panel);border:1px solid var(--dnd-border-inner);padding:15px;border-radius:4px;">
@@ -259,7 +258,7 @@ export default {
 
         // 布局
         const $layout = $('<div style="display:flex;gap:20px;height:100%;"></div>');
-        const $sidebar = $('<div style="width:250px;background:rgba(0,0,0,0.3);padding:10px;overflow-y:auto;"></div>');
+        const $sidebar = $('<div style="width:250px;background:var(--dnd-bg-secondary);padding:10px;overflow-y:auto;"></div>');
         const $mapArea = $('<div class="dnd-map-container"></div>');
 
         $sidebar.html('<h3 style="color:var(--dnd-text-header);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;">先攻列表</h3>');
@@ -274,13 +273,13 @@ export default {
             sorted.forEach(unit => {
                 const isActive = unit['是否为当前行动者'] === '是';
                 const hp = unit['HP状态'] || '??/??';
-                const activeStyle = isActive ? 'background:rgba(197, 160, 89, 0.2);border-left:3px solid var(--dnd-border-gold);' : '';
+                const activeStyle = isActive ? 'background:var(--dnd-selected-bg);border-left:3px solid var(--dnd-border-gold);' : '';
                 
                 const rowHtml = `
-                    <div style="padding:8px;border-bottom:1px solid #333;display:flex;justify-content:space-between;${activeStyle}">
+                    <div style="padding:8px;border-bottom:1px solid var(--dnd-border-subtle);display:flex;justify-content:space-between;${activeStyle}">
                         <div>
                             <div style="font-weight:bold;color:${unit['阵营'] === '敌方' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-main)'}">${unit['单位名称']}</div>
-                            <div style="font-size:12px;color:#888;">HP: ${hp}</div>
+                            <div style="font-size:12px;color:var(--dnd-text-dim);">HP: ${hp}</div>
                         </div>
                         <div style="font-size:16px;font-weight:bold;color:var(--dnd-text-header)">${parseInt(unit['先攻/位置'])||0}</div>
                     </div>
@@ -288,7 +287,7 @@ export default {
                 $sidebar.append(rowHtml);
             });
         } else {
-            $sidebar.append('<div style="color:#666">非战斗状态</div>');
+            $sidebar.append('<div style="color:var(--dnd-text-dim)">非战斗状态</div>');
         }
 
         if (mapData && mapData.length > 0) {
@@ -304,9 +303,9 @@ export default {
             }
 
             // 移除全屏版战斗地图显示，仅保留文字提示或预留空间
-            $mapArea.html('<div style="color:#888;padding:20px;text-align:center;">（战斗地图已隐藏，请使用 HUD 查看）</div>');
+                $mapArea.html('<div style="color:var(--dnd-text-dim);padding:20px;text-align:center;">（战斗地图已隐藏，请使用 HUD 查看）</div>');
         } else {
-            $mapArea.html('<div style="color:#666">无地图数据</div>');
+            $mapArea.html('<div style="color:var(--dnd-text-dim)">无地图数据</div>');
         }
 
         $layout.append($sidebar).append($mapArea);
@@ -316,7 +315,7 @@ export default {
     renderInventoryPanel($c) {
         const items = DataManager.getTable('ITEM_Inventory');
         if(!items || items.length === 0) {
-            $c.html('<div style="padding:20px;text-align:center;color:#888"><i class="fa-solid fa-suitcase"></i> 背包空空如也</div>');
+            $c.html('<div style="padding:20px;text-align:center;color:var(--dnd-text-dim)"><i class="fa-solid fa-suitcase"></i> 背包空空如也</div>');
             return;
         }
 
@@ -351,14 +350,14 @@ export default {
 
         // 搜索和筛选区域 (Panel)
         const searchHtml = `
-            <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid var(--dnd-border-inner);display:flex;gap:10px;align-items:center;">
+            <div style="background:var(--dnd-bg-secondary);padding:10px;border-radius:6px;border:1px solid var(--dnd-border-inner);display:flex;gap:10px;align-items:center;">
                 <div style="font-weight:bold;color:var(--dnd-text-highlight);white-space:nowrap;"><i class="fa-solid fa-search"></i> 查找物品</div>
-                <input type="text" id="dnd-panel-inv-search" placeholder="物品名称..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px 10px;border-radius:4px;" oninput="window.DND_Dashboard_UI.filterPanelInventory()">
-                <select id="dnd-panel-inv-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
+                <input type="text" id="dnd-panel-inv-search" placeholder="物品名称..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px 10px;border-radius:4px;" oninput="window.DND_Dashboard_UI.filterPanelInventory()">
+                <select id="dnd-panel-inv-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
                     <option value="">全部分类</option>
                     ${sortedCats.map(c => `<option value="${c}">${c}</option>`).join('')}
                 </select>
-                <select id="dnd-panel-inv-owner" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
+                <select id="dnd-panel-inv-owner" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:6px;border-radius:4px;" onchange="window.DND_Dashboard_UI.filterPanelInventory()">
                     <option value="">全部持有者</option>
                     ${sortedOwners.map(o => `<option value="${o}">${o}</option>`).join('')}
                     <option value="无">无持有者</option>
@@ -370,7 +369,7 @@ export default {
         // 1. 已装备区域 (仪表盘样式)
         if (equippedItems.length > 0) {
             const $equipSection = $(`
-                <div class="dnd-inv-section-equipped" style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-gold);">
+                <div class="dnd-inv-section-equipped" style="background:var(--dnd-bg-secondary);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-gold);">
                     <div style="font-size:16px;font-weight:bold;color:var(--dnd-text-header);margin-bottom:10px;display:flex;align-items:center;gap:10px;">
                         <span><i class="fa-solid fa-shield-halved"></i> 已装备</span>
                         <span style="font-size:12px;background:var(--dnd-accent-green);color:#fff;padding:2px 6px;border-radius:4px;">${equippedItems.length}</span>
@@ -397,7 +396,7 @@ export default {
             const catItems = categories[cat];
             const $catSection = $(`
                 <div class="dnd-inv-category" data-category="${cat}" style="background:var(--dnd-bg-panel);border:1px solid var(--dnd-border-inner);border-radius:4px;overflow:hidden;">
-                    <div class="dnd-inv-header" style="padding:10px 15px;background:rgba(255,255,255,0.05);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+                    <div class="dnd-inv-header" style="padding:10px 15px;background:var(--dnd-bg-secondary);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
                         <span style="font-weight:bold;color:var(--dnd-text-main);">${cat} (${catItems.length})</span>
                         <span class="dnd-collapse-icon" style="color:var(--dnd-text-dim)">▼</span>
                     </div>
@@ -498,11 +497,11 @@ export default {
             <div style="background:var(--dnd-bg-panel);padding:20px;border:1px solid var(--dnd-border-gold);">
                 <h2 style="color:var(--dnd-text-header);margin-top:0;">${g['当前场景']}</h2>
                 <p style="color:var(--dnd-text-main);">${g['场景描述']}</p>
-                <hr style="border:0;border-bottom:1px solid #333;margin:15px 0;">
+                <hr style="border:0;border-bottom:1px solid var(--dnd-border-subtle);margin:15px 0;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div><span style="color:#888">时间:</span> ${g['游戏时间']}</div>
-                    <div><span style="color:#888">天气:</span> ${g['天气状况']}</div>
-                    <div><span style="color:#888">战斗模式:</span> ${g['战斗模式']}</div>
+                <div><span style="color:var(--dnd-text-dim)">时间:</span> ${g['游戏时间']}</div>
+                <div><span style="color:var(--dnd-text-dim)">天气:</span> ${g['天气状况']}</div>
+                <div><span style="color:var(--dnd-text-dim)">战斗模式:</span> ${g['战斗模式']}</div>
                 </div>
             </div>
         `);
@@ -514,7 +513,7 @@ export default {
         let html = '<div style="display:flex;flex-direction:column;gap:15px;">';
         [...logs].reverse().forEach(l => {
             html += `
-            <div style="background:rgba(255,255,255,0.05);padding:15px;border-left:3px solid var(--dnd-border-gold);">
+            <div style="background:var(--dnd-bg-secondary);padding:15px;border-left:3px solid var(--dnd-border-gold);">
                 <div style="display:flex;justify-content:space-between;color:var(--dnd-text-dim);font-size:12px;margin-bottom:5px;">
                     <span>${l['时间跨度']} @ ${l['地点']}</span>
                     <span>${l['编码索引']}</span>
@@ -534,7 +533,7 @@ export default {
         const $grid = $('<div class="dnd-grid"></div>');
         
         npcs.forEach((npc, index) => {
-            const statusColor = npc['当前状态'] === '死亡' ? '#8a2c2c' : (npc['当前状态'] === '在场' ? '#3a6b4a' : '#888');
+            const statusColor = npc['当前状态'] === '死亡' ? 'var(--dnd-accent-red)' : (npc['当前状态'] === '在场' ? 'var(--dnd-accent-green)' : 'var(--dnd-text-dim)');
             
             // 解析HP用于显示血条
             const hpStr = npc['HP'] || '';
@@ -542,31 +541,31 @@ export default {
             const hpCurrent = hpMatch ? parseInt(hpMatch[1]) : 0;
             const hpMax = hpMatch ? parseInt(hpMatch[2]) : 1;
             const hpPercent = Math.min(100, Math.max(0, (hpCurrent / hpMax) * 100));
-            const hpColor = hpPercent > 50 ? '#4a7c59' : (hpPercent > 25 ? '#b8860b' : '#8a2c2c');
+            const hpColor = hpPercent > 50 ? 'var(--dnd-accent-green)' : (hpPercent > 25 ? 'var(--dnd-border-gold)' : 'var(--dnd-accent-red)');
             
             const cardHtml = `
                 <div class="dnd-char-card dnd-anim-entry dnd-clickable" style="cursor:pointer; animation-delay:${index * 0.05}s">
                     <div class="dnd-card-header">
                         <span class="dnd-char-name">${npc['姓名'] || '未知'}</span>
                         <span style="font-size:11px;">
-                            ${npc['等级'] ? `<span style="color:#d4af37;margin-right:6px;">Lv.${npc['等级']}</span>` : ''}
+                            ${npc['等级'] ? `<span style="color:var(--dnd-text-highlight);margin-right:6px;">Lv.${npc['等级']}</span>` : ''}
                             <span style="color:${statusColor}">${npc['当前状态'] || ''}</span>
                         </span>
                     </div>
                     <div class="dnd-card-body">
-                        <div style="font-size:12px;color:#aaa;margin-bottom:8px;">${npc['种族/性别/年龄'] || '-'} | ${npc['职业/身份'] || '-'}</div>
+                        <div style="font-size:12px;color:var(--dnd-text-dim);margin-bottom:8px;">${npc['种族/性别/年龄'] || '-'} | ${npc['职业/身份'] || '-'}</div>
                         
                         ${hpStr ? `
                         <div style="margin-bottom:8px;">
                             <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-                                <span style="color:#888;">HP</span>
-                                <span style="color:#ccc;">${hpStr}${npc['AC'] ? ` | AC ${npc['AC']}` : ''}</span>
+                                <span style="color:var(--dnd-text-dim);">HP</span>
+                                <span style="color:var(--dnd-text-main);">${hpStr}${npc['AC'] ? ` | AC ${npc['AC']}` : ''}</span>
                             </div>
-                            <div style="background:#1a1a1a;border-radius:3px;height:6px;overflow:hidden;">
+                            <div style="background:var(--dnd-bg-input);border-radius:3px;height:6px;overflow:hidden;">
                                 <div style="width:${hpPercent}%;height:100%;background:${hpColor};transition:width 0.3s;"></div>
                             </div>
                         </div>
-                        ` : (npc['AC'] ? `<div style="font-size:11px;color:#888;margin-bottom:8px;">AC ${npc['AC']}</div>` : '')}
+                        ` : (npc['AC'] ? `<div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:8px;">AC ${npc['AC']}</div>` : '')}
                         
                         <div class="dnd-stat-row">
                             <span class="dnd-stat-label">位置</span>
@@ -576,7 +575,7 @@ export default {
                             <span class="dnd-stat-label">关系</span>
                             <span class="dnd-stat-val">${npc['与主角关系'] || '-'}</span>
                         </div>
-                        <div style="margin-top:10px;font-size:13px;line-height:1.4;color:#ccc;max-height:60px;overflow:hidden;">
+                        <div style="margin-top:10px;font-size:13px;line-height:1.4;color:var(--dnd-text-main);max-height:60px;overflow:hidden;">
                             ${npc['外貌描述'] || ''}
                         </div>
                     </div>
@@ -589,43 +588,43 @@ export default {
                 
                 // 战斗属性区块
                 if (npc['等级'] || npc['HP'] || npc['AC']) {
-                    detail += `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:6px;margin-bottom:15px;">`;
+                    detail += `<div style="background:var(--dnd-bg-secondary);padding:12px;border-radius:6px;margin-bottom:15px;">`;
                     detail += `<div style="display:flex;gap:20px;flex-wrap:wrap;">`;
-                    if (npc['等级']) detail += `<div><span style="color:#888;font-size:11px;">等级</span><br><span style="color:#d4af37;font-size:16px;font-weight:bold;">Lv.${npc['等级']}</span></div>`;
-                    if (npc['HP']) detail += `<div><span style="color:#888;font-size:11px;">生命值</span><br><span style="color:#c94c4c;font-size:16px;font-weight:bold;">${npc['HP']}</span></div>`;
-                    if (npc['AC']) detail += `<div><span style="color:#888;font-size:11px;">护甲</span><br><span style="color:#6a9fb5;font-size:16px;font-weight:bold;">AC ${npc['AC']}</span></div>`;
+                    if (npc['等级']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">等级</span><br><span style="color:var(--dnd-text-highlight);font-size:16px;font-weight:bold;">Lv.${npc['等级']}</span></div>`;
+                    if (npc['HP']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">生命值</span><br><span style="color:var(--dnd-accent-red);font-size:16px;font-weight:bold;">${npc['HP']}</span></div>`;
+                    if (npc['AC']) detail += `<div><span style="color:var(--dnd-text-dim);font-size:11px;">护甲</span><br><span style="color:var(--dnd-text-main);font-size:16px;font-weight:bold;">AC ${npc['AC']}</span></div>`;
                     detail += `</div></div>`;
                 }
                 
                 // 主要技能
                 if (npc['主要技能']) {
-                    detail += `<div style="margin-bottom:12px;"><strong style="color:#d4af37;">主要技能:</strong><br>`;
+                    detail += `<div style="margin-bottom:12px;"><strong style="color:var(--dnd-text-highlight);">主要技能:</strong><br>`;
                     const skills = npc['主要技能'].split(/[,，]/).map(s => s.trim()).filter(s => s);
                     detail += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">`;
                     skills.forEach(skill => {
-                        detail += `<span style="background:rgba(212,175,55,0.15);color:#d4af37;padding:3px 8px;border-radius:4px;font-size:12px;">${skill}</span>`;
+                        detail += `<span style="background:var(--dnd-bg-tertiary);color:var(--dnd-text-highlight);padding:3px 8px;border-radius:4px;font-size:12px;">${skill}</span>`;
                     });
                     detail += `</div></div>`;
                 }
                 
                 // 随身物品
                 if (npc['随身物品']) {
-                    detail += `<div style="margin-bottom:12px;"><strong style="color:#8b7355;">随身物品:</strong><br>`;
+                    detail += `<div style="margin-bottom:12px;"><strong style="color:var(--dnd-text-header);">随身物品:</strong><br>`;
                     const items = npc['随身物品'].split(/[,，]/).map(s => s.trim()).filter(s => s);
                     detail += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">`;
                     items.forEach(item => {
-                        detail += `<span style="background:rgba(139,115,85,0.15);color:#c9a86c;padding:3px 8px;border-radius:4px;font-size:12px;">${item}</span>`;
+                        detail += `<span style="background:var(--dnd-bg-tertiary);color:var(--dnd-text-header);padding:3px 8px;border-radius:4px;font-size:12px;">${item}</span>`;
                     });
                     detail += `</div></div>`;
                 }
                 
                 // 关键经历
-                detail += `<div style="margin-bottom:10px"><strong>关键经历:</strong><br><span style="color:#aaa;">${npc['关键经历'] || '无'}</span></div>`;
+                detail += `<div style="margin-bottom:10px"><strong>关键经历:</strong><br><span style="color:var(--dnd-text-main);">${npc['关键经历'] || '无'}</span></div>`;
                 
                 // 外貌描述
-                detail += `<div style="margin-bottom:10px"><strong>外貌:</strong><br><span style="color:#aaa;">${npc['外貌描述'] || '无'}</span></div>`;
+                detail += `<div style="margin-bottom:10px"><strong>外貌:</strong><br><span style="color:var(--dnd-text-main);">${npc['外貌描述'] || '无'}</span></div>`;
                 
-                detail += `<div style="margin-top:20px;font-size:10px;color:#666">ID: ${npc['NPC_ID']}</div>`;
+                detail += `<div style="margin-top:20px;font-size:10px;color:var(--dnd-text-dim)">ID: ${npc['NPC_ID']}</div>`;
                 this.showModal(npc['姓名'], detail);
             });
             
@@ -643,7 +642,7 @@ export default {
         $modal.html(`
             <div class="dnd-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-gold);padding-bottom:12px;">
                 <h3 style="margin:0;color:var(--dnd-text-highlight);font-size:18px;">${title}</h3>
-                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:#888;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
+                <span class="dnd-modal-close" style="cursor:pointer;font-size:20px;color:var(--dnd-text-dim);width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:all 0.2s;"><i class="fa-solid fa-times"></i></span>
             </div>
             <div class="dnd-modal-body" style="max-height:60vh;overflow-y:auto;padding-right:5px;text-align: left;">${content}</div>
         `);
@@ -652,9 +651,9 @@ export default {
         $modal.find('.dnd-modal-close').on('click', function() {
             $overlay.removeClass('active');
         }).on('mouseenter', function() {
-            $(this).css({ background: 'rgba(255,255,255,0.1)', color: 'var(--dnd-text-highlight)' });
+            $(this).css({ background: 'var(--dnd-bg-tertiary)', color: 'var(--dnd-text-highlight)' });
         }).on('mouseleave', function() {
-            $(this).css({ background: 'transparent', color: '#888' });
+            $(this).css({ background: 'transparent', color: 'var(--dnd-text-dim)' });
         });
         
         $overlay.addClass('active');
@@ -671,7 +670,7 @@ export default {
         Object.keys(data).forEach(key => {
             if (key === 'mate') return;
             const sheet = data[key];
-            const $btn = $(`<button style="padding:5px 10px;background:#333;border:1px solid #555;color:#ccc;cursor:pointer;">${sheet.name || key}</button>`);
+            const $btn = $(`<button style="padding:5px 10px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);cursor:pointer;">${sheet.name || key}</button>`);
             
             $btn.on('click', () => {
                 let html = `<h3 style="color:var(--dnd-text-highlight)">${sheet.name}</h3>`;
@@ -690,7 +689,7 @@ export default {
                 }
                 $viewArea.html(html);
                 
-                $selector.children().css('border-color', '#555');
+                $selector.children().css('border-color', 'var(--dnd-border-subtle)');
                 $btn.css('border-color', 'var(--dnd-border-gold)');
             });
             $selector.append($btn);
@@ -727,13 +726,13 @@ export default {
             const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
-                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
-                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
-                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='var(--dnd-selected-bg)'"
+                       onmouseleave="this.style.background='var(--dnd-bg-secondary)'">
                     <input type="checkbox" class="dnd-export-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
                     <span style="flex:1;">
                         <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
-                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
                     </span>
                 </label>
             `;
@@ -743,12 +742,12 @@ export default {
         
         const modalContent = `
             <div style="margin-bottom:20px;">
-                <p style="color:#888;margin-bottom:15px;">选择要导出的角色：</p>
+                <p style="color:var(--dnd-text-dim);margin-bottom:15px;">选择要导出的角色：</p>
                 ${checkboxHtml}
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="dnd-btn dnd-export-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
-                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
+                <button class="dnd-btn dnd-export-cancel-btn" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-export-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:var(--dnd-text-header);padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导出</button>
             </div>
         `;
         
@@ -869,13 +868,13 @@ export default {
             const charType = char['成员类型'] === '主角' ? `${ICONS.MASK} 主角` : `${ICONS.USER} 同伴`;
             
             checkboxHtml += `
-                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;transition:background 0.2s;"
-                       onmouseenter="this.style.background='rgba(212,175,55,0.1)'"
-                       onmouseleave="this.style.background='rgba(0,0,0,0.2)'">
+                <label style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:5px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;transition:background 0.2s;"
+                       onmouseenter="this.style.background='var(--dnd-selected-bg)'"
+                       onmouseleave="this.style.background='var(--dnd-bg-secondary)'">
                     <input type="checkbox" class="dnd-import-char-checkbox" value="${charId}" checked style="width:16px;height:16px;cursor:pointer;">
                     <span style="flex:1;">
                         <span style="color:var(--dnd-text-main);font-weight:bold;">${charName}</span>
-                        <span style="color:#888;font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:12px;margin-left:8px;">${charType} · ${charClass}</span>
                     </span>
                 </label>
             `;
@@ -888,18 +887,18 @@ export default {
             <div style="margin-bottom:20px;">
                 <p style="color:var(--dnd-text-highlight);font-weight:bold;margin-bottom:10px;">导入模式：</p>
                 <div style="display:flex;flex-direction:column;gap:10px;">
-                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--dnd-bg-tertiary);border-radius:4px;cursor:pointer;border:2px solid var(--dnd-border-gold);transition:border-color 0.2s;" id="dnd-import-mode-append-label">
                         <input type="radio" name="dnd-import-mode" value="append" checked style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
                             <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">📥 追加角色</span>
-                            <span style="color:#888;font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
+                            <span style="color:var(--dnd-text-dim);font-size:12px;">将选中的角色添加到现有队伍中，不会删除现有角色。如果角色ID重复，将更新该角色数据。</span>
                         </span>
                     </label>
-                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(0,0,0,0.2);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
+                    <label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:var(--dnd-bg-tertiary);border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="dnd-import-mode-replace-label">
                         <input type="radio" name="dnd-import-mode" value="replace" style="width:18px;height:18px;margin-top:2px;cursor:pointer;">
                         <span>
                             <span style="color:var(--dnd-text-main);font-weight:bold;display:block;">${ICONS.SYNC} 替换队伍</span>
-                            <span style="color:#e74c3c;font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
+                            <span style="color:var(--dnd-accent-red);font-size:12px;">${ICONS.WARNING} 警告：这将清空当前所有队伍数据，然后导入选中的角色。</span>
                         </span>
                     </label>
                 </div>
@@ -908,13 +907,13 @@ export default {
         
         const modalContent = `
             <div style="margin-bottom:15px;">
-                <p style="color:#888;margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
+                <p style="color:var(--dnd-text-dim);margin-bottom:10px;">文件包含 ${party.length} 个角色，选择要导入的角色：</p>
                 ${checkboxHtml}
             </div>
             ${modeHtml}
             <div style="display:flex;gap:10px;justify-content:flex-end;">
-                <button class="dnd-btn dnd-import-cancel-btn" style="background:#333;border:1px solid #555;color:#ccc;padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
-                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:#1a1a1c;padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
+                <button class="dnd-btn dnd-import-cancel-btn" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px 20px;border-radius:4px;cursor:pointer;">取消</button>
+                <button class="dnd-btn dnd-import-confirm-btn" style="background:var(--dnd-border-gold);border:none;color:var(--dnd-text-header);padding:8px 20px;border-radius:4px;cursor:pointer;font-weight:bold;">导入</button>
             </div>
         `;
         
@@ -1040,7 +1039,7 @@ export default {
         
         if (equipped.length === 0 && consumables.length === 0) return;
         
-        let html = `<div style="padding:5px 10px;border-top:1px solid rgba(255,255,255,0.05);">`;
+        let html = `<div style="padding:5px 10px;border-top:1px solid var(--dnd-border-subtle);">`;
         
         // [已删除] 装备图标流 - 已移至底部装备按钮
         
@@ -1050,7 +1049,7 @@ export default {
             consumables.forEach((item, idx) => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 html += `
-                    <div class="dnd-quick-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-id="${itemId}" title="[${item['数量']}] ${item['物品名称']}" style="animation-delay:${idx * 0.03}s; padding:2px 6px;background:rgba(255,255,255,0.05);border:1px solid #444;border-radius:10px;font-size:10px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
+                    <div class="dnd-quick-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-id="${itemId}" title="[${item['数量']}] ${item['物品名称']}" style="animation-delay:${idx * 0.03}s; padding:2px 6px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);border-radius:10px;font-size:10px;white-space:nowrap;cursor:pointer;flex-shrink:0;">
                         ${item['物品名称']} x${item['数量']}
                     </div>
                 `;

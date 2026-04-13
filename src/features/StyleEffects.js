@@ -95,8 +95,7 @@ export const StyleEffects = {
                 // 切角效果
                 rules.push(`
                     .dnd-char-card,
-                    .dnd-panel,
-                    .dnd-dialog {
+                    .dnd-panel {
                         clip-path: ${clipPath || 'polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px)'} !important;
                         border-radius: 0 !important;
                     }
@@ -164,8 +163,7 @@ export const StyleEffects = {
                 // 切角 (Cyberpunk style)
                 rules.push(`
                     .dnd-char-card,
-                    .dnd-panel,
-                    .dnd-dialog {
+                    .dnd-panel {
                         clip-path: ${clipPath || 'polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px)'} !important;
                         border-radius: 0 !important;
                     }

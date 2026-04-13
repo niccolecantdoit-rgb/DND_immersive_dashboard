@@ -2,6 +2,18 @@
 // src/core/TavernAPI.js
 
 export const TavernAPI = {
+    getDatabaseAPI: function() {
+        try {
+            return window.AutoCardUpdaterAPI
+                || (window.parent && window.parent.AutoCardUpdaterAPI)
+                || (window.top && window.top.AutoCardUpdaterAPI)
+                || null;
+        } catch (e) {
+            console.error('[TavernAPI] 获取数据库 API 失败:', e);
+            return window.AutoCardUpdaterAPI || null;
+        }
+    },
+
     // 获取全局核心对象（兼容 iframe 和 父窗口）
     getCore: function() {
         let st = null;
@@ -23,6 +35,28 @@ export const TavernAPI = {
         return {
             SillyTavern: st,
             TavernHelper: helper
+        };
+    },
+
+    getDatabaseAIStatus: function() {
+        const api = this.getDatabaseAPI();
+        let presets = [];
+        let tablePreset = '';
+        let plotPreset = '';
+
+        try {
+            if (api?.getApiPresets) presets = api.getApiPresets() || [];
+            if (api?.getTableApiPreset) tablePreset = api.getTableApiPreset() || '';
+            if (api?.getPlotApiPreset) plotPreset = api.getPlotApiPreset() || '';
+        } catch (e) {
+            console.warn('[TavernAPI] 读取数据库 AI 状态失败:', e);
+        }
+
+        return {
+            available: !!(api && typeof api.callAI === 'function'),
+            presetCount: Array.isArray(presets) ? presets.length : 0,
+            tablePreset,
+            plotPreset
         };
     },
 
@@ -133,7 +167,20 @@ export const TavernAPI = {
      */
     generate: async function(messages, options = {}) {
         const { SillyTavern, TavernHelper } = this.getCore();
-        const { presetId, customConfig, maxTokens = 4096 } = options;
+        const { presetId, customConfig, maxTokens = 4096, useDatabaseAPI = false } = options;
+
+        if (useDatabaseAPI) {
+            const dbApi = this.getDatabaseAPI();
+            if (!dbApi || typeof dbApi.callAI !== 'function') {
+                throw new Error('当前数据库 API 未提供 callAI()');
+            }
+
+            const response = await dbApi.callAI(messages, { max_tokens: maxTokens });
+            if (!response) {
+                throw new Error('数据库 AI 调用失败，请检查数据库中的 AI 配置');
+            }
+            return typeof response === 'string' ? response.trim() : String(response).trim();
+        }
 
         if (!SillyTavern && !TavernHelper) {
             throw new Error("SillyTavern 核心 API 未就绪");

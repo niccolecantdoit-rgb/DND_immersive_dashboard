@@ -13,8 +13,8 @@ import { UpdateController } from './features/UpdateController.js';
 import { PresetSwitcher } from './features/PresetSwitcher.js';
 import { DataManager } from './data/DataManager.js';
 import { TavernSettingsSync } from './core/TavernSettingsSync.js';
-import { NotificationSystem } from './ui/modules/UIUtils.js';
 import { TemplateSync } from './features/TemplateSync.js';
+import { NotificationSystem } from './ui/modules/UIUtils.js';
 
 (function () {
     'use strict';
@@ -40,7 +40,7 @@ import { TemplateSync } from './features/TemplateSync.js';
             return;
         }
 
-        const tryInit = () => {
+        const tryInit = async () => {
             const api = getDB();
             Logger.debug('tryInit - API 状态:', !!api, 'body 存在:', !!$('body').length);
             
@@ -68,8 +68,8 @@ import { TemplateSync } from './features/TemplateSync.js';
                 });
 
                 UIRenderer.init();
-                ThemeManager.init(); // [修复] 初始化主题
-                StyleManager.init(); // [新增] 初始化风格管理器
+                await ThemeManager.init(); // 先应用保存的配色
+                await StyleManager.init(); // 再应用保存的风格，确保风格作为最终基底生效
                 
                 // [新增] 异步加载设置 (覆盖默认/localStorage配置)
                 DBAdapter.getSetting(CONFIG.STORAGE_KEYS.PRESET_CONFIG).then(saved => {
@@ -99,6 +99,9 @@ import { TemplateSync } from './features/TemplateSync.js';
                 
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
+
+                    // 初始化模板同步（首次运行/版本升级时确认导入内置模板）
+                    TemplateSync.init();
                     
                     // 尝试迁移旧数据以释放空间
                     setTimeout(() => DBAdapter.migrateFromLocalStorage(), 5000);
@@ -113,9 +116,6 @@ import { TemplateSync } from './features/TemplateSync.js';
                         // 初始渲染一次 HUD
                         setTimeout(UIRenderer.renderHUD, 1000);
                     }
-
-                    // [新增] 延迟检查模板同步 (等待 UI 和通知系统就绪)
-                    setTimeout(() => TemplateSync.init(), 3000);
                 } else if (initAttempts < MAX_ATTEMPTS) {
                     initAttempts++;
                     setTimeout(tryInit, 1000);

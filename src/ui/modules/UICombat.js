@@ -162,8 +162,8 @@ export default {
             return;
         }
         
-        let html = `<div class="dnd-resource-consumption" style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;border:1px dashed rgba(255,255,255,0.1);">
-            <div style="font-size:11px;color:#aaa;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+        let html = `<div class="dnd-resource-consumption" style="margin-top:10px;padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;border:1px dashed var(--dnd-border-subtle);">
+            <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
                 <span><i class="fa-solid fa-bolt"></i> 本场战斗消耗</span>
                 <span class="dnd-clickable" style="cursor:pointer;color:var(--dnd-text-dim);font-size:14px;line-height:1;" title="重置统计" onclick="window.DND_Dashboard_UI.initResourceTracker(); window.DND_Dashboard_UI.renderHUD();"><i class="fa-solid fa-sync"></i></span>
             </div>`;
@@ -171,7 +171,7 @@ export default {
         if (hasSlots) {
             html += `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px;">`;
             for (const [level, used] of Object.entries(consumption.spellSlots)) {
-                html += `<span style="font-size:10px;color:#e74c3c;background:rgba(231, 76, 60, 0.1);padding:1px 4px;border-radius:2px;">${level}: -${used}</span>`;
+                html += `<span style="font-size:10px;color:var(--dnd-accent-red);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;">${level}: -${used}</span>`;
             }
             html += `</div>`;
         }
@@ -179,7 +179,7 @@ export default {
         if (hasRes) {
             html += `<div style="display:flex;flex-wrap:wrap;gap:5px;">`;
             for (const [name, used] of Object.entries(consumption.classResources)) {
-                html += `<span style="font-size:10px;color:#e67e22;background:rgba(230, 126, 34, 0.1);padding:1px 4px;border-radius:2px;">${name}: -${used}</span>`;
+                html += `<span style="font-size:10px;color:var(--dnd-text-highlight);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;">${name}: -${used}</span>`;
             }
             html += `</div>`;
         }
@@ -282,8 +282,8 @@ export default {
                 
                 // 样式处理
                 const style = isDisabled
-                    ? "background:rgba(0,0,0,0.3);border:1px solid #333;color:#666;padding:8px;border-radius:4px;cursor:not-allowed;"
-                    : "background:rgba(255,255,255,0.05);border:1px solid #555;color:#ccc;padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;";
+                    ? "background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-dim);padding:8px;border-radius:4px;cursor:not-allowed;"
+                    : "background:var(--dnd-bg-input);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;";
                 
                 const action = isDisabled
                     ? ""
@@ -291,11 +291,11 @@ export default {
                     
                 const mouseOver = isDisabled
                     ? ""
-                    : `onmouseover="this.style.borderColor='var(--dnd-border-gold)';this.style.color='#fff';this.style.background='rgba(255,255,255,0.1)'"`;
+                    : `onmouseover="this.style.borderColor='var(--dnd-border-gold)';this.style.color='var(--dnd-text-highlight)';this.style.background='var(--dnd-bg-tertiary)'"`;
                     
                 const mouseOut = isDisabled
                     ? ""
-                    : `onmouseout="this.style.borderColor='#555';this.style.color='#ccc';this.style.background='rgba(255,255,255,0.05)'"`;
+                    : `onmouseout="this.style.borderColor='var(--dnd-border-inner)';this.style.color='var(--dnd-text-main)';this.style.background='var(--dnd-bg-input)'"`;
 
                 html += `
                     <button class="dnd-clickable" style="${style}" ${mouseOver} ${mouseOut} ${action}>
@@ -475,33 +475,33 @@ export default {
         const html = `
             <div style="border-bottom:1px solid ${color};padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:${color};font-size:16px;display:flex;justify-content:space-between;">
                 <span>${unit['单位名称']}</span>
-                <span style="font-size:12px;background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;color:#fff;">${unit['阵营']}</span>
+                <span style="font-size:12px;background:var(--dnd-bg-tertiary);padding:2px 6px;border-radius:4px;color:var(--dnd-text-main);">${unit['阵营']}</span>
             </div>
             
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;font-size:13px;">
-                <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">
-                    <div style="color:#888;font-size:11px;">HP 状态</div>
-                    <div style="font-weight:bold;color:#fff;">${hpStr}</div>
+                <div style="background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
+                    <div style="color:var(--dnd-text-dim);font-size:11px;">HP 状态</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-main);">${hpStr}</div>
                 </div>
-                <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">
-                    <div style="color:#888;font-size:11px;">先攻 / 位置</div>
-                    <div style="font-weight:bold;color:#fff;">${unit['先攻/位置'] || '-'}</div>
+                <div style="background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
+                    <div style="color:var(--dnd-text-dim);font-size:11px;">先攻 / 位置</div>
+                    <div style="font-weight:bold;color:var(--dnd-text-main);">${unit['先攻/位置'] || '-'}</div>
                 </div>
             </div>
 
             <div style="margin-bottom:10px;">
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">防御 / 抗性</div>
-                <div style="color:#fff;font-size:13px;background:rgba(255,255,255,0.05);padding:5px;border-radius:3px;">${unit['防御/抗性'] || '无'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">防御 / 抗性</div>
+                <div style="color:var(--dnd-text-main);font-size:13px;background:var(--dnd-bg-input);padding:5px;border-radius:3px;">${unit['防御/抗性'] || '无'}</div>
             </div>
             
             <div style="margin-bottom:10px;">
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">附着状态</div>
-                <div style="color:#e6dcca;font-size:13px;background:rgba(255,255,255,0.05);padding:5px;border-radius:3px;">${unit['附着状态'] || '无'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">附着状态</div>
+                <div style="color:var(--dnd-text-header);font-size:13px;background:var(--dnd-bg-input);padding:5px;border-radius:3px;">${unit['附着状态'] || '无'}</div>
             </div>
 
             <div>
-                <div style="color:#aaa;font-size:12px;margin-bottom:3px;">回合资源</div>
-                <div style="color:#ccc;font-size:12px;line-height:1.4;">${unit['回合资源'] || '-'}</div>
+                <div style="color:var(--dnd-text-dim);font-size:12px;margin-bottom:3px;">回合资源</div>
+                <div style="color:var(--dnd-text-main);font-size:12px;line-height:1.4;">${unit['回合资源'] || '-'}</div>
             </div>
         `;
         
@@ -531,7 +531,7 @@ export default {
             // 尝试显示提示而不是直接退出
             const html = `<div style="padding:15px;text-align:center;">
                 <div style="font-weight:bold;color:var(--dnd-text-highlight);margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']}</div>
-                <div style="color:#888;">该角色暂无已学习的技能或法术。</div>
+                <div style="color:var(--dnd-text-dim);">该角色暂无已学习的技能或法术。</div>
             </div>`;
             this.showItemDetailPopup(html, event.clientX, event.clientY);
             return;
@@ -566,7 +566,7 @@ export default {
 
         if (skills) skills.forEach(s => processAbility(s));
         
-        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']} 的技能</div>`;
+        let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-bolt"></i> ${current['姓名']} 的技能</div>`;
         html += `<div style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">`;
         
         let hasSkills = false;
@@ -574,7 +574,7 @@ export default {
             if (grouped[type].length === 0) return;
             hasSkills = true;
             
-            html += `<div style="font-size:12px;color:#888;border-bottom:1px dashed #444;margin-top:5px;">${type}</div>`;
+            html += `<div style="font-size:12px;color:var(--dnd-text-dim);border-bottom:1px dashed var(--dnd-border-subtle);margin-top:5px;">${type}</div>`;
             grouped[type].forEach(s => {
                 const rawName = s._displayName || '未命名';
                 const safeName = rawName.replace(/'/g, "\\'").replace(/"/g, '"');
@@ -595,17 +595,17 @@ export default {
                 }
                 
                 html += `
-                    <div class="dnd-clickable" style="padding:6px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
+                    <div class="dnd-clickable" style="padding:6px;background:var(--dnd-bg-input);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
                         onclick="${onClick}">
                         <span style="color:var(--dnd-text-main);">${icon} ${rawName}</span>
-                        <span style="font-size:10px;color:#aaa;">${s['射程']||'-'}</span>
+                        <span style="font-size:10px;color:var(--dnd-text-dim);">${s['射程']||'-'}</span>
                     </div>
                 `;
             });
         });
         
         if (!hasSkills) {
-            html += `<div style="color:#888;text-align:center;padding:10px;">无技能显示</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">无技能显示</div>`;
         }
 
         html += `</div>`;

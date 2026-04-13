@@ -2,16 +2,62 @@
 import { Logger } from '../core/Logger.js';
 import { DBAdapter } from '../core/DBAdapter.js';
 import { CONFIG } from '../config/Config.js';
+import { EMBEDDED_TEMPLATE } from '../config/EmbeddedTemplate.js';
 import { getCore } from '../core/Utils.js';
 import { NotificationSystem } from '../ui/modules/UIUtils.js';
 
 /**
  * 模板自动同步模块
  * 
- * 当插件版本更新时，自动从 GitHub 拉取最新配套模板，
+ * 当插件首次启用或版本更新时，使用内置模板数据
  * 弹窗询问用户是否导入到神·数据库中。
  */
 export const TemplateSync = {
+    /**
+     * 手动触发模板导入
+     */
+    manualImport: async (options = {}) => {
+        try {
+            const currentVersion = CONFIG.TEMPLATE_SYNC.CURRENT_VERSION;
+            const { getDB } = getCore();
+            const api = getDB();
+
+            const {
+                skipConfirm = false,
+                confirmMessage = null,
+                confirmTitle = null,
+            } = options || {};
+
+            if (!api || !api.importTemplateFromData) {
+                NotificationSystem.error('当前数据库 API 不支持模板导入，请先确认数据库插件已启用。', '模板同步');
+                return false;
+            }
+
+            const message = confirmMessage
+                || `确定要手动导入 DND 仪表盘 v${currentVersion} 的内置模板吗？\n\n这会将当前数据库模板替换为插件内置模板结构。`;
+
+            const confirmed = skipConfirm
+                ? true
+                : await NotificationSystem.confirm(message, {
+                    title: confirmTitle || '手动导入模板',
+                    confirmText: '立即导入',
+                    cancelText: '取消',
+                    type: 'warning'
+                });
+
+            if (!confirmed) {
+                Logger.info('[TemplateSync] 用户取消手动模板导入');
+                return false;
+            }
+
+            return await TemplateSync._importEmbeddedTemplate(currentVersion);
+        } catch (err) {
+            Logger.error('[TemplateSync] 手动导入失败:', err);
+            NotificationSystem.error(`手动导入模板失败: ${err.message}`, '模板同步');
+            return false;
+        }
+    },
+
     /**
      * 初始化：检查是否需要同步模板
      * 需要在 API 可用之后调用
@@ -52,13 +98,11 @@ export const TemplateSync = {
 
             if (!confirmed) {
                 Logger.info('[TemplateSync] 用户跳过模板导入');
-                // 即使跳过也记录版本，避免每次启动都弹窗
-                await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION, currentVersion);
                 return;
             }
 
-            // 用户确认，开始拉取并导入
-            await TemplateSync._fetchAndImport(currentVersion);
+            // 用户确认，开始导入内置模板
+            await TemplateSync._importEmbeddedTemplate(currentVersion);
 
         } catch (err) {
             Logger.error('[TemplateSync] 初始化失败:', err);
@@ -66,21 +110,17 @@ export const TemplateSync = {
     },
 
     /**
-     * 从远程拉取模板并导入
+     * 读取内置模板并导入
      */
-    _fetchAndImport: async (version) => {
+    _importEmbeddedTemplate: async (version) => {
         try {
-            NotificationSystem.info('正在从 GitHub 获取最新模板...', '模板同步');
+            NotificationSystem.info('正在准备内置模板...', '模板同步');
 
-            // 添加时间戳防止缓存
-            const url = CONFIG.TEMPLATE_SYNC.REMOTE_URL + '?t=' + Date.now();
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const templateData = await response.json();
+            const templateData = JSON.parse(JSON.stringify(EMBEDDED_TEMPLATE));
+            const importOptions = {
+                scope: 'global',
+                presetName: `DND仪表盘 ${version}`
+            };
 
             // 基本校验
             if (!templateData || !templateData.mate || templateData.mate.type !== 'chatSheets') {
@@ -92,26 +132,51 @@ export const TemplateSync = {
                 throw new Error('模板数据格式无效：没有找到任何 sheet');
             }
 
-            Logger.info(`[TemplateSync] 模板获取成功，包含 ${sheetCount} 个表格`);
+            const invalidSheet = Object.entries(templateData).find(([key, value]) => key.startsWith('sheet_') && (
+                !value
+                || typeof value !== 'object'
+                || !('name' in value)
+                || !('content' in value)
+                || !('sourceData' in value)
+            ));
+            if (invalidSheet) {
+                throw new Error(`模板数据格式无效：${invalidSheet[0]} 缺少 name/content/sourceData 字段`);
+            }
+
+            Logger.info(`[TemplateSync] 内置模板准备完成，包含 ${sheetCount} 个表格`);
 
             // 调用数据库 API 导入模板
             const { getDB } = getCore();
             const api = getDB();
-            const result = await api.importTemplateFromData(templateData);
+            let result = await api.importTemplateFromData(templateData, importOptions);
+
+            if (!result || !result.success) {
+                Logger.warn('[TemplateSync] 对象导入失败，尝试以 JSON 字符串重试:', result?.message || '未知错误');
+                const retryPayload = JSON.stringify(templateData);
+                const retryResult = await api.importTemplateFromData(retryPayload, importOptions);
+                if (retryResult && retryResult.success) {
+                    result = retryResult;
+                } else {
+                    const primaryMsg = result?.message || '未知错误';
+                    const retryMsg = retryResult?.message || '未知错误';
+                    throw new Error(`API 导入失败: ${primaryMsg}${retryMsg && retryMsg !== primaryMsg ? `；字符串重试失败: ${retryMsg}` : ''}`);
+                }
+            }
 
             if (result && result.success) {
                 // 记录已同步的版本
                 await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.TEMPLATE_SYNCED_VERSION, version);
                 NotificationSystem.success(`模板导入成功 (${sheetCount} 个表格)`, '模板同步');
                 Logger.info(`[TemplateSync] 模板 v${version} 导入成功`);
-            } else {
-                const errMsg = result ? result.message : '未知错误';
-                throw new Error('API 导入失败: ' + errMsg);
+                return true;
             }
 
+            return false;
+
         } catch (err) {
-            Logger.error('[TemplateSync] 拉取/导入模板失败:', err);
-            NotificationSystem.error(`模板同步失败: ${err.message}\n\n你可以稍后在设置中手动导入模板。`, '模板同步');
+            Logger.error('[TemplateSync] 导入内置模板失败:', err);
+            NotificationSystem.error(`模板同步失败: ${err.message}\n\n你可以稍后重新打开页面后重试。`, '模板同步');
+            return false;
         }
     }
 };

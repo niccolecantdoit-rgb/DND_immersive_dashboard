@@ -77,6 +77,15 @@ export const StyleManager = {
     // 动态注入的样式元素ID
     STYLE_ELEMENT_ID: 'dnd-style-manager-overrides',
     
+    // 记录上次样式包设置的 CSS 变量键（用于清理残留）
+    _lastAppliedVars: new Set(),
+    
+    // 需要保留的运行时变量前缀（不被清理）
+    _preservedVarPrefixes: [
+        '--dnd-ui-scale',  // UI 缩放
+        '--dnd-scale',     // 缩放相关
+    ],
+    
     /**
      * 初始化样式管理器
      */
@@ -123,7 +132,17 @@ export const StyleManager = {
                 return false;
             }
             
-            // 1. 应用颜色变量（复用ThemeManager）
+            // 0. [修复] 清除上次样式包设置的 CSS 变量，避免残留污染
+            this._clearPreviousStyleVars();
+            
+            // 0.5 [修复] 恢复当前主题/自定义主题的颜色基准
+            // 确保样式包未定义的变量回退到主题值而非 CSS 默认值
+            this._restoreThemeBaseline();
+            
+            // 重置变量记录集合
+            this._lastAppliedVars = new Set();
+            
+            // 1. 应用颜色变量（覆盖主题基准）
             if (stylePack.colors) {
                 this._applyColorVars(stylePack.colors);
             }
@@ -337,6 +356,75 @@ export const StyleManager = {
     // ==================== 内部方法 ====================
     
     /**
+     * 清除上次样式包设置的 CSS 变量
+     * 仅清除 StyleManager 管理的变量，保留：
+     * - 运行时变量（如 UI scale）
+     */
+    _clearPreviousStyleVars() {
+        if (this._lastAppliedVars.size === 0) return;
+        
+        const { window: coreWin } = getCore();
+        let root;
+        try {
+            root = coreWin?.document?.documentElement || document.documentElement;
+        } catch (e) {
+            root = document.documentElement;
+        }
+        
+        if (!root) return;
+        
+        // 清除记录的变量
+        this._lastAppliedVars.forEach(key => {
+            // 检查是否为需要保留的运行时变量
+            const isPreserved = this._preservedVarPrefixes.some(prefix => key.startsWith(prefix));
+            if (!isPreserved) {
+                root.style.removeProperty(key);
+            }
+        });
+        
+        Logger.debug('已清除', this._lastAppliedVars.size, '个样式变量');
+    },
+    
+    /**
+     * 恢复当前主题/自定义主题的颜色基准
+     * 在清除样式包变量后调用，确保未定义的变量回退到主题值而非 CSS 默认值
+     * 注意：此方法应用的变量不记录到 _lastAppliedVars，因为它们是主题基准
+     */
+    _restoreThemeBaseline() {
+        const { window: coreWin } = getCore();
+        let root;
+        try {
+            root = coreWin?.document?.documentElement || document.documentElement;
+        } catch (e) {
+            root = document.documentElement;
+        }
+        
+        if (!root) return;
+        
+        // 获取当前主题的颜色变量（已合并：基础主题 + 自定义覆盖）
+        const themeVars = ThemeManager.getCurrentVars();
+        
+        // 应用主题变量（不记录到 _lastAppliedVars，这些是主题基准）
+        Object.entries(themeVars).forEach(([key, value]) => {
+            root.style.setProperty(key, value);
+        });
+        
+        // 从有效的主题变量中读取颜色值，生成渐变背景
+        // 注意：themeVars 不包含渐变变量，需要从基础颜色变量动态生成
+        const panelStart = themeVars['--dnd-bg-panel-start'] || ThemeManager.COLOR_VARS['--dnd-bg-panel-start'].default;
+        const panelEnd = themeVars['--dnd-bg-panel-end'] || ThemeManager.COLOR_VARS['--dnd-bg-panel-end'].default;
+        const cardStart = themeVars['--dnd-bg-card-start'] || ThemeManager.COLOR_VARS['--dnd-bg-card-start'].default;
+        const cardEnd = themeVars['--dnd-bg-card-end'] || ThemeManager.COLOR_VARS['--dnd-bg-card-end'].default;
+        
+        root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
+        root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
+        root.style.setProperty('--dnd-bg-card', `linear-gradient(135deg, ${ensureOpaqueColor(cardStart, 0.98)} 0%, ${ensureOpaqueColor(cardEnd, 0.98)} 100%)`);
+        root.style.setProperty('--dnd-bg-popup', `linear-gradient(to bottom, ${ensureOpaqueColor(cardStart)}, ${ensureOpaqueColor(cardEnd)})`);
+        
+        Logger.debug('已恢复主题基准:', ThemeManager.currentTheme);
+    },
+    
+    /**
      * 应用颜色变量（包含渐变生成）
      */
     _applyColorVars(colors) {
@@ -353,13 +441,22 @@ export const StyleManager = {
         // 直接应用颜色变量
         Object.entries(colors).forEach(([key, value]) => {
             root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);  // 记录变量键
         });
         
-        // 生成渐变背景（复用ThemeManager的逻辑）
-        const panelStart = colors['--dnd-bg-panel-start'] || '#2b1b17';
-        const panelEnd = colors['--dnd-bg-panel-end'] || '#1a100e';
-        const cardStart = colors['--dnd-bg-card-start'] || '#242424';
-        const cardEnd = colors['--dnd-bg-card-end'] || '#1a1a1c';
+        // 获取当前已设置的主题基准值作为回退（而非硬编码默认值）
+        const computedStyle = getComputedStyle(root);
+        const getThemeVar = (varName) => computedStyle.getPropertyValue(varName).trim();
+        
+        // 生成渐变背景：优先使用样式包提供的值，否则继承当前主题基准
+        const panelStart = colors['--dnd-bg-panel-start'] || getThemeVar('--dnd-bg-panel-start') || '#2b1b17';
+        const panelEnd = colors['--dnd-bg-panel-end'] || getThemeVar('--dnd-bg-panel-end') || '#1a100e';
+        const cardStart = colors['--dnd-bg-card-start'] || getThemeVar('--dnd-bg-card-start') || '#242424';
+        const cardEnd = colors['--dnd-bg-card-end'] || getThemeVar('--dnd-bg-card-end') || '#1a1a1c';
+        
+        // 记录生成的渐变变量
+        const gradientVars = ['--dnd-bg-panel', '--dnd-bg-hud', '--dnd-bg-card', '--dnd-bg-popup'];
+        gradientVars.forEach(v => this._lastAppliedVars.add(v));
         
         root.style.setProperty('--dnd-bg-panel', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
         root.style.setProperty('--dnd-bg-hud', `linear-gradient(to bottom, ${panelStart}, ${panelEnd})`);
@@ -384,6 +481,7 @@ export const StyleManager = {
         
         Object.entries(vars).forEach(([key, value]) => {
             root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);  // 记录变量键
         });
     },
     
@@ -407,9 +505,9 @@ export const StyleManager = {
         // 边框形态
         if (morphology.border) {
             const { style, width, outerStyle } = morphology.border;
-            if (style) root.style.setProperty('--dnd-border-style', style);
-            if (width) root.style.setProperty('--dnd-border-width', width);
-            if (outerStyle) root.style.setProperty('--dnd-border-outer-style', outerStyle);
+            if (style) { root.style.setProperty('--dnd-border-style', style); this._lastAppliedVars.add('--dnd-border-style'); }
+            if (width) { root.style.setProperty('--dnd-border-width', width); this._lastAppliedVars.add('--dnd-border-width'); }
+            if (outerStyle) { root.style.setProperty('--dnd-border-outer-style', outerStyle); this._lastAppliedVars.add('--dnd-border-outer-style'); }
         }
         
         // 角部形态
@@ -417,42 +515,46 @@ export const StyleManager = {
             const { style, clipPath } = morphology.corners;
             if (clipPath && clipPath !== 'none') {
                 root.style.setProperty('--dnd-card-clip-path', clipPath);
+                this._lastAppliedVars.add('--dnd-card-clip-path');
             } else {
                 root.style.setProperty('--dnd-card-clip-path', 'none');
+                this._lastAppliedVars.add('--dnd-card-clip-path');
             }
             // 根据角部样式设置特殊的裁剪路径
             if (style) {
                 root.style.setProperty('--dnd-corner-style', style);
+                this._lastAppliedVars.add('--dnd-corner-style');
             }
         }
         
         // 卡片形态
         if (morphology.card) {
             const { shape, aspectRatio, transform, decoration } = morphology.card;
-            if (shape) root.style.setProperty('--dnd-card-shape', shape);
-            if (aspectRatio) root.style.setProperty('--dnd-card-aspect-ratio', aspectRatio);
+            if (shape) { root.style.setProperty('--dnd-card-shape', shape); this._lastAppliedVars.add('--dnd-card-shape'); }
+            if (aspectRatio) { root.style.setProperty('--dnd-card-aspect-ratio', aspectRatio); this._lastAppliedVars.add('--dnd-card-aspect-ratio'); }
             if (transform && transform !== 'none') {
                 root.style.setProperty('--dnd-card-transform', transform);
+                this._lastAppliedVars.add('--dnd-card-transform');
             }
-            if (decoration) root.style.setProperty('--dnd-card-decoration', decoration);
+            if (decoration) { root.style.setProperty('--dnd-card-decoration', decoration); this._lastAppliedVars.add('--dnd-card-decoration'); }
         }
         
         // 装饰元素
         if (morphology.decorations) {
             const { corners, dividers, headers, icons } = morphology.decorations;
-            if (corners) root.style.setProperty('--dnd-corner-ornament', corners);
-            if (dividers) root.style.setProperty('--dnd-divider-style', dividers);
-            if (headers) root.style.setProperty('--dnd-header-decoration', headers);
-            if (icons) root.style.setProperty('--dnd-icon-shape', icons);
+            if (corners) { root.style.setProperty('--dnd-corner-ornament', corners); this._lastAppliedVars.add('--dnd-corner-ornament'); }
+            if (dividers) { root.style.setProperty('--dnd-divider-style', dividers); this._lastAppliedVars.add('--dnd-divider-style'); }
+            if (headers) { root.style.setProperty('--dnd-header-decoration', headers); this._lastAppliedVars.add('--dnd-header-decoration'); }
+            if (icons) { root.style.setProperty('--dnd-icon-shape', icons); this._lastAppliedVars.add('--dnd-icon-shape'); }
         }
         
         // 视觉特效
         if (morphology.effects) {
             const { overlay, innerGlow, borderGlow, texture } = morphology.effects;
-            if (overlay) root.style.setProperty('--dnd-effect-overlay', this._getOverlayValue(overlay));
-            if (innerGlow) root.style.setProperty('--dnd-effect-inner-glow', this._getGlowValue(innerGlow));
-            if (borderGlow) root.style.setProperty('--dnd-effect-border-glow', this._getGlowValue(borderGlow));
-            if (texture) root.style.setProperty('--dnd-effect-texture', this._getTextureValue(texture));
+            if (overlay) { root.style.setProperty('--dnd-effect-overlay', this._getOverlayValue(overlay)); this._lastAppliedVars.add('--dnd-effect-overlay'); }
+            if (innerGlow) { root.style.setProperty('--dnd-effect-inner-glow', this._getGlowValue(innerGlow)); this._lastAppliedVars.add('--dnd-effect-inner-glow'); }
+            if (borderGlow) { root.style.setProperty('--dnd-effect-border-glow', this._getGlowValue(borderGlow)); this._lastAppliedVars.add('--dnd-effect-border-glow'); }
+            if (texture) { root.style.setProperty('--dnd-effect-texture', this._getTextureValue(texture)); this._lastAppliedVars.add('--dnd-effect-texture'); }
         }
         
         // 布局密度
@@ -460,12 +562,14 @@ export const StyleManager = {
             const { density, cardMinWidth, gridGap } = morphology.layout;
             if (density) {
                 root.style.setProperty('--dnd-layout-density', density);
+                this._lastAppliedVars.add('--dnd-layout-density');
                 // 根据密度调整间距
                 const densityMultiplier = density === 'compact' ? 0.75 : (density === 'spacious' ? 1.25 : 1);
                 root.style.setProperty('--dnd-density-multiplier', String(densityMultiplier));
+                this._lastAppliedVars.add('--dnd-density-multiplier');
             }
-            if (cardMinWidth) root.style.setProperty('--dnd-card-min-width', cardMinWidth);
-            if (gridGap) root.style.setProperty('--dnd-grid-gap', gridGap);
+            if (cardMinWidth) { root.style.setProperty('--dnd-card-min-width', cardMinWidth); this._lastAppliedVars.add('--dnd-card-min-width'); }
+            if (gridGap) { root.style.setProperty('--dnd-grid-gap', gridGap); this._lastAppliedVars.add('--dnd-grid-gap'); }
         }
         
         Logger.debug('已应用形态配置:', morphology);
@@ -489,96 +593,102 @@ export const StyleManager = {
         
         if (!root) return;
         
+        // 辅助函数：设置变量并记录
+        const setVar = (key, value) => {
+            root.style.setProperty(key, value);
+            this._lastAppliedVars.add(key);
+        };
+        
         // 悬浮状态 (Hover)
         if (interactiveStates.hover) {
             const { brightness, scale, lift, shadow, borderColor, glow, transition } = interactiveStates.hover;
-            if (brightness) root.style.setProperty('--dnd-hover-brightness', String(brightness));
-            if (scale) root.style.setProperty('--dnd-hover-scale', String(scale));
-            if (lift) root.style.setProperty('--dnd-hover-lift', lift);
-            if (shadow) root.style.setProperty('--dnd-hover-shadow', shadow);
-            if (borderColor) root.style.setProperty('--dnd-hover-border-color', borderColor);
-            if (glow) root.style.setProperty('--dnd-hover-glow', glow);
-            if (transition) root.style.setProperty('--dnd-hover-transition', transition);
+            if (brightness) setVar('--dnd-hover-brightness', String(brightness));
+            if (scale) setVar('--dnd-hover-scale', String(scale));
+            if (lift) setVar('--dnd-hover-lift', lift);
+            if (shadow) setVar('--dnd-hover-shadow', shadow);
+            if (borderColor) setVar('--dnd-hover-border-color', borderColor);
+            if (glow) setVar('--dnd-hover-glow', glow);
+            if (transition) setVar('--dnd-hover-transition', transition);
         }
         
         // 卡片悬浮
         if (interactiveStates.cardHover) {
             const { transform, shadow, borderColor } = interactiveStates.cardHover;
-            if (transform) root.style.setProperty('--dnd-card-hover-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-card-hover-shadow', shadow);
-            if (borderColor) root.style.setProperty('--dnd-card-hover-border-color', borderColor);
+            if (transform) setVar('--dnd-card-hover-transform', transform);
+            if (shadow) setVar('--dnd-card-hover-shadow', shadow);
+            if (borderColor) setVar('--dnd-card-hover-border-color', borderColor);
         }
         
         // 按钮悬浮
         if (interactiveStates.buttonHover) {
             const { brightness, transform, shadow } = interactiveStates.buttonHover;
-            if (brightness) root.style.setProperty('--dnd-btn-hover-brightness', String(brightness));
-            if (transform) root.style.setProperty('--dnd-btn-hover-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-btn-hover-shadow', shadow);
+            if (brightness) setVar('--dnd-btn-hover-brightness', String(brightness));
+            if (transform) setVar('--dnd-btn-hover-transform', transform);
+            if (shadow) setVar('--dnd-btn-hover-shadow', shadow);
         }
         
         // 点击/激活状态 (Active/Pressed)
         if (interactiveStates.active) {
             const { scale, brightness, transform, shadow } = interactiveStates.active;
-            if (scale) root.style.setProperty('--dnd-active-scale', String(scale));
-            if (brightness) root.style.setProperty('--dnd-active-brightness', String(brightness));
-            if (transform) root.style.setProperty('--dnd-active-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-active-shadow', shadow);
+            if (scale) setVar('--dnd-active-scale', String(scale));
+            if (brightness) setVar('--dnd-active-brightness', String(brightness));
+            if (transform) setVar('--dnd-active-transform', transform);
+            if (shadow) setVar('--dnd-active-shadow', shadow);
         }
         
         // 按钮点击
         if (interactiveStates.buttonActive) {
             const { transform, shadow } = interactiveStates.buttonActive;
-            if (transform) root.style.setProperty('--dnd-btn-active-transform', transform);
-            if (shadow) root.style.setProperty('--dnd-btn-active-shadow', shadow);
+            if (transform) setVar('--dnd-btn-active-transform', transform);
+            if (shadow) setVar('--dnd-btn-active-shadow', shadow);
         }
         
         // 选中状态 (Selected)
         if (interactiveStates.selected) {
             const { background, borderColor, borderWidth, glow, textColor } = interactiveStates.selected;
-            if (background) root.style.setProperty('--dnd-selected-bg', background);
-            if (borderColor) root.style.setProperty('--dnd-selected-border-color', borderColor);
-            if (borderWidth) root.style.setProperty('--dnd-selected-border-width', borderWidth);
-            if (glow) root.style.setProperty('--dnd-selected-glow', glow);
-            if (textColor) root.style.setProperty('--dnd-selected-text-color', textColor);
+            if (background) setVar('--dnd-selected-bg', background);
+            if (borderColor) setVar('--dnd-selected-border-color', borderColor);
+            if (borderWidth) setVar('--dnd-selected-border-width', borderWidth);
+            if (glow) setVar('--dnd-selected-glow', glow);
+            if (textColor) setVar('--dnd-selected-text-color', textColor);
         }
         
         // 导航选中状态
         if (interactiveStates.navActive) {
             const { background, border, indicator } = interactiveStates.navActive;
-            if (background) root.style.setProperty('--dnd-nav-active-bg', background);
-            if (border) root.style.setProperty('--dnd-nav-active-border', border);
-            if (indicator) root.style.setProperty('--dnd-nav-active-indicator', indicator);
+            if (background) setVar('--dnd-nav-active-bg', background);
+            if (border) setVar('--dnd-nav-active-border', border);
+            if (indicator) setVar('--dnd-nav-active-indicator', indicator);
         }
         
         // 聚焦状态 (Focus)
         if (interactiveStates.focus) {
             const { borderColor, shadow, outline } = interactiveStates.focus;
-            if (borderColor) root.style.setProperty('--dnd-focus-border-color', borderColor);
-            if (shadow) root.style.setProperty('--dnd-focus-shadow', shadow);
-            if (outline) root.style.setProperty('--dnd-focus-outline', outline);
+            if (borderColor) setVar('--dnd-focus-border-color', borderColor);
+            if (shadow) setVar('--dnd-focus-shadow', shadow);
+            if (outline) setVar('--dnd-focus-outline', outline);
         }
         
         // 禁用状态 (Disabled)
         if (interactiveStates.disabled) {
             const { opacity, cursor, filter } = interactiveStates.disabled;
-            if (opacity) root.style.setProperty('--dnd-disabled-opacity', String(opacity));
-            if (cursor) root.style.setProperty('--dnd-disabled-cursor', cursor);
-            if (filter) root.style.setProperty('--dnd-disabled-filter', filter);
+            if (opacity) setVar('--dnd-disabled-opacity', String(opacity));
+            if (cursor) setVar('--dnd-disabled-cursor', cursor);
+            if (filter) setVar('--dnd-disabled-filter', filter);
         }
         
         // 图标悬浮
         if (interactiveStates.iconHover) {
             const { glow, scale } = interactiveStates.iconHover;
-            if (glow) root.style.setProperty('--dnd-icon-hover-glow', glow);
-            if (scale) root.style.setProperty('--dnd-icon-hover-scale', String(scale));
+            if (glow) setVar('--dnd-icon-hover-glow', glow);
+            if (scale) setVar('--dnd-icon-hover-scale', String(scale));
         }
         
         // 输入框聚焦
         if (interactiveStates.inputFocus) {
             const { border, shadow } = interactiveStates.inputFocus;
-            if (border) root.style.setProperty('--dnd-input-focus-border', border);
-            if (shadow) root.style.setProperty('--dnd-input-focus-shadow', shadow);
+            if (border) setVar('--dnd-input-focus-border', border);
+            if (shadow) setVar('--dnd-input-focus-shadow', shadow);
         }
         
         Logger.debug('已应用交互状态配置:', interactiveStates);

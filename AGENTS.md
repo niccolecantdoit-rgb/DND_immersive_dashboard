@@ -9,6 +9,7 @@ SillyTavern 的 DND 5E 沉浸式仪表盘 Userscript 插件。通过 Tampermonke
 - `npm run dev` - 开发模式 (watch + Socket.IO 热更新到端口 6621)
 - `npm run build` - 生产构建
 - `npm run minify` - 额外压缩 (生成 .min.js)
+- **交付/发布前必须连续执行**：`npm run build` 后立即执行 `npm run minify`，确保 `.user.js` 与 `.min.js` 同步更新。
 
 ## 版本同步 (非常重要)
 修改版本时必须同时更新以下 4 处：

@@ -48,13 +48,14 @@ export const CONFIG = {
         CUSTOM_STYLES: 'dnd_custom_styles',
         // 选项换行设置
         OPTION_WRAP: 'dnd_option_wrap',
-        // 模板同步相关
+        // 迷你地图显示开关
+        SHOW_MINI_MAP: 'dnd_show_mini_map',
+        // 隐藏浮动球开关
+        HIDE_FLOATING_BALL: 'dnd_hide_floating_ball',
+        // Mini HUD 独立位置 (隐藏球模式下)
+        MINI_HUD_POS: 'dnd_mini_hud_pos',
+        // 已同步的模板版本
         TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version'
-    },
-    // 模板同步配置
-    TEMPLATE_SYNC: {
-        REMOTE_URL: 'https://raw.githubusercontent.com/niccolecantdoit-rgb/DND_immersive_dashboard/master/dist/DND%E4%BB%AA%E8%A1%A8%E7%9B%98%E9%85%8D%E5%A5%97%E6%A8%A1%E6%9D%BF.json',
-        CURRENT_VERSION: '1.9.2'  // 与 package.json 保持同步
     },
     // 界面缩放配置
     UI_SCALE: {
@@ -68,6 +69,10 @@ export const CONFIG = {
         enabled: true,          // 是否启用动态背景
         type: 'particles',      // 默认效果类型: particles, gears, ripples, runes, starfield, gradient, grid, dna
         intensity: 1.0          // 效果强度 (0.5 - 2.0)
+    },
+    // 模板同步配置
+    TEMPLATE_SYNC: {
+        CURRENT_VERSION: '2.0.1'
     },
     // 地图缩放配置
     MAP_ZOOM: {
@@ -91,9 +96,11 @@ export const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #242424 0%, #1a1a1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1b17, #1a100e)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(28, 28, 30, 0.99), rgba(18, 18, 20, 0.99))',
+                '--dnd-bg-input': 'rgba(26, 26, 28, 0.95)',
                 '--dnd-bg-item': 'rgba(255,255,255,0.03)',
                 '--dnd-border-gold': '#9d8b6c',
                 '--dnd-border-inner': '#5c4b35',
+                '--dnd-border-subtle': '#444',
                 '--dnd-text-main': '#dcd0c0',
                 '--dnd-text-header': '#e6dcca',
                 '--dnd-text-highlight': '#ffdb85',
@@ -117,9 +124,11 @@ export const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c2e24 0%, #0f1c16 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a2b22, #0e1a14)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 32, 26, 0.99), rgba(10, 20, 16, 0.99))',
+                '--dnd-bg-input': 'rgba(20, 32, 26, 0.95)',
                 '--dnd-bg-item': 'rgba(255,255,255,0.05)',
                 '--dnd-border-gold': '#5a8a6a',
                 '--dnd-border-inner': '#2c4a3a',
+                '--dnd-border-subtle': '#3a5a4a',
                 '--dnd-text-main': '#c0dcd0',
                 '--dnd-text-header': '#cae6da',
                 '--dnd-text-highlight': '#85ffb5',
@@ -143,9 +152,11 @@ export const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #2e1c1c 0%, #1c0f0f 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #2b1717, #1a0e0e)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(32, 20, 20, 0.99), rgba(20, 10, 10, 0.99))',
+                '--dnd-bg-input': 'rgba(32, 20, 20, 0.95)',
                 '--dnd-bg-item': 'rgba(255,200,200,0.03)',
                 '--dnd-border-gold': '#8a5a5a',
                 '--dnd-border-inner': '#4a2c2c',
+                '--dnd-border-subtle': '#5a3a3a',
                 '--dnd-text-main': '#dcc0c0',
                 '--dnd-text-header': '#e6cada',
                 '--dnd-text-highlight': '#ff8585',
@@ -169,9 +180,11 @@ export const CONFIG = {
                 '--dnd-bg-card': 'linear-gradient(135deg, #1c1c2e 0%, #0f0f1c 100%)',
                 '--dnd-bg-hud': 'linear-gradient(to bottom, #1a1a2e, #0e0e1a)',
                 '--dnd-bg-popup': 'linear-gradient(to bottom, rgba(20, 20, 36, 0.99), rgba(10, 10, 20, 0.99))',
+                '--dnd-bg-input': 'rgba(20, 20, 36, 0.95)',
                 '--dnd-bg-item': 'rgba(200,200,255,0.03)',
                 '--dnd-border-gold': '#6a6a9d',
                 '--dnd-border-inner': '#3a3a5a',
+                '--dnd-border-subtle': '#4a4a6a',
                 '--dnd-text-main': '#c0c0dc',
                 '--dnd-text-header': '#cacaE6',
                 '--dnd-text-highlight': '#b585ff',

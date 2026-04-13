@@ -6,6 +6,7 @@ import { DataManager } from '../../data/DataManager.js';
 import { SettingsManager } from '../../core/SettingsManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { TavernAPI } from '../../core/TavernAPI.js';
+import { TemplateSync } from '../../features/TemplateSync.js';
 import { NotificationSystem } from './UIUtils.js';
 import UICore from './UICore.js';
 import { DynamicBackground } from '../DynamicBackground.js';
@@ -19,6 +20,8 @@ export default {
         const config = CONFIG.PRESET_SWITCHING;
         const presets = PresetSwitcher.getAvailablePresets();
         const apiConfig = await SettingsManager.getAPIConfig();
+        const aiProvider = apiConfig.provider || 'plugin';
+        const dbAiStatus = TavernAPI.getDatabaseAIStatus();
         const syncStatus = await SettingsManager.getSyncStatus();
         const currentScale = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.UI_SCALE) || CONFIG.UI_SCALE.DEFAULT;
         
@@ -38,6 +41,14 @@ export default {
         const savedOptionWrap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP);
         const optionWrapEnabled = savedOptionWrap === true || savedOptionWrap === 'true';
         
+        // 获取迷你地图显示设置
+        const savedShowMiniMap = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP);
+        const showMiniMapEnabled = savedShowMiniMap !== false && savedShowMiniMap !== 'false'; // 默认开启
+        
+        // 获取隐藏浮动球设置
+        const savedHideFloatingBall = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
+        const hideFloatingBallEnabled = savedHideFloatingBall === true || savedHideFloatingBall === 'true'; // 默认关闭
+        
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
             let html = `<option value="">-- 手动输入 --</option>`;
@@ -55,21 +66,32 @@ export default {
                 </h2>
 
                 <!-- 同步状态 -->
-                <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
+                <div style="background:var(--dnd-bg-card);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;">
                     <div>
                         <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;">${ICONS.CLOUD} 云同步状态</div>
-                        <div style="color:#888;font-size:12px;">配置将自动同步到酒馆服务器</div>
+                        <div style="color:var(--dnd-text-dim);font-size:12px;">配置将自动同步到酒馆服务器</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:10px;">
                         <span id="dnd-sync-badge" class="dnd-badge dnd-badge-${syncStatus.statusClass}" style="padding:4px 8px;">${syncStatus.statusText}</span>
-                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid #555;color:#ccc;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
+                        <button type="button" id="dnd-sync-force" style="background:transparent;border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;" title="强制同步">${ICONS.SYNC}</button>
                     </div>
                 </div>
 
+                <!-- 模板同步 -->
+                <div style="background:var(--dnd-bg-card);padding:15px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:15px;">
+                    <div>
+                        <div style="color:var(--dnd-text-header);font-weight:bold;margin-bottom:5px;"><i class="fa-solid fa-table"></i> 表格模板</div>
+                        <div style="color:var(--dnd-text-dim);font-size:12px;line-height:1.6;">当前内置模板版本：v${CONFIG.TEMPLATE_SYNC.CURRENT_VERSION}。可在这里手动重新导入模板。</div>
+                    </div>
+                    <button type="button" id="dnd-template-import" style="background:rgba(157,139,108,0.16);border:1px solid var(--dnd-border-gold);color:var(--dnd-text-highlight);padding:8px 14px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">
+                        <i class="fa-solid fa-file-import"></i> 导入表格模板
+                    </button>
+                </div>
+
                 <!-- 界面显示设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">💻 界面显示</h3>
-                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
+                    <p style="color:var(--dnd-text-dim);font-size:13px;margin-bottom:15px;">
                         调整仪表盘和悬浮球的大小比例，适配不同分辨率的屏幕。
                     </p>
                     
@@ -82,7 +104,7 @@ export default {
                             <input type="range" id="dnd-set-ui-scale"
                                 min="${CONFIG.UI_SCALE.MIN}" max="${CONFIG.UI_SCALE.MAX}" step="${CONFIG.UI_SCALE.STEP}" value="${currentScale}"
                                 style="flex:1;cursor:pointer;">
-                            <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
+                            <button type="button" id="dnd-reset-scale" style="padding:4px 8px;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;font-size:12px;">重置</button>
                         </div>
                     </div>
                     
@@ -95,10 +117,30 @@ export default {
                             启用后，HUD 中的行动选项按钮文本将自动换行显示完整内容，而不是截断。
                         </p>
                     </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-show-mini-map" ${showMiniMapEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">显示 MiniHUD 地图</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            控制探索模式和战斗模式中的迷你地图是否显示。关闭后可节省屏幕空间。
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-hide-floating-ball" ${hideFloatingBallEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">隐藏浮动球</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后隐藏浮动球，Mini HUD 将独立显示并可拖拽。需配合酒馆助手按钮使用。
+                        </p>
+                    </div>
                 </div>
 
                 <!-- 配色模板设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.PALETTE} 配色模板</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择预设主题或自定义配色，让界面风格更符合你的喜好。
@@ -106,7 +148,7 @@ export default {
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">预设主题</label>
-                        <select id="dnd-theme-preset" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                        <select id="dnd-theme-preset" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                             ${ThemeManager.getList().map(t => `<option value="${t.id}" ${t.id === ThemeManager.currentTheme ? 'selected' : ''}>${t.icon || ICONS.PALETTE} ${t.name}</option>`).join('')}
                         </select>
                     </div>
@@ -125,8 +167,8 @@ export default {
                                 return Object.entries(editableVars).map(([key, info]) => `
                                     <div style="display:flex;align-items:center;gap:8px;">
                                         <input type="color" class="dnd-color-picker" data-var="${key}" value="${info.value.replace(/^#/, '#').substring(0, 7)}"
-                                            style="width:32px;height:32px;border:1px solid #444;border-radius:4px;cursor:pointer;background:transparent;padding:0;">
-                                        <span style="color:#ccc;font-size:12px;flex:1;">${info.label}</span>
+                                            style="width:32px;height:32px;border:1px solid var(--dnd-border-subtle);border-radius:4px;cursor:pointer;background:transparent;padding:0;">
+                                        <span style="color:var(--dnd-text-main);font-size:12px;flex:1;">${info.label}</span>
                                     </div>
                                 `).join('');
                             })()}
@@ -170,7 +212,7 @@ export default {
                                 <span class="dnd-badge dnd-badge-warning" style="padding:4px 8px;">警告</span>
                                 <span class="dnd-badge dnd-badge-error" style="padding:4px 8px;">错误</span>
                             </div>
-                            <div style="margin-top:10px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px;">
+                            <div style="margin-top:10px;padding:8px;background:var(--dnd-bg-input);border-radius:4px;">
                                 <span style="color:var(--dnd-text-main);">主文本</span> ·
                                 <span style="color:var(--dnd-text-highlight);">高亮文本</span> ·
                                 <span style="color:var(--dnd-text-dim);">次要文本</span>
@@ -180,7 +222,7 @@ export default {
                 </div>
 
                 <!-- 风格管理 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.MASK} 风格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         选择完整的视觉风格主题，包含颜色、尺寸、圆角、动画等全套配置。
@@ -189,7 +231,7 @@ export default {
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:8px;color:var(--dnd-text-main);">当前风格</label>
-                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--dnd-bg-input);border-radius:6px;border:1px solid var(--dnd-border-inner);">
                             <span style="font-size:24px;">${StyleManager.getCurrentStyle().icon || ICONS.PALETTE}</span>
                             <div style="flex:1;">
                                 <div style="font-weight:bold;color:var(--dnd-text-header);">${StyleManager.getCurrentStyle().name || '经典DND'}</div>
@@ -206,7 +248,7 @@ export default {
                                      data-style-id="${style.id}">
                                     <div style="font-size:28px;margin-bottom:6px;">${style.icon || ICONS.PALETTE}</div>
                                     <div style="font-size:12px;font-weight:bold;color:${style.id === StyleManager.currentStyleId ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};">${style.name}</div>
-                                    ${style.isCustom ? '<div style="font-size:9px;color:#888;margin-top:2px;">自定义</div>' : ''}
+                                    ${style.isCustom ? '<div style="font-size:9px;color:var(--dnd-text-dim);margin-top:2px;">自定义</div>' : ''}
                                     ${style.id === StyleManager.currentStyleId ? '<div style="font-size:9px;color:var(--dnd-text-highlight);margin-top:2px;">✓ 当前</div>' : ''}
                                 </div>
                             `).join('')}
@@ -253,7 +295,7 @@ export default {
                 </div>
 
                 <!-- 动态背景设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">${ICONS.SPARKLES} 动态背景</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         为界面添加动态背景效果，类似游戏UI设计，让背景不再单调。
@@ -269,7 +311,7 @@ export default {
                     <div class="dnd-bg-group" style="opacity:${bgConfig.enabled ? 1 : 0.5};pointer-events:${bgConfig.enabled ? 'auto' : 'none'};transition:all 0.3s;">
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">背景效果</label>
-                            <select id="dnd-bg-type" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                            <select id="dnd-bg-type" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                                 ${bgEffects.map(e => `<option value="${e.id}" ${e.id === bgConfig.type ? 'selected' : ''}>${e.icon || ICONS.SPARKLES} ${e.name}</option>`).join('')}
                             </select>
                         </div>
@@ -289,39 +331,65 @@ export default {
                 </div>
 
                 <!-- API 配置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-plug"></i> API 连接配置</h3>
-                    <p style="color:#888;font-size:13px;margin-bottom:15px;">
-                        配置 OpenAI 兼容 API，用于角色生成和地图绘制。
+                    <p style="color:var(--dnd-text-dim);font-size:13px;margin-bottom:15px;">
+                        可在插件自定义 API 与神数据库 AI 调用之间切换。角色创建与地图生成会使用这里选定的方案。
                     </p>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 地址 (URL)</label>
-                        <input type="text" id="dnd-set-api-url" value="${apiConfig.url || ''}" placeholder="https://api.openai.com/v1" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                    </div>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 密钥 (Key)</label>
-                        <input type="password" id="dnd-set-api-key" value="${apiConfig.key || ''}" placeholder="sk-..." style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                    </div>
-                    
-                    <div style="margin-bottom:10px;">
-                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">模型名称 (Model)</label>
-                        <div style="display:flex;gap:10px;">
-                            <input type="text" id="dnd-set-api-model" value="${apiConfig.model || ''}" placeholder="gpt-3.5-turbo" style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                            <button type="button" id="dnd-set-fetch-models" style="padding:0 15px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;">获取列表</button>
+
+                    <div style="margin-bottom:15px;">
+                        <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">AI 调用方案</label>
+                        <select id="dnd-ai-provider" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                            <option value="plugin" ${aiProvider === 'plugin' ? 'selected' : ''}>插件自定义 API</option>
+                            <option value="database" ${aiProvider === 'database' ? 'selected' : ''}>神数据库 AI 调用</option>
+                        </select>
+                        <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:6px;">
+                            选择"神数据库 AI 调用"后，将直接使用数据库插件的 <code>callAI()</code> 能力，而不是插件内单独配置的 URL / Key / Model。
                         </div>
-                        <!-- 模型下拉列表容器 -->
-                        <div id="dnd-model-list-container" style="display:none;margin-top:5px;">
-                            <select id="dnd-set-model-select" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
-                                <option value="">-- 选择模型 --</option>
-                            </select>
+                    </div>
+
+                    <div id="dnd-db-ai-config-group" style="display:${aiProvider === 'database' ? 'block' : 'none'};margin-bottom:15px;padding:12px;border-radius:6px;border:1px solid var(--dnd-border-subtle);background:var(--dnd-bg-secondary);">
+                        <div style="font-weight:bold;color:var(--dnd-text-header);margin-bottom:8px;">神数据库 AI 状态</div>
+                        <div style="font-size:12px;color:var(--dnd-text-main);line-height:1.7;">
+                            <div>AI 调用接口：<span style="color:${dbAiStatus.available ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};font-weight:bold;">${dbAiStatus.available ? '已检测到' : '未检测到'}</span></div>
+                            <div>已检测到 API 预设：${dbAiStatus.presetCount} 个</div>
+                            <div>当前填表预设：${dbAiStatus.tablePreset || '使用数据库当前配置'}</div>
+                            <div>当前剧情预设：${dbAiStatus.plotPreset || '使用数据库当前配置'}</div>
+                        </div>
+                        <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:8px;line-height:1.6;">
+                            这里显示的是数据库 AI 接口是否已暴露给前端；具体的 API URL、模型与预设切换，请在神数据库插件内部完成配置。
+                        </div>
+                    </div>
+                    
+                    <div id="dnd-plugin-api-config-group" style="opacity:${aiProvider === 'plugin' ? 1 : 0.45};pointer-events:${aiProvider === 'plugin' ? 'auto' : 'none'};transition:all 0.25s;">
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 地址 (URL)</label>
+                            <input type="text" id="dnd-set-api-url" value="${apiConfig.url || ''}" placeholder="https://api.openai.com/v1" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                        </div>
+                        
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">API 密钥 (Key)</label>
+                            <input type="password" id="dnd-set-api-key" value="${apiConfig.key || ''}" placeholder="sk-..." style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                        </div>
+                        
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">模型名称 (Model)</label>
+                            <div style="display:flex;gap:10px;">
+                                <input type="text" id="dnd-set-api-model" value="${apiConfig.model || ''}" placeholder="gpt-3.5-turbo" style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                                <button type="button" id="dnd-set-fetch-models" style="padding:0 15px;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;">获取列表</button>
+                            </div>
+                            <!-- 模型下拉列表容器 -->
+                            <div id="dnd-model-list-container" style="display:none;margin-top:5px;">
+                                <select id="dnd-set-model-select" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
+                                    <option value="">-- 选择模型 --</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
                 <!-- 表格管理设置 -->
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);margin-bottom:20px;">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-clipboard-list"></i> 表格管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         自定义表格管理模块的布局和显示内容。
@@ -329,7 +397,7 @@ export default {
                     
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">每行按钮数</label>
-                        <select id="dnd-tm-cols-setting" style="width:100%;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;">
+                        <select id="dnd-tm-cols-setting" style="width:100%;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;">
                             <option value="auto" ${savedTmCols === 'auto' ? 'selected' : ''}>自动 (Auto)</option>
                             <option value="2" ${savedTmCols == 2 ? 'selected' : ''}>2 列</option>
                             <option value="3" ${savedTmCols == 3 ? 'selected' : ''}>3 列</option>
@@ -340,22 +408,22 @@ export default {
 
                     <div style="margin-bottom:10px;">
                         <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">可见表格</label>
-                        <div style="background:rgba(0,0,0,0.2);border:1px solid #444;border-radius:4px;padding:10px;max-height:150px;overflow-y:auto;">
+                        <div style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);border-radius:4px;padding:10px;max-height:150px;overflow-y:auto;">
                             ${tables.length > 0 ? tables.map(k => {
                                 const name = allData[k].name || k;
                                 const isChecked = !hiddenTables.includes(k);
                                 return `
                                     <label style="display:flex;align-items:center;margin-bottom:5px;cursor:pointer;">
                                         <input type="checkbox" class="dnd-tm-visible-check" value="${k}" ${isChecked ? 'checked' : ''} style="margin-right:8px;">
-                                        <span style="color:#ccc;font-size:12px;">${name}</span>
+                                        <span style="color:var(--dnd-text-main);font-size:12px;">${name}</span>
                                     </label>
                                 `;
-                            }).join('') : '<div style="color:#666;font-size:12px;">暂无可用表格</div>'}
+                            }).join('') : '<div style="color:var(--dnd-text-dim);font-size:12px;">暂无可用表格</div>'}
                         </div>
                     </div>
                 </div>
 
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                <div style="background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;">🔁 自动预设切换</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:20px;">
                         根据游戏内的战斗状态（全局状态表中的"战斗模式"字段），自动切换酒馆的 Plot/World Info 预设。
@@ -372,20 +440,20 @@ export default {
                         <div style="margin-bottom:15px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.SWORD} 战斗状态预设</label>
                             <div style="display:flex;gap:10px;">
-                                <select id="dnd-cfg-combat-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <select id="dnd-cfg-combat-sel" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.COMBAT_PRESET)}
                                 </select>
-                                <input type="text" id="dnd-cfg-combat-input" value="${config.COMBAT_PRESET}" placeholder="预设名称" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <input type="text" id="dnd-cfg-combat-input" value="${config.COMBAT_PRESET}" placeholder="预设名称" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                             </div>
                         </div>
                         
                         <div style="margin-bottom:20px;">
                             <label style="display:block;margin-bottom:5px;color:var(--dnd-text-main);">${ICONS.COMPASS} 探索状态预设</label>
                             <div style="display:flex;gap:10px;">
-                                <select id="dnd-cfg-explore-sel" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <select id="dnd-cfg-explore-sel" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                                     ${buildOptions(config.EXPLORE_PRESET)}
                                 </select>
-                                <input type="text" id="dnd-cfg-explore-input" value="${config.EXPLORE_PRESET}" placeholder="预设名称" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:8px;border-radius:4px;flex:1;">
+                                <input type="text" id="dnd-cfg-explore-input" value="${config.EXPLORE_PRESET}" placeholder="预设名称" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:8px;border-radius:4px;flex:1;">
                             </div>
                         </div>
                     </div>
@@ -415,7 +483,7 @@ export default {
                 </div>
 
                 <!-- 存储诊断工具 -->
-                <div style="margin-top:20px;background:rgba(0,0,0,0.3);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
+                <div style="margin-top:20px;background:var(--dnd-bg-card);padding:20px;border-radius:6px;border:1px solid var(--dnd-border-inner);">
                     <h3 style="color:var(--dnd-text-header);margin-top:0;"><i class="fa-solid fa-database"></i> 存储空间管理</h3>
                     <p style="color:#888;font-size:13px;margin-bottom:15px;">
                         检查 LocalStorage 使用情况，或清理 IndexedDB 中的缓存数据（图片和地图）。
@@ -539,6 +607,19 @@ export default {
             $btn.prop('disabled', false).css('opacity', 1);
         });
 
+        // 手动导入模板
+        $c.find('#dnd-template-import').on('click', async function(e) {
+            if (e) e.preventDefault();
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 处理中');
+            try {
+                await TemplateSync.manualImport();
+            } finally {
+                $btn.prop('disabled', false).html(originalHtml);
+            }
+        });
+
         // 绑定刷新按钮 (API)
         $c.find('#dnd-set-fetch-models').on('click', async function(e) {
             if(e) e.preventDefault();
@@ -580,6 +661,23 @@ export default {
             const val = $(this).val();
             if (val) {
                 $c.find('#dnd-set-api-model').val(val);
+            }
+        });
+
+        const updateAIProviderUI = () => {
+            const provider = $c.find('#dnd-ai-provider').val();
+            const isPlugin = provider === 'plugin';
+            $c.find('#dnd-plugin-api-config-group').css({
+                opacity: isPlugin ? 1 : 0.45,
+                pointerEvents: isPlugin ? 'auto' : 'none'
+            });
+            $c.find('#dnd-db-ai-config-group').css('display', isPlugin ? 'none' : 'block');
+        };
+
+        $c.find('#dnd-ai-provider').on('change', function() {
+            updateAIProviderUI();
+            if ($(this).val() === 'database' && !TavernAPI.getDatabaseAIStatus().available) {
+                NotificationSystem.warning('已切换到神数据库 AI 模式，但当前数据库插件还未检测到 callAI() 接口。保存前请确认数据库插件已更新。');
             }
         });
 
@@ -646,6 +744,32 @@ export default {
             const checked = $(this).prop('checked');
             await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.OPTION_WRAP, checked);
             NotificationSystem.notify(checked ? '已启用行动选项换行' : '已禁用行动选项换行', { type: 'success', duration: 2000 });
+        });
+
+        // 迷你地图显示设置
+        $c.find('#dnd-show-mini-map').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, checked);
+            NotificationSystem.notify(checked ? '已显示迷你地图' : '已隐藏迷你地图', { type: 'success', duration: 2000 });
+            
+            // 如果当前在 mini 状态，立即重新渲染 HUD
+            const { window: coreWin } = getCore();
+            if (coreWin.DND_Dashboard_UI && coreWin.DND_Dashboard_UI.state === 'mini') {
+                coreWin.DND_Dashboard_UI.renderHUD();
+            }
+        });
+
+        // 隐藏浮动球设置
+        $c.find('#dnd-hide-floating-ball').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DBAdapter.setSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, checked);
+            NotificationSystem.notify(checked ? '已隐藏浮动球' : '已显示浮动球', { type: 'success', duration: 2000 });
+            
+            // 立即应用设置
+            const { window: coreWin } = getCore();
+            if (coreWin.DND_Dashboard_UI) {
+                coreWin.DND_Dashboard_UI.applyFloatingBallVisibility();
+            }
         });
 
         // 配色模板设置
@@ -803,8 +927,8 @@ export default {
                     $(this)
                         .toggleClass('active', isActive)
                         .css({
-                            background: isActive ? 'rgba(157, 139, 108, 0.2)' : 'rgba(0,0,0,0.3)',
-                            borderColor: isActive ? 'var(--dnd-border-gold)' : '#444'
+                            background: isActive ? 'var(--dnd-selected-bg)' : 'var(--dnd-bg-card)',
+                            borderColor: isActive ? 'var(--dnd-border-gold)' : 'var(--dnd-border-subtle)'
                         })
                         .find('div:first').nextAll('div:first').css({
                             color: isActive ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'
@@ -835,7 +959,7 @@ export default {
         }).on('mouseleave', function() {
             if (!$(this).hasClass('active')) {
                 $(this).css({
-                    borderColor: '#444',
+                    borderColor: 'var(--dnd-border-subtle)',
                     transform: 'translateY(0)'
                 });
             }
@@ -963,7 +1087,12 @@ export default {
             
             // 0. 保存缩放设置
             const scaleVal = $c.find('#dnd-set-ui-scale').val();
-            safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+            await safeSave(CONFIG.STORAGE_KEYS.UI_SCALE, scaleVal);
+
+            // 0.1 保存界面显示开关
+            await safeSave(CONFIG.STORAGE_KEYS.OPTION_WRAP, $c.find('#dnd-option-wrap').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, $c.find('#dnd-show-mini-map').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, $c.find('#dnd-hide-floating-ball').prop('checked'));
 
             // 0.5 保存配色设置
             if ($customColorEnabled.prop('checked')) {
@@ -974,7 +1103,7 @@ export default {
                 await ThemeManager.saveCustom(customVars);
             } else {
                 const themeId = $themePreset.val();
-                safeSave(CONFIG.STORAGE_KEYS.THEME, themeId);
+                await safeSave(CONFIG.STORAGE_KEYS.THEME, themeId);
             }
 
             // 1. 保存动态背景配置
@@ -984,7 +1113,7 @@ export default {
                 intensity: parseFloat($c.find('#dnd-bg-intensity').val())
             };
             Object.assign(CONFIG.DYNAMIC_BG, newBgConfig);
-            safeSave(CONFIG.STORAGE_KEYS.DYNAMIC_BG, JSON.stringify(newBgConfig));
+            await safeSave(CONFIG.STORAGE_KEYS.DYNAMIC_BG, JSON.stringify(newBgConfig));
 
             // 2. 保存预设配置
             const newConfig = {
@@ -994,10 +1123,17 @@ export default {
             };
             
             Object.assign(CONFIG.PRESET_SWITCHING, newConfig);
-            safeSave(CONFIG.STORAGE_KEYS.PRESET_CONFIG, newConfig);
+            await safeSave(CONFIG.STORAGE_KEYS.PRESET_CONFIG, newConfig);
             
             // 3. 保存 API 配置
+            const selectedProvider = $c.find('#dnd-ai-provider').val();
+            if (selectedProvider === 'database' && !TavernAPI.getDatabaseAIStatus().available) {
+                NotificationSystem.error('当前数据库插件未提供 callAI() 接口，请先更新数据库插件后再切换到神数据库 AI。');
+                return;
+            }
+
             const newApiConfig = {
+                provider: selectedProvider,
                 url: $c.find('#dnd-set-api-url').val().trim(),
                 key: $c.find('#dnd-set-api-key').val().trim(),
                 model: $c.find('#dnd-set-api-model').val().trim()
@@ -1016,6 +1152,7 @@ export default {
             
             // 通知全局更新
             $(document).trigger('dnd:settings-changed');
+            await UICore.applyFloatingBallVisibility();
 
             // 视觉反馈
             const $btn = $(this);

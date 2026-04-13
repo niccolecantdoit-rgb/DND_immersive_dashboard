@@ -2,7 +2,19 @@
   "mate": {
     "type": "chatSheets",
     "version": 1,
-    "updateConfigUiSentinel": -1
+    "updateConfigUiSentinel": -1,
+    "globalInjectionConfig": {
+      "readableEntryPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99981
+      },
+      "wrapperPlacement": {
+        "position": "before_character_definition",
+        "depth": 2,
+        "order": 99980
+      }
+    }
   },
   "sheet_SYS_GlobalState": {
     "uid": "sheet_SYS_GlobalState",
@@ -34,7 +46,37 @@
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "全局状态"
+      "splitByRow": false,
+      "entryName": "全局状态",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🌍 全局状态-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 0
   },
@@ -73,8 +115,37 @@
     },
     "exportConfig": {
       "enabled": false,
+      "splitByRow": true,
       "entryName": "NPC信息",
-      "splitByRow": true
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "👥 NPC注册表-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 1
   },
@@ -111,7 +182,37 @@
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "背包物品"
+      "splitByRow": false,
+      "entryName": "背包物品",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🎒 背包-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 2
   },
@@ -145,7 +246,37 @@
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "任务列表"
+      "splitByRow": false,
+      "entryName": "任务列表",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "📜 任务-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 3
   },
@@ -182,7 +313,37 @@
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "势力关系"
+      "splitByRow": false,
+      "entryName": "势力关系",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🏛️ 势力声望-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 4
   },
@@ -213,11 +374,42 @@
       "contextDepth": -1,
       "updateFrequency": 1,
       "batchSize": 3,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 3
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "战斗遭遇"
+      "splitByRow": false,
+      "entryName": "战斗遭遇",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "⚔️ 战斗遭遇表-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 5
   },
@@ -245,23 +437,54 @@
       "contextDepth": -1,
       "updateFrequency": 1,
       "batchSize": 3,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 3
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "战斗地图"
+      "splitByRow": false,
+      "entryName": "战斗地图",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🗺️ 战斗地图-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
     "orderNo": 6
   },
   "sheet_LOG_Summary": {
     "uid": "sheet_LOG_Summary",
-    "name": "总结表",
+    "name": "纪要表",
     "sourceData": {
-      "note": "轮次日志，每轮交互后必须立即插入一条新记录。\n- 列0: 时间跨度 - 本轮事件发生的精确时间范围。\n- 列1: 地点 - 本轮事件发生的地点，从大到小描述（例如：国家-城市-具体地点）。\n- 列2: 纪要 - 对本轮交互进行**高保真、零解读**的物理与行为记录。1.**绝对客观的监控视角**：仅记录视觉可见的动作（移动、接触、物品操作）和听觉可闻的信息。2.**去心理化**：绝对禁止描写内心想法、情绪状态（如\"依恋\"、\"不舍\"）、动机分析（如\"基于...考量\"）及意义升华（如\"标志着...\"）。3.**保留物理细节**：详尽记录动作过程。4.**篇幅**：追求事实点的完整罗列，总字数不得少于300字。\n- 列3: 重要对话 - 只摘录原文中造成事实重点的重要对白本身(需标明由谁说的)，总token不得超过80token。\n- 列4: 编码索引 - 为本轮总结表生成一个唯一的编码索引，格式为 AMXX，XX从01开始递增。\n【检查】检查本轮总结表及总体大纲表插入的条目中是否均带有一个相同的编码索引，且格式为`AM`+数字（如`AM01`），若任一方缺失或二者不一致，则需修正。",
-      "initNode": "故事初始化时，插入一条新记录用作记录正文剧情，如果提供的正文包含多轮交互，将其总结为一条记录后插入。",
+      "note": "轮次日志，每轮交互后必须立即插入一条新记录。\n- 列0: 时间跨度 - 本轮事件发生的精确时间范围。\n- 列1: 地点 - 本轮事件发生的地点，从大到小描述。\n- 列2: 纪要 - 以第三方视角客观记录本轮事件，不得加入推测、情绪化语言、负面解读或主观判断。内容必须基于正文明确发生的事实，不得补充未出现的情节，不少于300字，结尾部分禁止进行总结或者升华。\n- 列3: 概览 - 30字以内，一句话概括纪要内容。\n- 列4: 编码索引 - 格式为 AMXX，XX从01递增。\n",
+      "initNode": "故事初始化时，插入一条新记录用于记录初始化剧情。",
       "deleteNode": "禁止删除。",
       "updateNode": "禁止操作。",
-      "insertNode": "每轮交互结束后，插入一条新记录，如果提供的正文包含多轮交互，将其总结为一条记录后插入。"
+      "insertNode": "每轮交互结束后插入一条新记录。"
     },
     "content": [
       [
@@ -269,7 +492,7 @@
         "时间跨度",
         "地点",
         "纪要",
-        "重要对话",
+        "概览",
         "编码索引"
       ]
     ],
@@ -281,43 +504,46 @@
       "skipFloors": -1
     },
     "exportConfig": {
-      "enabled": false,
-      "entryName": "总结表",
-      "entryType": "keyword"
+      "enabled": true,
+      "splitByRow": true,
+      "entryName": "纪要",
+      "entryType": "keyword",
+      "keywords": "编码索引",
+      "preventRecursion": true,
+      "injectionTemplate": "<记忆回溯>\n$1\n</记忆回溯>",
+      "extraIndexEnabled": true,
+      "extraIndexEntryName": "纪要索引",
+      "extraIndexColumns": [
+        "概览",
+        "编码索引"
+      ],
+      "extraIndexColumnModes": {
+        "概览": "index_only",
+        "编码索引": "both"
+      },
+      "extraIndexInjectionTemplate": "<已发生的事件概览>\n$1\n</已发生的事件概览>",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 999,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 1000,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 9999,
+        "order": 99987
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 9999,
+        "order": 99988
+      }
     },
     "orderNo": 7
-  },
-  "sheet_LOG_Outline": {
-    "uid": "sheet_LOG_Outline",
-    "name": "总体大纲",
-    "sourceData": {
-      "note": "对每轮的'总结表'进行精炼，形成故事主干。\n- 列0: 时间跨度 - 总结表所记录的时间范围。\n- 列1: 大纲 - 对本轮'总结表'核心事件的精炼概括。\n- 列2: 编码索引 - 必须与当前轮次'总结表'表中的编码索引完全一致。\n【检查】检查本轮总结表及总体大纲表插入的条目中是否均带有一个相同的编码索引，且格式为`AM`+数字（如`AM01`），若任一方缺失或二者不一致，则需修正。\n",
-      "initNode": "故事初始化时，插入一条新记录用作记录初始化剧情。",
-      "deleteNode": "禁止删除。",
-      "updateNode": "禁止操作。",
-      "insertNode": "每轮交互结束后，插入一条新记录。"
-    },
-    "content": [
-      [
-        null,
-        "时间跨度",
-        "大纲",
-        "编码索引"
-      ]
-    ],
-    "updateConfig": {
-      "uiSentinel": -1,
-      "contextDepth": -1,
-      "updateFrequency": -1,
-      "batchSize": -1,
-      "skipFloors": -1
-    },
-    "exportConfig": {
-      "enabled": false,
-      "entryName": "总体大纲",
-      "entryType": "keyword"
-    },
-    "orderNo": 8
   },
   "sheet_UI_ActionOptions": {
     "uid": "sheet_UI_ActionOptions",
@@ -347,10 +573,40 @@
     },
     "exportConfig": {
       "enabled": false,
+      "splitByRow": false,
       "entryName": "行动选项",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🎮 行动选项-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      },
       "injectIntoWorldbook": false
     },
-    "orderNo": 9
+    "orderNo": 8
   },
   "sheet_DICE_Pool": {
     "uid": "sheet_DICE_Pool",
@@ -381,9 +637,39 @@
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "骰子池"
+      "splitByRow": false,
+      "entryName": "骰子池",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🎲 骰子池-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 10
+    "orderNo": 9
   },
   "sheet_EXPLORATION_Map_Data": {
     "uid": "sheet_EXPLORATION_Map_Data",
@@ -406,13 +692,44 @@
     ],
     "updateConfig": {
       "batchSize": 3,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 3
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "探索地图数据"
+      "splitByRow": false,
+      "entryName": "探索地图数据",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🗺️ 探索地图数据-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 18
+    "orderNo": 17
   },
   "sheet_COMBAT_Map_Visuals": {
     "uid": "sheet_COMBAT_Map_Visuals",
@@ -435,13 +752,44 @@
     ],
     "updateConfig": {
       "batchSize": 3,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 3
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "战斗绘制"
+      "splitByRow": false,
+      "entryName": "战斗绘制",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🖌️ 战斗地图绘制-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 19
+    "orderNo": 18
   },
   "sheet_CHARACTER_Registry": {
     "uid": "sheet_CHARACTER_Registry",
@@ -469,14 +817,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": true,
+      "splitByRow": true,
       "entryName": "角色信息",
-      "splitByRow": true
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "👤 角色表-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 15
+    "orderNo": 14
   },
   "sheet_CHARACTER_Attributes": {
     "uid": "sheet_CHARACTER_Attributes",
@@ -506,13 +884,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": true,
-      "entryName": "角色属性"
+      "splitByRow": false,
+      "entryName": "角色属性",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "📊 角色属性-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 16
+    "orderNo": 15
   },
   "sheet_CHARACTER_Resources": {
     "uid": "sheet_CHARACTER_Resources",
@@ -537,13 +946,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "角色资源"
+      "splitByRow": false,
+      "entryName": "角色资源",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "⚡ 角色资源-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 17
+    "orderNo": 16
   },
   "sheet_SKILL_Library": {
     "uid": "sheet_SKILL_Library",
@@ -573,13 +1013,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "技能库"
+      "splitByRow": false,
+      "entryName": "技能库",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "📚 技能/法术库-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 11
+    "orderNo": 10
   },
   "sheet_CHARACTER_Skills": {
     "uid": "sheet_CHARACTER_Skills",
@@ -605,13 +1076,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "角色技能"
+      "splitByRow": false,
+      "entryName": "角色技能",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🔗 角色技能关联-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 12
+    "orderNo": 11
   },
   "sheet_FEAT_Library": {
     "uid": "sheet_FEAT_Library",
@@ -637,13 +1139,44 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "专长库"
+      "splitByRow": false,
+      "entryName": "专长库",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🏅 专长库-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 13
+    "orderNo": 12
   },
   "sheet_CHARACTER_Feats": {
     "uid": "sheet_CHARACTER_Feats",
@@ -669,12 +1202,43 @@
     ],
     "updateConfig": {
       "batchSize": 1,
-      "uiSentinel": -1
+      "uiSentinel": -1,
+      "groupId": 1
     },
     "exportConfig": {
       "enabled": false,
-      "entryName": "角色专长"
+      "splitByRow": false,
+      "entryName": "角色专长",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "🔗 角色专长关联-索引",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10000
+      },
+      "extraIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 10010
+      },
+      "fixedEntryPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99990
+      },
+      "fixedIndexPlacement": {
+        "position": "at_depth_as_system",
+        "depth": 2,
+        "order": 99991
+      }
     },
-    "orderNo": 14
+    "orderNo": 13
   }
 }

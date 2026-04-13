@@ -49,13 +49,22 @@ export const SettingsManager = {
         return {
             url: parsed.url || '',
             key: parsed.key || '',
-            model: parsed.model || ''
+            model: parsed.model || '',
+            provider: parsed.provider || 'plugin'
         };
     },
 
     setAPIConfig: async (config) => {
         Logger.info('[SettingsManager] Saving API Config:', config);
         await TavernSettingsSync.setSetting('dnd_global_api_config', config);
+    },
+
+    getAISettings: async () => {
+        const apiConfig = await SettingsManager.getAPIConfig();
+        return {
+            provider: apiConfig.provider || 'plugin',
+            apiConfig
+        };
     },
     
     // 获取同步状态（用于设置面板显示）

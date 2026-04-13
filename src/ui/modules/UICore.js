@@ -16,6 +16,160 @@ export default {
     _lastToggleTime: 0, // 用于防止重复触发
     _controlledCharId: null, // [新增] 当前操控的角色ID，null表示默认PC
     _dynamicBgIds: {}, // [新增] 动态背景效果实例ID存储
+    _hideFloatingBall: false, // [新增] 隐藏浮动球模式开关
+    _helperButtonRegistered: false, // [新增] Helper 按钮事件是否已注册
+    _helperButtonStop: null,
+    _helperButtonRetryTimer: null,
+    _helperButtonRetryCount: 0,
+    _miniHudPos: null,
+
+    _parseSavedPosition(raw) {
+        if (!raw) return null;
+        let pos = raw;
+
+        if (typeof pos === 'string') {
+            try {
+                pos = JSON.parse(pos);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        if (!pos || typeof pos.left !== 'string' || typeof pos.top !== 'string') {
+            return null;
+        }
+
+        return {
+            left: pos.left,
+            top: pos.top
+        };
+    },
+
+    // [新增] 应用浮动球可见性设置
+    async applyFloatingBallVisibility() {
+        const { $ } = getCore();
+        const savedHide = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
+        this._hideFloatingBall = savedHide === true || savedHide === 'true';
+        this._miniHudPos = this._parseSavedPosition(await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.MINI_HUD_POS));
+        
+        const $btn = $('#dnd-toggle-btn');
+        if (this._hideFloatingBall) {
+            $btn.addClass('dnd-force-hidden');
+            Logger.info('[UICore] 浮动球已隐藏');
+
+            if (!this._helperButtonRegistered) {
+                this.registerHelperButtonEvent({ scheduleRetry: true });
+            }
+        } else {
+            $btn.removeClass('dnd-force-hidden');
+            Logger.info('[UICore] 浮动球已显示');
+        }
+        
+        // 触发 HUD 位置更新
+        if (window.DND_Dashboard_UI && window.DND_Dashboard_UI.updateHUDPosition) {
+            window.DND_Dashboard_UI.updateHUDPosition();
+        }
+    },
+
+    _getHelperButtonAPI() {
+        const { window: coreWin } = getCore();
+        const candidates = [];
+        const addCandidate = (candidate) => {
+            if (candidate && !candidates.includes(candidate)) candidates.push(candidate);
+        };
+
+        addCandidate(window);
+        try { addCandidate(window.parent); } catch (e) {}
+        try { addCandidate(window.top); } catch (e) {}
+        addCandidate(coreWin);
+
+        for (const candidate of candidates) {
+            const getButtonEvent = candidate.getButtonEvent;
+            const eventOn = candidate.eventOn;
+            if (typeof getButtonEvent === 'function' && typeof eventOn === 'function') {
+                return {
+                    getButtonEvent,
+                    eventOn,
+                    appendInexistentScriptButtons: candidate.appendInexistentScriptButtons,
+                    sourceWindow: candidate
+                };
+            }
+        }
+
+        return null;
+    },
+
+    _scheduleHelperButtonRetry() {
+        if (!this._hideFloatingBall || this._helperButtonRegistered || this._helperButtonRetryTimer) return;
+        if (this._helperButtonRetryCount >= 30) {
+            Logger.warn('[UICore] Helper 按钮事件注册重试已达到上限');
+            return;
+        }
+
+        this._helperButtonRetryCount += 1;
+        this._helperButtonRetryTimer = setTimeout(() => {
+            this._helperButtonRetryTimer = null;
+            this.registerHelperButtonEvent({ scheduleRetry: true });
+        }, 1000);
+    },
+
+    // [新增] 注册 Tavern Helper 按钮事件
+    registerHelperButtonEvent(options = {}) {
+        if (this._helperButtonRegistered) return;
+        const { scheduleRetry = false } = options;
+        
+        try {
+            // 安全检查 Helper API 是否存在
+            const helperAPI = this._getHelperButtonAPI();
+            
+            if (!helperAPI) {
+                Logger.debug('[UICore] Tavern Helper API 不可用，等待重试');
+                if (scheduleRetry) this._scheduleHelperButtonRetry();
+                return;
+            }
+
+            const { getButtonEvent, eventOn, appendInexistentScriptButtons } = helperAPI;
+            
+            // 尝试创建按钮（如果不存在）
+            if (appendInexistentScriptButtons) {
+                try {
+                    appendInexistentScriptButtons([{ name: 'DND仪表盘', visible: true }]);
+                } catch (e) {
+                    Logger.debug('[UICore] Helper 按钮已存在或创建失败:', e.message);
+                }
+            }
+            
+            // 注册按钮点击事件
+            const buttonEvent = getButtonEvent('DND仪表盘');
+            if (buttonEvent) {
+                this._helperButtonStop = eventOn(buttonEvent, () => {
+                    Logger.info('[UICore] Helper 按钮被点击');
+                    
+                    if (this._hideFloatingBall) {
+                        // 隐藏浮动球模式下，助手按钮承担主开关职责：
+                        // collapsed -> mini，mini/full -> collapsed
+                        this.toggleDashboard();
+                    } else {
+                        this.toggleDashboard();
+                    }
+                });
+                
+                this._helperButtonRegistered = true;
+                this._helperButtonRetryCount = 0;
+                if (this._helperButtonRetryTimer) {
+                    clearTimeout(this._helperButtonRetryTimer);
+                    this._helperButtonRetryTimer = null;
+                }
+                Logger.info('[UICore] Helper 按钮事件已注册');
+            } else if (scheduleRetry) {
+                Logger.debug('[UICore] Helper 按钮事件名暂不可用，等待重试');
+                this._scheduleHelperButtonRetry();
+            }
+        } catch (e) {
+            Logger.warn('[UICore] 注册 Helper 按钮事件失败:', e.message);
+            if (scheduleRetry) this._scheduleHelperButtonRetry();
+        }
+    },
 
     setControlledCharacter(charId) {
         this._controlledCharId = charId;
@@ -308,6 +462,21 @@ export default {
             $(document).off('dblclick.dndAvatar');
             $(document).off('click.dndPos'); // 清除位置设置弹窗的监听器
         } catch (e) { console.warn('Event cleanup error:', e); }
+
+        if (this._helperButtonStop && typeof this._helperButtonStop.stop === 'function') {
+            try {
+                this._helperButtonStop.stop();
+            } catch (e) {
+                Logger.warn('[UICore] Helper 按钮监听清理失败:', e);
+            }
+        }
+        this._helperButtonStop = null;
+        this._helperButtonRegistered = false;
+        if (this._helperButtonRetryTimer) {
+            clearTimeout(this._helperButtonRetryTimer);
+            this._helperButtonRetryTimer = null;
+        }
+        this._helperButtonRetryCount = 0;
 
         // 3. 清除 DOM 元素 (更彻底的清除)
         const selectorsToRemove = [
@@ -796,7 +965,7 @@ export default {
             if (charId) {
                 // 验证是否为主角或队友 (只允许修改己方头像)
                 const party = DataManager.getPartyData();
-                const isPartyMember = party && party.some(p => {
+                const matchedPartyMember = party && party.find(p => {
                     // 匹配 ID 或 姓名
                     return (p['PC_ID'] == charId) || 
                         (p['CHAR_ID'] == charId) || 
@@ -804,8 +973,8 @@ export default {
                         (p['姓名'] == charName);
                 });
 
-                if (isPartyMember) {
-                    this.showAvatarUploadDialog(charId, charName);
+                if (matchedPartyMember) {
+                    this.showAvatarUploadDialog(matchedPartyMember, matchedPartyMember['姓名'] || charName);
                 } else {
                     console.log('[DND Dashboard] 仅限修改主角或队友头像');
                     // 可以选择添加一个视觉反馈，比如 shake 动画
@@ -820,5 +989,15 @@ export default {
                 }
             }
         });
+
+        // [新增] 读取并应用隐藏浮动球设置
+        void this.applyFloatingBallVisibility();
+        
+        // [新增] 在隐藏悬浮球模式下延迟重试 Helper 按钮注册
+        setTimeout(() => {
+            if (this._hideFloatingBall) {
+                this.registerHelperButtonEvent({ scheduleRetry: true });
+            }
+        }, 1000);
     }
 };

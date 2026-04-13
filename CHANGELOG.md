@@ -1,5 +1,61 @@
 # 更新日志
 
+## [2.0.1] - 2026-04-13
+
+### 🐛 问题修复
+- **样式切换残留变量清理**：修复多次切换仪表盘风格时，旧样式变量残留导致背包与仪表盘界面被污染、刷新后才恢复的问题。
+- **隐藏悬浮球助手按钮开关修复**：修复开启“隐藏浮动球”后，酒馆助手里的“DND仪表盘”按钮再次点击无法正确关闭仪表盘的问题。
+
+## [2.0.0] - 2026-04-09
+
+### ✨ 新增功能
+- **内置模板导入**：接通 [`TemplateSync.js`](src/features/TemplateSync.js) 与启动链路，改为在首次使用或版本升级时弹窗确认，并直接通过 `importTemplateFromData()` 导入脚本内置模板，不再依赖远程拉取配套模板文件。
+- **隐藏悬浮球模式**：在设置面板新增"隐藏浮动球"开关。启用后可通过酒馆助手按钮打开 Mini HUD，并为隐藏模式下的 Mini HUD 增加独立拖拽与位置持久化能力。
+- **内置风格扩展**：新增两套粉红色调毛毡/编织风格主题：
+  - **草莓毛毡**：温暖的草莓红毛毡风格，带有手工缝线装饰和软糯圆角。
+  - **桃粉手作**：棉麻布艺风格的蜜桃粉主题，带有编织纹理和温暖质感。
+  - 两套主题均采用深色底上的暖粉/桃粉/莓粉配色，强调毛毡、针织、布料纹理，可爱但不过分幼稚。
+
+### 🐛 本轮修正
+- **样式切换残留变量清理**：修复多次切换仪表盘风格时，旧样式的 CSS 变量（如 `--dnd-bg-secondary`、`--dnd-bg-input`、`--dnd-border-subtle`）残留在 `documentElement` 上导致 UI 显示异常的问题。
+  - 在 [`StyleManager.js`](src/features/StyleManager.js) 中新增 `_lastAppliedVars` 集合记录当前样式包设置的变量键。
+  - 切换风格时：先清除旧样式变量 → 恢复当前主题/自定义主题的颜色基准 → 再应用新样式包。
+  - 确保样式包未定义的变量正确回退到当前主题值，而非 CSS 默认值。
+  - 保留运行时变量（如 UI 缩放）不被误清，确保切换风格不影响其他设置。
+- **隐藏悬浮球助手按钮开关修复**：修复开启“隐藏浮动球”后，酒馆助手里的“DND仪表盘”按钮只能重复打开/切回展示态、不能正确关闭的问题。
+  - 将隐藏浮动球模式下的按钮点击逻辑统一为 `toggleDashboard()`，确保 `collapsed -> mini`、`mini/full -> collapsed`。
+  - 避免 full 状态下再次点击被错误切回 mini，导致用户感知为“又打开一次”。
+- **战斗地图透明叠层修复**：修复战斗模式地图底图在特殊场景名下可能注入失败的问题，并将网格、区域圈、虚拟位置圈与射程圈改为以透明/描边为主的叠层表现；同时减轻战斗小地图内阴影，避免底图被整体压暗发灰。
+- **角色创建缺表自动恢复**：修复创建/升级角色时因缺少 `CHARACTER_Registry` 或相关模板表而直接报错中断的问题；现在会提示导入 DND 配套模板，并在导入成功后自动重试当前保存流程。
+- **头像绑定改为聊天作用域 + 角色主键优先**：统一头像存储/读取逻辑，优先按 `chatId + CHAR_ID` 绑定，并兼容旧的 `CHAR_ID / PC_ID / 姓名` 历史键，修复 Mini HUD 与队伍面板在新增角色或跨聊天切换时头像错位、串档的问题。
+- **对话框全屏模式复用 Modal Overlay**：重构 [`NotificationSystem`](src/ui/modules/UIUtils.js) 的 confirm/prompt 实现逻辑：
+  - 在 full dashboard 可见且 `#dnd-modal-overlay` 存在时，confirm/prompt 现在直接复用现有的 modal overlay 体系显示，确保在全屏面板内正确居中。
+  - 在 mini 模式或 overlay 不可用时，自动 fallback 到原有的自建 dialog 路径。
+  - 关闭时正确清理本次事件绑定和 modal 内容，不影响 `UIPanels.showModal()` 的常规行为。
+  - 彻底解决 TemplateSync 导入模板确认弹窗在全屏模式下贴顶不居中的问题。
+- **对话框窄屏居中彻底修复**：重构 `NotificationSystem` 的 confirm/prompt 对话框居中方式，参考 `UIPanels.showModal` 的 flex 居中模式：
+  - 改为 backdrop 作为 flex 容器承载 dialog，由遮罩层负责 `display:flex / align-items:center / justify-content:center` 居中。
+  - dialog 本体改为 `position:relative`，不再依赖 `fixed/top/left/transform` 定位，彻底解决窄屏下对话框偏离或被裁切的问题。
+  - 自建对话框路径现在仅作为 fallback 保留，避免在全屏模式继续依赖容易受 UI 缩放影响的容器坐标系。
+  - 移除了冗余的 `_forceDialogCenter`、`_updateDialogTransform`、`_setDialogInlineStyles` 辅助方法，简化代码逻辑。
+  - 点击遮罩关闭逻辑优化：仅当点击 backdrop 本身（非 dialog 内部）时才触发关闭。
+- **角色创建 API 方案同步**：恢复旧的创建会话或继续对话时，都会重新同步设置页的 AI 调用方案，确保选择“神数据库 AI 调用”后角色创建也会走数据库 `callAI()`。
+- **HUD 手动更新点击链加固**：手动刷新按钮不再依赖运行时混入对象上的 `triggerManualUpdate` 方法，改为按钮分支直接调用本地 helper 并执行数据库 `manualUpdate()`，同时在成功后触发当前 HUD/面板重绘。
+- **对话框窄屏裁切修复**：修复 `NotificationSystem` 的 confirm/prompt 对话框在窄屏（320-390px）或短视口下被顶部裁切、按钮区异常的问题：
+  - 重构 `_forceDialogCenter` 方法，在窄屏/短视口下采用安全边距定位，确保 header/body/footer 都在视口内可达。
+  - 改用三段式 flex 布局：header/footer 设为 `flex-shrink:0`，body 设为 `flex:1/min-height:0/overflow-y:auto`，正文内容独立滚动。
+  - 移动端按钮区支持换行和堆叠布局。
+  - 从 `StyleEffects.js` 的 chamfer/cut 风格和 `StylePresets.js` 的 cyber-neon 主题中移除对 `.dnd-dialog` 的 `clip-path` 注入，对话框作为功能性 UI 不再被主题裁切。
+  - 为 `.dnd-dialog-message` 添加 `white-space: pre-line`，使 TemplateSync 导入确认弹窗中的换行符可读。
+- **对话框强制居中**：修复 `NotificationSystem` 的 confirm/prompt 对话框在窄窗口或主题样式覆盖下可能偏离屏幕中心的问题。改为通过 JS inline style + !important 强制设置视口居中定位，抵抗后续主题 CSS / customCSS / StyleEffects 的覆盖。
+- **数据库 AI 方案入口**：在设置面板中补充"神数据库 AI 调用"方案入口，并在角色创建与地图生成路径中接入数据库 `callAI()`。
+- **模板导入稳健性**：模板同步现改为携带 `scope/presetName` 选项，并在对象导入失败时自动以 JSON 字符串重试；同时补充每张表的字段完整性校验，且跳过导入时不再误记为"已同步"。
+- **手动导入模板入口**：在设置面板新增"导入表格模板"按钮，允许用户在需要时手动触发内置模板导入流程。
+- **HUD 手动刷新按钮修复**：将 Mini HUD 底部原本失效的"手动刷新数据"按钮接到数据库插件的 `manualUpdate()` 接口，改为直接触发神数据库的"立即手动更新"流程，并补充执行中状态与失败提示。
+- **隐藏悬浮球保存与助手按钮**：修复"隐藏浮动球"等界面显示开关未写回设置的问题，并增强酒馆助手按钮事件的多窗口查找与重试注册逻辑。
+- **开发流程规范**：更新项目规范与 README，明确发布/交付前必须在 `npm run build` 后执行 `npm run minify`，并新增 VSCode 工作区设置以启用 npm scripts 探测。
+- **VSCode 工作区共享**：调整 `.gitignore`，允许仓库提交 `.vscode/settings.json`，避免 npm scripts 探测设置只停留在本地环境。
+
 
 ## [1.9.2] - 2026-02-10
 

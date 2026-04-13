@@ -11,7 +11,7 @@ export default {
         // 所以我们只传递 ID，然后在 showItemDetail 中重新查找
         // 或者将对象存储在 DOM data 属性中
         const isEquipped = item['已装备'] === '是' || item['已装备'] === true || String(item['已装备']).toLowerCase() === 'true';
-        const bg = isEquippedHighlight ? 'background:rgba(197, 160, 89, 0.1);border-color:var(--dnd-border-gold);' : '';
+        const bg = isEquippedHighlight ? 'background:var(--dnd-selected-bg);border-color:var(--dnd-border-gold);' : '';
         
         // 使用 data-item-id 存储 ID，避免 onclick 传递复杂对象
         const itemId = item['物品ID'] || item['物品名称'];
@@ -25,7 +25,7 @@ export default {
         
         // 生成 HTML
         return `
-            <div style="background:rgba(255,255,255,0.03);padding:10px;border:1px solid var(--dnd-border-inner);border-radius:4px;position:relative;cursor:pointer;animation-delay:${delay}s;${bg}"
+            <div style="background:var(--dnd-bg-secondary);padding:10px;border:1px solid var(--dnd-border-inner);border-radius:4px;position:relative;cursor:pointer;animation-delay:${delay}s;${bg}"
                 class="dnd-item-card dnd-anim-entry dnd-clickable"
                 onclick="window.DND_Dashboard_UI.showItemDetail('${safeId}', event)">
                 <div style="font-weight:bold;color:${isEquipped ? 'var(--dnd-text-highlight)' : 'var(--dnd-text-main)'};margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -35,7 +35,7 @@ export default {
                 
                 ${damage ? `<div class="dnd-item-damage"><i class="fa-solid fa-gavel"></i> ${damage}</div>` : ''}
 
-                <div style="font-size:12px;color:#888;display:flex;justify-content:space-between;margin-top:4px;">
+                <div style="font-size:12px;color:var(--dnd-text-dim);display:flex;justify-content:space-between;margin-top:4px;">
                     <span>x${item['数量']}</span>
                     <span>${item['价值'] || '-'}</span>
                 </div>
@@ -45,8 +45,8 @@ export default {
                 <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px;">
                     <div class="dnd-item-rarity rarity-${rarity.toLowerCase()}">${rarity}</div>
                     <div style="display:flex;flex-direction:column;align-items:flex-end;">
-                        ${owner ? `<div style="font-size:10px;color:var(--dnd-accent-blue);background:rgba(44, 76, 138, 0.2);padding:1px 4px;border-radius:2px;margin-bottom:2px;"><i class="fa-solid fa-user"></i> ${owner}</div>` : ''}
-                        ${item['重量'] ? `<div style="font-size:11px;color:#666;">${item['重量']} lb</div>` : ''}
+                        ${owner ? `<div style="font-size:10px;color:var(--dnd-text-highlight);background:var(--dnd-bg-tertiary);padding:1px 4px;border-radius:2px;margin-bottom:2px;"><i class="fa-solid fa-user"></i> ${owner}</div>` : ''}
+                        ${item['重量'] ? `<div style="font-size:11px;color:var(--dnd-text-dim);">${item['重量']} lb</div>` : ''}
                     </div>
                 </div>
             </div>
@@ -101,14 +101,14 @@ export default {
                 ${isEquipped ? '<span style="font-size:12px;background:var(--dnd-accent-green);color:#fff;padding:2px 6px;border-radius:4px;">已装备</span>' : ''}
             </div>
             
-            <div style="margin-bottom:15px;background:rgba(255,255,255,0.05);padding:10px;border-radius:4px;font-size:12px;">
+            <div style="margin-bottom:15px;background:var(--dnd-bg-secondary);padding:10px;border-radius:4px;font-size:12px;">
                 ${detailHtml}
             </div>
             
-            <div style="line-height:1.6;color:#ccc;font-size:13px;">
+            <div style="line-height:1.6;color:var(--dnd-text-main);font-size:13px;">
                 ${item['描述'] || '暂无描述'}
             </div>
-            <div style="margin-top:15px;font-size:10px;color:#666;text-align:right;">ID: ${item['物品ID'] || '-'}</div>
+            <div style="margin-top:15px;font-size:10px;color:var(--dnd-text-dim);text-align:right;">ID: ${item['物品ID'] || '-'}</div>
         `;
         
         const { window: coreWin } = getCore();
@@ -139,7 +139,7 @@ export default {
         }
 
         // 添加关闭按钮到内容顶部
-        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:#888;font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
+        const closeBtn = `<div style="position:absolute;top:8px;right:8px;cursor:pointer;color:var(--dnd-text-dim);font-size:16px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.color='var(--dnd-text-highlight)';this.style.background='var(--dnd-bg-tertiary)'" onmouseout="this.style.color='var(--dnd-text-dim)';this.style.background='transparent'" onclick="window.DND_Dashboard_UI.hideDetailPopup()"><i class="fa-solid fa-times"></i></div>`;
         $popup.html(closeBtn + '<div style="padding-right:20px;">' + contentHtml + '</div>');
         
         // 使用 coreWin 获取正确的窗口尺寸（兼容 iframe）
@@ -275,13 +275,13 @@ export default {
         ];
         
         let html = `<div style="display:flex;flex-direction:column;gap:5px;">`;
-        html += `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
+        html += `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:5px;">
             ${fullItem['物品名称']}
             ${isEquipped ? '<span style="font-size:10px;background:var(--dnd-accent-green);color:#fff;padding:1px 4px;border-radius:3px;margin-left:5px;">已装备</span>' : ''}
         </div>`;
         
         // 显示简要信息
-        html += `<div style="font-size:11px;color:#888;margin-bottom:5px;padding:4px 6px;background:rgba(0,0,0,0.2);border-radius:3px;">
+        html += `<div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:5px;padding:4px 6px;background:var(--dnd-bg-tertiary);border-radius:3px;">
             <div>类别: ${fullItem['类别'] || '-'} | 数量: ${fullItem['数量'] || 1}</div>
             ${fullItem['价值'] ? `<div>价值: ${fullItem['价值']}</div>` : ''}
         </div>`;
@@ -289,7 +289,7 @@ export default {
         // Description with collapse/expand
         const desc = fullItem['描述'] || '暂无描述';
         html += `
-            <div style="font-size:12px;color:#ccc;line-height:1.5;margin-bottom:8px;padding:5px;background:rgba(0,0,0,0.2);border-radius:4px;border-left:2px solid #555;cursor:pointer;max-height:60px;overflow:hidden;transition:max-height 0.3s ease-out;text-overflow:ellipsis;"
+            <div style="font-size:12px;color:var(--dnd-text-main);line-height:1.5;margin-bottom:8px;padding:5px;background:var(--dnd-bg-secondary);border-radius:4px;border-left:2px solid var(--dnd-border-inner);cursor:pointer;max-height:60px;overflow:hidden;transition:max-height 0.3s ease-out;text-overflow:ellipsis;"
                 onclick="this.style.maxHeight = this.style.maxHeight==='60px' ? '500px' : '60px'"
                 title="点击展开/收起">
                 ${desc}
@@ -298,9 +298,9 @@ export default {
         
         actions.forEach(act => {
             html += `
-                <div style="cursor:pointer;padding:6px 10px;border-radius:4px;display:flex;align-items:center;gap:8px;font-size:13px;" 
-                    onmouseover="this.style.background='rgba(255,255,255,0.1)'" 
-                    onmouseout="this.style.background='transparent'"
+                    <div style="cursor:pointer;padding:6px 10px;border-radius:4px;display:flex;align-items:center;gap:8px;font-size:13px;" 
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'" 
+                        onmouseout="this.style.background='transparent'"
                     onclick="window.DND_Dashboard_UI.handleItemAction('${itemId}', '${act.action}', ${fullItem['数量'] || 1})">
                     <span>${act.icon}</span> <span>${act.label}</span>
                 </div>
@@ -354,7 +354,7 @@ export default {
         const items = DataManager.getTable('ITEM_Inventory');
         
         if (!items || items.length === 0) {
-            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-text-dim);">${ICONS.BACKPACK} 背包空空如也</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -369,14 +369,14 @@ export default {
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-main);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
             <span>${ICONS.BACKPACK} 背包物品</span>
-            <span style="font-size:11px;color:#888;">${backpackItems.length} 件</span>
+            <span style="font-size:11px;color:var(--dnd-text-dim);">${backpackItems.length} 件</span>
         </div>`;
 
         // 搜索和筛选
         html += `
             <div style="display:flex;gap:5px;margin-bottom:10px;">
-                <input type="text" id="dnd-inv-search" placeholder="搜索物品..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterInventory()">
-                <select id="dnd-inv-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterInventory()">
+                <input type="text" id="dnd-inv-search" placeholder="搜索物品..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterInventory()">
+                <select id="dnd-inv-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterInventory()">
                     <option value="">全部分类</option>
                     ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
                 </select>
@@ -386,22 +386,22 @@ export default {
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;" id="dnd-inv-list">`;
         
         if (backpackItems.length === 0) {
-            html += `<div style="color:#666;text-align:center;padding:10px;">背包中没有未装备的物品</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">背包中没有未装备的物品</div>`;
         } else {
             backpackItems.forEach(item => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 const safeId = (itemId || '').replace(/'/g, "\\'");
                 const category = item['类别'] || '杂物';
                 html += `
-                    <div class="dnd-inv-list-item" data-name="${item['物品名称']}" data-category="${category}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid var(--dnd-border-inner);border-radius:4px;cursor:pointer;font-size:12px;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.1)'"
-                        onmouseout="this.style.background='rgba(255,255,255,0.03)'"
+                    <div class="dnd-inv-list-item" data-name="${item['物品名称']}" data-category="${category}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);border-radius:4px;cursor:pointer;font-size:12px;"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
+                        onmouseout="this.style.background='var(--dnd-bg-secondary)'"
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;display:flex;flex-direction:column;">
                             <span>${item['物品名称']}</span>
-                            <span style="font-size:10px;color:#666;">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
+                            <span style="font-size:10px;color:var(--dnd-text-dim);">${category} ${item['所属人'] ? ` · <i class="fa-solid fa-user"></i>${item['所属人']}` : ''}</span>
                         </div>
-                        <span style="color:#888;flex-shrink:0;">x${item['数量']}</span>
+                        <span style="color:var(--dnd-text-dim);flex-shrink:0;">x${item['数量']}</span>
                     </div>
                 `;
             });
@@ -437,7 +437,7 @@ export default {
     showEquipmentPanel(event) {
         const items = DataManager.getTable('ITEM_Inventory');
         if (!items) {
-            this.showItemDetailPopup(`<div style="text-align:center;color:#888;">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
+            this.showItemDetailPopup(`<div style="text-align:center;color:var(--dnd-text-dim);">${ICONS.SWORD} 无装备数据</div>`, event.clientX, event.clientY);
             return;
         }
         
@@ -449,26 +449,26 @@ export default {
         
         let html = `<div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
             <span>${ICONS.SWORD} 已装备</span>
-            <span style="font-size:11px;color:#888;">${equippedItems.length} 件</span>
+            <span style="font-size:11px;color:var(--dnd-text-dim);">${equippedItems.length} 件</span>
         </div>`;
         html += `<div style="max-height:350px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;">`;
         
         if (equippedItems.length === 0) {
-            html += `<div style="color:#666;text-align:center;padding:10px;">尚未装备任何物品</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">尚未装备任何物品</div>`;
         } else {
             equippedItems.forEach(item => {
                 const itemId = item['物品ID'] || item['物品名称'];
                 const safeId = (itemId || '').replace(/'/g, "\\'");
                 html += `
-                    <div class="dnd-inv-list-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:rgba(197, 160, 89, 0.1);border:1px solid var(--dnd-border-gold);border-radius:4px;cursor:pointer;font-size:12px;"
-                        onmouseover="this.style.background='rgba(197, 160, 89, 0.2)'"
-                        onmouseout="this.style.background='rgba(197, 160, 89, 0.1)'"
+                    <div class="dnd-inv-list-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--dnd-selected-bg);border:1px solid var(--dnd-border-gold);border-radius:4px;cursor:pointer;font-size:12px;"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
+                        onmouseout="this.style.background='var(--dnd-selected-bg)'"
                         onclick="window.DND_Dashboard_UI.showMiniItemActions('${safeId}', event)">
                         <div style="display:flex;flex-direction:column;overflow:hidden;max-width:180px;">
                             <span style="color:var(--dnd-text-highlight);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><i class="fa-solid fa-shield-halved"></i> ${item['物品名称']}</span>
                             ${item['所属人'] ? `<span style="font-size:10px;color:var(--dnd-accent-blue);"><i class="fa-solid fa-user"></i> ${item['所属人']}</span>` : ''}
                         </div>
-                        <span style="color:#888;flex-shrink:0;">${item['类别'] || '-'}</span>
+                        <span style="color:var(--dnd-text-dim);flex-shrink:0;">${item['类别'] || '-'}</span>
                     </div>
                 `;
             });
@@ -484,9 +484,9 @@ export default {
         if (!factions || factions.length === 0) return;
         
         let html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                 <span>🏛️ 势力与声望</span>
-                <span style="font-size:11px;color:#888;">${factions.length} 个势力</span>
+                <span style="font-size:11px;color:var(--dnd-text-dim);">${factions.length} 个势力</span>
             </div>
             <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
         `;
@@ -494,7 +494,7 @@ export default {
         factions.forEach(f => {
             const relation = parseInt(f['关系等级']) || 0;
             let icon = '<i class="fa-solid fa-scale-balanced"></i>';
-            let color = '#ccc';
+            let color = 'var(--dnd-text-dim)';
             let statusText = '中立';
             let percent = 50; // 中立默认 50%
             
@@ -527,15 +527,15 @@ export default {
             const typeIcon = typeIcons[factionType] || typeIcons['其他'];
             
             html += `
-                <div class="dnd-faction-item" style="padding:10px;background:rgba(30,30,30,0.8);border:1px solid rgba(197,160,89,0.3);border-radius:6px;">
+                <div class="dnd-faction-item" style="padding:10px;background:var(--dnd-bg-card);border:1px solid var(--dnd-border-inner);border-radius:6px;">
                     <!-- 势力标题行 -->
                     <div class="dnd-faction-header" style="display:flex;justify-content:space-between;align-items:center;">
                         <span style="color:${color};font-size:14px;font-weight:bold;">${icon} ${f['势力名称']}</span>
-                        <span style="font-size:11px;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
+                        <span style="font-size:11px;background:var(--dnd-bg-tertiary);padding:2px 8px;border-radius:3px;">${statusText} (${relation})</span>
                     </div>
                     
                     <!-- 势力类型和领袖 -->
-                    <div style="display:flex;gap:12px;font-size:11px;color:#aaa;margin-top:6px;flex-wrap:wrap;">
+                    <div style="display:flex;gap:12px;font-size:11px;color:var(--dnd-text-dim);margin-top:6px;flex-wrap:wrap;">
                         <span title="势力类型">${typeIcon} ${factionType}</span>
                         ${f['势力领袖'] ? `<span title="势力领袖"><i class="fa-solid fa-user-tie"></i> ${f['势力领袖']}</span>` : ''}
                         ${f['势力总部'] ? `<span title="势力总部"><i class="fa-solid fa-location-dot"></i> ${f['势力总部']}</span>` : ''}
@@ -543,28 +543,28 @@ export default {
                     
                     <!-- 势力宗旨 -->
                     ${f['势力宗旨'] ? `
-                    <div style="font-size:11px;color:#c5a059;margin-top:6px;padding:4px 8px;background:rgba(197,160,89,0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                    <div style="font-size:11px;color:var(--dnd-text-highlight);margin-top:6px;padding:4px 8px;background:var(--dnd-selected-bg);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
                         <i class="fa-solid fa-scroll"></i> ${f['势力宗旨']}
                     </div>
                     ` : ''}
                     
                     <!-- 势力描述 -->
-                    <div style="font-size:11px;color:#aaa;margin-top:6px;line-height:1.4;">
+                    <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:6px;line-height:1.4;">
                         ${f['势力描述'] || '暂无描述'}
                     </div>
                     
                     <!-- 声望条 -->
-                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#888;margin-top:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:10px;color:var(--dnd-text-dim);margin-top:8px;">
                         <span>声望: ${repVal}</span>
-                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                        <div class="dnd-faction-rep-bar" style="flex:1;height:6px;background:var(--dnd-bg-tertiary);border-radius:3px;overflow:hidden;">
                             <div class="dnd-faction-rep-fill" style="width:${percent}%;height:100%;background:${color};transition:width 0.3s;"></div>
                         </div>
                     </div>
                     
                     <!-- 主角在势力中的信息 -->
                     ${(f['主角头衔'] || f['特权/通缉']) ? `
-                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
-                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);">
+                        <div style="font-size:10px;color:var(--dnd-text-dim);margin-bottom:4px;"><i class="fa-solid fa-id-card"></i> 主角身份</div>
                         <div style="display:flex;gap:10px;font-size:11px;flex-wrap:wrap;">
                             ${f['主角头衔'] ? `<span style="color:var(--dnd-text-highlight);"><i class="fa-solid fa-medal"></i> ${f['主角头衔']}</span>` : ''}
                             ${f['特权/通缉'] ? `<span style="color:${relation >= 0 ? 'var(--dnd-accent-green)' : 'var(--dnd-accent-red)'};"><i class="fa-solid fa-scroll"></i> ${f['特权/通缉']}</span>` : ''}
@@ -574,9 +574,9 @@ export default {
                     
                     <!-- 关键事件 -->
                     ${f['关键事件'] ? `
-                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,0.1);">
-                        <div style="font-size:10px;color:#888;margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
-                        <div style="font-size:11px;color:#bbb;line-height:1.4;">${f['关键事件']}</div>
+                    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);">
+                        <div style="font-size:10px;color:var(--dnd-text-dim);margin-bottom:4px;"><i class="fa-solid fa-book"></i> 关键事件</div>
+                        <div style="font-size:11px;color:var(--dnd-text-main);line-height:1.4;">${f['关键事件']}</div>
                     </div>
                     ` : ''}
                 </div>
@@ -592,7 +592,7 @@ export default {
     showQuestTooltip(quest, x, y) {
         Logger.info('showQuestTooltip 被调用', quest['任务名称']);
         
-        const statusColor = quest['状态'] === '已完成' ? '#3a6b4a' : (quest['状态'] === '已失败' ? '#8a2c2c' : '#c5a059');
+        const statusColor = quest['状态'] === '已完成' ? 'var(--dnd-accent-green)' : (quest['状态'] === '已失败' ? 'var(--dnd-accent-red)' : 'var(--dnd-text-highlight)');
         
         const html = `
             <div style="border-bottom:1px solid var(--dnd-border-gold);padding-bottom:5px;margin-bottom:10px;font-weight:bold;color:var(--dnd-text-highlight);font-size:16px;display:flex;justify-content:space-between;align-items:center;">
@@ -600,24 +600,24 @@ export default {
                 <span style="font-size:11px;background:${statusColor};color:#fff;padding:2px 6px;border-radius:4px;">${quest['状态'] || '进行中'}</span>
             </div>
             
-            <div style="font-size:13px;line-height:1.5;margin-bottom:15px;color:#ccc;">
+            <div style="font-size:13px;line-height:1.5;margin-bottom:15px;color:var(--dnd-text-main);">
                 ${quest['目标描述'] || '暂无描述'}
             </div>
             
             ${quest['当前进度'] ? `
-            <div style="margin-bottom:10px;padding:6px 8px;background:rgba(197, 160, 89, 0.1);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
-                <div style="font-size:11px;color:#888;margin-bottom:2px;">当前进度</div>
+            <div style="margin-bottom:10px;padding:6px 8px;background:var(--dnd-bg-tertiary);border-left:2px solid var(--dnd-border-gold);border-radius:2px;">
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:2px;">当前进度</div>
                 <div style="font-size:12px;color:var(--dnd-text-main);">${quest['当前进度']}</div>
             </div>` : ''}
             
-            <div style="font-size:12px;color:#aaa;background:rgba(255,255,255,0.05);padding:8px;border-radius:4px;">
+            <div style="font-size:12px;color:var(--dnd-text-dim);background:var(--dnd-bg-secondary);padding:8px;border-radius:4px;">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
                     <div><strong>发布者:</strong> ${quest['发布者']||'-'}</div>
                     <div><strong>类型:</strong> ${quest['类型']||'-'}</div>
                     <div><strong>时限:</strong> ${quest['时限']||'无限制'}</div>
                     <div><strong>难度:</strong> ${quest['难度']||'-'}</div>
                 </div>
-                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #444;color:var(--dnd-text-highlight);">
+                <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--dnd-border-subtle);color:var(--dnd-text-highlight);">
                     <strong>${ICONS.TROPHY} 奖励:</strong> ${quest['奖励']||'-'}
                 </div>
             </div>

@@ -4,9 +4,11 @@ import { getCore } from '../core/Utils.js';
 const SCRIPT_ID = 'dnd_immersive_dashboard';
 
 export const addStyles = () => {
-    const { $ } = getCore();
+    const { $, window: coreWin } = getCore();
     if (!$) return;
-    if ($(`#${SCRIPT_ID}-styles`).length) return;
+    const doc = coreWin?.document || document;
+    const $root = coreWin?.jQuery || $;
+    if ($root(doc).find(`#${SCRIPT_ID}-styles`).length) return;
     
     const css = `
         :root {
@@ -276,7 +278,7 @@ export const addStyles = () => {
         /* 风格选择卡片 - 支持 Morphology */
         .dnd-style-card {
             padding: 12px !important;
-            background: rgba(0,0,0,0.3) !important;
+            background: var(--dnd-bg-card) !important;
             /* Morphology Support */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-subtle) !important;
             border-radius: var(--dnd-radius-md, 6px) !important;
@@ -304,7 +306,7 @@ export const addStyles = () => {
         }
         
         .dnd-style-card.active {
-            background: rgba(157, 139, 108, 0.2) !important;
+            background: var(--dnd-selected-bg) !important;
             border-color: var(--dnd-border-gold) !important;
         }
         
@@ -459,7 +461,7 @@ export const addStyles = () => {
             flex: 1 !important;
             overflow-y: auto !important;
             padding: 20px !important;
-            background: radial-gradient(circle at center, rgba(30,30,35,0.8) 0%, rgba(10,10,12,0.9) 100%) !important;
+            background: var(--dnd-bg-main) !important;
         }
 
         /* 滚动条美化 */
@@ -968,14 +970,14 @@ export const addStyles = () => {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            box-shadow: 0 0 10px rgba(157, 139, 108, 0.3) !important;
+            box-shadow: 0 0 10px rgba(var(--dnd-border-gold-rgb, 157, 139, 108), 0.3) !important;
             cursor: pointer !important;
             transition: all 0.3s ease !important;
             flex-shrink: 0 !important;
         }
         #dnd-logo-container:hover {
             transform: scale(1.05) rotate(5deg) !important;
-            box-shadow: 0 0 15px rgba(157, 139, 108, 0.6) !important;
+            box-shadow: 0 0 15px rgba(var(--dnd-border-gold-rgb, 157, 139, 108), 0.6) !important;
             border-color: var(--dnd-text-highlight) !important;
         }
         #dnd-logo-container:active {
@@ -1051,8 +1053,8 @@ export const addStyles = () => {
         /* HUD 底部常驻资源栏 */
         .dnd-hud-footer {
             padding: 8px 10px !important;
-            background: rgba(0,0,0,0.4) !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            background: var(--dnd-bg-secondary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
             font-size: 11px !important;
             display: flex !important;
             flex-wrap: wrap !important;
@@ -1065,8 +1067,8 @@ export const addStyles = () => {
         
         /* 队伍折叠面板 */
         .dnd-hud-party-collapse {
-            background: rgba(0,0,0,0.2) !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
+            background: var(--dnd-bg-tertiary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
         }
         .dnd-party-header {
             padding: 5px 10px !important;
@@ -1111,11 +1113,13 @@ export const addStyles = () => {
         
         /* [新增] 地图内部容器样式 */
         .dnd-minimap-inner {
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.9);
+            /* [修复] 减少内阴影强度，使战斗地图不再过暗 */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
             transition: transform 0.2s ease-out;
         }
+        /* [修复] 网格使用更低的透明度和更明亮的边框色，呈现透明线条效果 */
         .dnd-minimap-grid {
-            opacity: 0.3;
+            opacity: 0.6;
             pointer-events: none;
         }
 
@@ -1196,7 +1200,7 @@ export const addStyles = () => {
             position: absolute;
             border-radius: 50%;
             border: 2px solid var(--dnd-text-highlight);
-            background: rgba(255, 255, 255, 0.1);
+            background: transparent;
             pointer-events: none;
             z-index: 50;
             animation: dnd-map-ripple 0.6s ease-out forwards;
@@ -1206,7 +1210,7 @@ export const addStyles = () => {
         /* 探索模式布局 */
         .dnd-hud-explore-layout { display: flex !important; flex-direction: column !important; width: 100% !important; gap: 10px !important; }
         .dnd-hud-quests {
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.2), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), transparent) !important;
             padding: 8px !important;
             border-radius: 4px !important;
             border-left: 2px solid var(--dnd-border-gold) !important;
@@ -1216,11 +1220,11 @@ export const addStyles = () => {
             padding: 4px 0 !important; border-bottom: 1px dashed var(--dnd-border-inner) !important;
             cursor: pointer !important;
         }
-        .dnd-hud-quest-item:hover { color: var(--dnd-text-highlight) !important; background: rgba(157, 139, 108, 0.1) !important; }
+        .dnd-hud-quest-item:hover { color: var(--dnd-text-highlight) !important; background: var(--dnd-selected-bg) !important; }
 
         /* 行动按钮样式覆盖 */
         .dnd-action-btn {
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.4), rgba(40, 30, 20, 0.4)) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             color: var(--dnd-text-header) !important;
             border-left: 3px solid var(--dnd-border-gold) !important;
@@ -1245,11 +1249,11 @@ export const addStyles = () => {
         }
 
         .dnd-action-btn:hover {
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.3), rgba(60, 50, 40, 0.3)) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), var(--dnd-bg-tertiary)) !important;
             border-color: var(--dnd-text-highlight) !important;
             transform: translateX(4px) scale(1.02) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 10px rgba(157, 139, 108, 0.2) !important;
-            text-shadow: 0 0 5px rgba(255, 219, 133, 0.5) !important;
+            box-shadow: 0 4px 12px var(--dnd-border-inner), 0 0 10px var(--dnd-accent) !important;
+            text-shadow: 0 0 5px var(--dnd-accent-hover) !important;
         }
         
         .dnd-action-btn:active {
@@ -1262,7 +1266,7 @@ export const addStyles = () => {
         /* 迷你角色条 */
         .dnd-mini-char {
             display: flex !important; align-items: center !important; gap: 10px !important;
-            background: linear-gradient(to right, rgba(92, 75, 53, 0.3), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-bg-tertiary), transparent) !important;
             padding: 5px 10px !important; border-radius: 4px !important;
             border-left: 3px solid transparent !important;
             cursor: pointer !important;
@@ -1271,12 +1275,12 @@ export const addStyles = () => {
             border: 1px solid transparent !important;
         }
         .dnd-mini-char:hover {
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.2), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), transparent) !important;
             border-color: var(--dnd-border-gold) !important;
         }
         .dnd-mini-char.active {
             border-left-color: var(--dnd-text-highlight) !important;
-            background: linear-gradient(to right, rgba(157, 139, 108, 0.4), transparent) !important;
+            background: linear-gradient(to right, var(--dnd-selected-bg), transparent) !important;
         }
         
         .dnd-mini-char-avatar {
@@ -1305,7 +1309,7 @@ export const addStyles = () => {
             align-items: center !important;
             padding: 0 20px !important;
             justify-content: space-between !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+            box-shadow: var(--dnd-shadow-md) !important;
         }
         .dnd-title {
             font-family: var(--dnd-font-serif) !important;
@@ -1313,7 +1317,7 @@ export const addStyles = () => {
             color: var(--dnd-text-highlight) !important;
             text-transform: uppercase !important;
             letter-spacing: 2px !important;
-            text-shadow: 0 0 5px rgba(255, 219, 133, 0.3) !important;
+            text-shadow: 0 0 5px var(--dnd-text-highlight) !important;
         }
         .dnd-close-btn {
             background: transparent !important;
@@ -1347,7 +1351,7 @@ export const addStyles = () => {
                     justify-content: center !important;
                     cursor: pointer !important;
                     z-index: 2147483641 !important;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.9), inset 0 0 10px rgba(0,0,0,0.5) !important;
+                    box-shadow: var(--dnd-shadow-lg), inset 0 0 10px var(--dnd-bg-tertiary) !important;
                     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
                     font-size: 22px !important;
                     
@@ -1362,12 +1366,32 @@ export const addStyles = () => {
                 background: var(--dnd-border-gold) !important;
                 color: var(--dnd-text-inverse-dark) !important;
                 transform: scale(1.1) rotate(90deg) !important;
-                box-shadow: 0 0 20px rgba(157, 139, 108, 0.6) !important;
+                box-shadow: var(--dnd-selected-glow) !important;
             }
         #dnd-toggle-btn.dnd-hidden {
             opacity: 0 !important;
             transform: scale(0) !important;
             pointer-events: none !important;
+        }
+        #dnd-toggle-btn.dnd-force-hidden {
+            opacity: 0 !important;
+            transform: scale(0) !important;
+            pointer-events: none !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode {
+            right: auto !important;
+            bottom: auto !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-header {
+            cursor: move !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            touch-action: none !important;
+        }
+        #dnd-mini-hud.dnd-independent-mode #dnd-logo-container,
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-expand-btn,
+        #dnd-mini-hud.dnd-independent-mode #dnd-hud-toggle-bar {
+            cursor: pointer !important;
         }
 
         /* 移动端角色卡片入场动画 */
@@ -1417,9 +1441,9 @@ export const addStyles = () => {
         
         /* 呼吸光环 (用于当前行动者) */
         @keyframes dnd-pulse-border {
-            0% { box-shadow: 0 0 0 0 rgba(255, 219, 133, 0.4); border-color: rgba(255, 219, 133, 0.6); }
-            70% { box-shadow: 0 0 0 6px rgba(255, 219, 133, 0); border-color: rgba(255, 219, 133, 1); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 219, 133, 0); border-color: rgba(255, 219, 133, 0.6); }
+            0% { box-shadow: 0 0 0 0 var(--dnd-selected-glow); border-color: var(--dnd-border-gold); }
+            70% { box-shadow: 0 0 0 6px transparent; border-color: var(--dnd-text-highlight); }
+            100% { box-shadow: 0 0 0 0 transparent; border-color: var(--dnd-border-gold); }
         }
         .dnd-active-turn {
             animation: dnd-pulse-border 2s infinite !important;
@@ -1441,7 +1465,7 @@ export const addStyles = () => {
             content: "";
             position: absolute;
             top: 0; left: 0; width: 200%; height: 100%;
-            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0) 100%);
+            background: linear-gradient(90deg, transparent 0%, var(--dnd-selected-bg) 50%, transparent 100%);
             animation: dnd-shimmer 10s infinite linear;
             transform: skewX(-20deg);
         }
@@ -1534,7 +1558,7 @@ export const addStyles = () => {
             }
             .dnd-nav-item.active {
                 border-bottom-color: var(--dnd-border-gold) !important;
-                background: rgba(197, 160, 89, 0.1) !important;
+                background: var(--dnd-selected-bg) !important;
             }
             .dnd-content-area {
                 padding: 15px !important;
@@ -1591,7 +1615,7 @@ export const addStyles = () => {
         }
         .dnd-quick-trigger:hover {
             background: var(--dnd-border-gold);
-            color: #000;
+            color: var(--dnd-text-inverse);
         }
 
         .dnd-quick-bar {
@@ -1658,8 +1682,8 @@ export const addStyles = () => {
             gap: 15px !important;
             overflow-x: auto !important;
             padding: 12px 10px !important;
-            border-top: 1px solid rgba(255,255,255,0.1) !important;
-            background: rgba(0,0,0,0.2) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
+            background: var(--dnd-bg-secondary) !important;
         }
         .party-bar-item {
             display: flex !important;
@@ -1700,7 +1724,7 @@ export const addStyles = () => {
             left: -5px;
             width: 18px;
             height: 18px;
-            background: rgba(0,0,0,0.7);
+            background: var(--dnd-bg-tertiary);
             border: 1px solid var(--dnd-border-subtle);
             border-radius: 50%;
             font-size: 10px;
@@ -1718,7 +1742,7 @@ export const addStyles = () => {
         .party-control-btn.active {
             opacity: 1;
             border-color: var(--dnd-border-gold);
-            background: rgba(197, 160, 89, 0.3);
+            background: var(--dnd-selected-bg);
         }
 
         .dnd-item-damage {
@@ -1764,7 +1788,7 @@ export const addStyles = () => {
             left: -5px;
             width: 18px;
             height: 18px;
-            background: rgba(0,0,0,0.7);
+            background: var(--dnd-bg-tertiary);
             border: 1px solid var(--dnd-border-subtle);
             border-radius: 50%;
             font-size: 10px;
@@ -1782,7 +1806,7 @@ export const addStyles = () => {
         .party-control-btn.active {
             opacity: 1;
             border-color: var(--dnd-border-gold);
-            background: rgba(197, 160, 89, 0.3);
+            background: var(--dnd-selected-bg);
         }
 
         /* Dice Grid */
@@ -1792,10 +1816,10 @@ export const addStyles = () => {
             gap: var(--dnd-spacing-sm, 6px) !important;
         }
         .dnd-dice-btn {
-            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)) !important;
+            background: var(--dnd-bg-tertiary) !important;
             /* Morphology: Border */
-            border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) #444 !important;
-            color: #ccc !important;
+            border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-subtle) !important;
+            color: var(--dnd-text-main) !important;
             padding: 10px 5px !important;
             /* Morphology: Radius */
             border-radius: var(--dnd-radius-sm, 4px) !important;
@@ -1831,7 +1855,7 @@ export const addStyles = () => {
         .dnd-quick-slot {
             width: 48px;
             height: 48px;
-            background: rgba(0,0,0,0.5);
+            background: var(--dnd-bg-tertiary);
             /* Morphology: Border */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-inner);
             /* Morphology: Radius */
@@ -1868,11 +1892,11 @@ export const addStyles = () => {
         
         .dnd-quick-slot:hover {
             border-color: var(--dnd-text-highlight);
-            background: rgba(255,255,255,0.1);
+            background: var(--dnd-selected-bg);
         }
         .dnd-quick-slot.add-btn {
-            border: 1px dashed rgba(255,255,255,0.3) !important;
-            color: rgba(255,255,255,0.6) !important;
+            border: 1px dashed var(--dnd-border-inner) !important;
+            color: var(--dnd-text-dim) !important;
             font-weight: bold;
             font-size: 24px;
         }
@@ -2042,7 +2066,7 @@ export const addStyles = () => {
             pointer-events: none !important;
         }
 
-        /* 对话框背景遮罩 */
+        /* 对话框背景遮罩 - Flex 居中容器 */
         .dnd-dialog-backdrop {
             position: fixed !important;
             top: 0 !important;
@@ -2054,35 +2078,43 @@ export const addStyles = () => {
             opacity: 0 !important;
             transition: opacity 0.2s ease !important;
             pointer-events: auto !important;
+            /* Flex 居中 - 最暴力的居中方式 */
+            display: none !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 20px !important;
+            box-sizing: border-box !important;
         }
         .dnd-dialog-backdrop-visible {
             opacity: 1 !important;
+            display: flex !important;
         }
 
-        /* 对话框主体 */
+        /* 对话框主体 - 由 backdrop flex 容器居中，不再依赖 fixed/top/transform */
         .dnd-dialog {
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) scale(0.9) !important;
-            min-width: 320px !important;
-            max-width: 90vw !important;
+            position: relative !important;
+            min-width: 280px !important;
+            max-width: min(90vw, 450px) !important;
             max-height: 80vh !important;
             background: var(--dnd-bg-popup) !important;
             /* Morphology: Border */
             border: var(--dnd-border-width, 1px) var(--dnd-border-style, solid) var(--dnd-border-gold) !important;
             /* Morphology: Radius */
             border-radius: var(--dnd-radius-lg, 10px) !important;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(157, 139, 108, 0.1), var(--dnd-effect-border-glow, none) !important;
+            box-shadow: var(--dnd-shadow-lg), var(--dnd-selected-glow), var(--dnd-effect-border-glow, none) !important;
             color: var(--dnd-text-main) !important;
             font-family: var(--dnd-font-sans) !important;
             opacity: 0 !important;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            transform: scale(0.9) !important;
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
             pointer-events: auto !important;
-            overflow: hidden !important;
             
-            /* Morphology: Shape */
-            clip-path: var(--dnd-card-clip-path, none) !important;
+            /* 三段式 Flex 布局 - 确保内容正确滚动 */
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            /* 禁止主题的 clip-path 裁切对话框 */
+            clip-path: none !important;
         }
         
         /* 对话框纹理层 */
@@ -2096,9 +2128,10 @@ export const addStyles = () => {
             z-index: 0 !important;
             mix-blend-mode: overlay !important;
         }
+        /* 可见状态 */
         .dnd-dialog-visible {
-            transform: translate(-50%, -50%) scale(1) !important;
             opacity: 1 !important;
+            transform: scale(1) !important;
         }
 
         /* 对话框类型 */
@@ -2109,7 +2142,7 @@ export const addStyles = () => {
             border-bottom-color: var(--dnd-toast-error) !important;
         }
         .dnd-dialog-danger .dnd-dialog-btn-confirm {
-            background: linear-gradient(135deg, var(--dnd-toast-error), #c0392b) !important;
+            background: linear-gradient(135deg, var(--dnd-toast-error), var(--dnd-accent-red)) !important;
         }
 
         /* 对话框头部 */
@@ -2118,8 +2151,11 @@ export const addStyles = () => {
             justify-content: space-between !important;
             align-items: center !important;
             padding: 16px 20px !important;
-            background: rgba(0, 0, 0, 0.3) !important;
+            background: var(--dnd-bg-secondary) !important;
             border-bottom: 1px solid var(--dnd-border-gold) !important;
+            /* 三段式布局：头部固定高度，不参与滚动 */
+            flex-shrink: 0 !important;
+            min-height: 0 !important;
         }
 
         .dnd-dialog-title {
@@ -2146,6 +2182,11 @@ export const addStyles = () => {
         /* 对话框内容 */
         .dnd-dialog-body {
             padding: 20px !important;
+            /* 三段式布局：body 占据剩余空间，内容超出时滚动 */
+            flex: 1 !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
         }
 
         .dnd-dialog-message {
@@ -2153,13 +2194,17 @@ export const addStyles = () => {
             line-height: 1.6 !important;
             color: var(--dnd-text-main) !important;
             margin: 0 0 15px 0 !important;
+            /* 使 TemplateSync 的 \n\n 换行符可读 */
+            white-space: pre-line !important;
+            word-break: break-word !important;
         }
 
         /* 对话框输入框 */
         .dnd-dialog-input {
             width: 100% !important;
+            box-sizing: border-box !important;
             padding: 10px 14px !important;
-            background: rgba(0, 0, 0, 0.4) !important;
+            background: var(--dnd-bg-input) !important;
             border: 1px solid var(--dnd-border-inner) !important;
             border-radius: 6px !important;
             color: var(--dnd-text-main) !important;
@@ -2170,7 +2215,7 @@ export const addStyles = () => {
         }
         .dnd-dialog-input:focus {
             border-color: var(--dnd-border-gold) !important;
-            box-shadow: 0 0 0 3px rgba(157, 139, 108, 0.2) !important;
+            box-shadow: var(--dnd-focus-shadow) !important;
         }
         .dnd-dialog-input::placeholder {
             color: var(--dnd-text-dim) !important;
@@ -2180,10 +2225,14 @@ export const addStyles = () => {
         .dnd-dialog-footer {
             display: flex !important;
             justify-content: flex-end !important;
+            flex-wrap: wrap !important;
             gap: 10px !important;
             padding: 16px 20px !important;
-            background: rgba(0, 0, 0, 0.2) !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+            background: var(--dnd-bg-secondary) !important;
+            border-top: 1px solid var(--dnd-border-subtle) !important;
+            /* 三段式布局：底部固定高度，不参与滚动 */
+            flex-shrink: 0 !important;
+            min-height: 0 !important;
         }
 
         /* 对话框按钮 */
@@ -2198,23 +2247,23 @@ export const addStyles = () => {
         }
 
         .dnd-dialog-btn-cancel {
-            background: rgba(255, 255, 255, 0.08) !important;
+            background: var(--dnd-bg-tertiary) !important;
             color: var(--dnd-text-main) !important;
-            border: 1px solid var(--dnd-border-inner) !important;
+            border: 1px solid var(--dnd-border-subtle) !important;
         }
         .dnd-dialog-btn-cancel:hover {
-            background: rgba(255, 255, 255, 0.15) !important;
+            background: var(--dnd-selected-bg) !important;
             border-color: var(--dnd-border-gold) !important;
         }
 
         .dnd-dialog-btn-confirm {
-            background: linear-gradient(135deg, var(--dnd-border-gold), #7a6b52) !important;
-            color: var(--dnd-text-inverse) !important;
+            background: var(--dnd-btn-primary) !important;
+            color: var(--dnd-btn-text) !important;
         }
         .dnd-dialog-btn-confirm:hover {
             filter: brightness(1.1) !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(157, 139, 108, 0.4) !important;
+            box-shadow: var(--dnd-hover-shadow) !important;
         }
         .dnd-dialog-btn-confirm:active {
             transform: translateY(0) !important;
@@ -2238,25 +2287,22 @@ export const addStyles = () => {
                 transform: translateY(-100%) !important;
             }
             
+            /* 对话框移动端适配：由 backdrop flex 居中，此处仅设置尺寸约束 */
             .dnd-dialog {
                 min-width: 0 !important;
                 width: calc(100vw - 40px) !important;
                 max-width: 400px !important;
-                /* 修复移动端对话框被截断到顶部的问题 */
-                /* 使用 inset + margin auto 实现稳定居中 */
-                top: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
-                margin: auto !important;
-                height: fit-content !important;
                 max-height: calc(100vh - 40px) !important;
                 max-height: calc(100dvh - 40px) !important; /* 动态视口高度，更适合移动端 */
-                overflow-y: auto !important;
-                transform: scale(0.9) !important;
             }
-            .dnd-dialog-visible {
-                transform: scale(1) !important;
+            
+            /* 移动端对话框按钮可堆叠 */
+            .dnd-dialog-footer {
+                flex-direction: column !important;
+            }
+            
+            .dnd-dialog-btn {
+                width: 100% !important;
             }
         }
 
@@ -2392,7 +2438,7 @@ export const addStyles = () => {
         
         /* 特定颜色的图标光晕增强 */
         .dnd-text-highlight .svg-inline--fa {
-            filter: drop-shadow(0 0 2px rgba(255, 219, 133, 0.3));
+            filter: drop-shadow(0 0 2px var(--dnd-text-highlight));
         }
 
         /* 状态提示特效 */
@@ -2406,9 +2452,9 @@ export const addStyles = () => {
         }
 
         @keyframes dnd-icon-pulse-gold {
-            0% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
-            50% { filter: drop-shadow(0 0 8px rgba(255, 219, 133, 0.8)); }
-            100% { filter: drop-shadow(0 0 0 rgba(255, 219, 133, 0)); }
+            0% { filter: drop-shadow(0 0 0 transparent); }
+            50% { filter: drop-shadow(0 0 8px var(--dnd-text-highlight)); }
+            100% { filter: drop-shadow(0 0 0 transparent); }
         }
         .dnd-icon-notify {
             animation: dnd-icon-pulse-gold 2s infinite !important;
@@ -2426,7 +2472,7 @@ export const addStyles = () => {
         }
         .dnd-hover-lift:hover {
             transform: translateY(-3px) scale(1.02) !important;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+            box-shadow: var(--dnd-shadow-md) !important;
             filter: brightness(1.1) !important;
             z-index: 10 !important;
         }
@@ -2440,16 +2486,16 @@ export const addStyles = () => {
         /* 呼吸光环动画 */
         @keyframes dnd-breathe-glow {
             0%, 100% {
-                box-shadow: 0 0 15px rgba(0,0,0,0.9),
-                            inset 0 0 10px rgba(0,0,0,0.5),
-                            0 0 20px rgba(157, 139, 108, 0.2),
-                            0 0 40px rgba(157, 139, 108, 0.1);
+                box-shadow: var(--dnd-shadow-md),
+                            inset 0 0 10px var(--dnd-bg-tertiary),
+                            0 0 20px var(--dnd-selected-glow),
+                            0 0 40px var(--dnd-selected-bg);
             }
             50% {
-                box-shadow: 0 0 15px rgba(0,0,0,0.9),
-                            inset 0 0 10px rgba(0,0,0,0.5),
-                            0 0 30px rgba(157, 139, 108, 0.4),
-                            0 0 60px rgba(157, 139, 108, 0.2);
+                box-shadow: var(--dnd-shadow-md),
+                            inset 0 0 10px var(--dnd-bg-tertiary),
+                            0 0 30px var(--dnd-selected-glow),
+                            0 0 60px var(--dnd-selected-bg);
             }
         }
         
@@ -2466,9 +2512,9 @@ export const addStyles = () => {
         
         /* 悬浮球悬停增强 - 增强原有效果 */
         #dnd-toggle-btn:hover {
-            box-shadow: 0 0 20px rgba(157, 139, 108, 0.6),
-                        0 0 40px rgba(157, 139, 108, 0.3),
-                        inset 0 0 10px rgba(255, 219, 133, 0.15) !important;
+            box-shadow: 0 0 20px var(--dnd-selected-glow),
+                        0 0 40px var(--dnd-selected-bg),
+                        inset 0 0 10px var(--dnd-bg-panel-start) !important;
         }
 
         /* === 2. HUD 面板增强效果 === */
@@ -2503,22 +2549,20 @@ export const addStyles = () => {
         }
         
         .dnd-char-card:hover {
-            transform: translateY(-8px) rotateX(3deg) rotateY(-2deg) scale(1.02) !important;
-            box-shadow:
-                0 20px 40px rgba(0, 0, 0, 0.5),
-                0 0 20px rgba(157, 139, 108, 0.2),
-                inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+            transform: var(--dnd-card-hover-transform) !important;
+            box-shadow: var(--dnd-card-hover-shadow),
+                        inset 0 1px 0 var(--dnd-bg-panel-start) !important;
         }
         
         /* 卡片边框发光呼吸 */
         @keyframes dnd-card-glow {
             0%, 100% {
                 border-color: var(--dnd-border-inner);
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                box-shadow: var(--dnd-shadow-sm);
             }
             50% {
-                border-color: rgba(157, 139, 108, 0.6);
-                box-shadow: 0 4px 20px rgba(157, 139, 108, 0.15);
+                border-color: var(--dnd-border-gold);
+                box-shadow: var(--dnd-selected-glow);
             }
         }
         
@@ -2543,9 +2587,9 @@ export const addStyles = () => {
             background: conic-gradient(
                 from 0deg,
                 transparent,
-                rgba(157, 139, 108, 0.5),
+                var(--dnd-border-gold),
                 transparent,
-                rgba(255, 219, 133, 0.3),
+                var(--dnd-text-highlight),
                 transparent
             );
             opacity: 0;
@@ -2560,7 +2604,7 @@ export const addStyles = () => {
         
         .dnd-avatar-container:hover {
             transform: scale(1.1) !important;
-            box-shadow: 0 0 15px rgba(157, 139, 108, 0.5) !important;
+            box-shadow: var(--dnd-selected-glow) !important;
         }
 
         /* === 4. 骰子按钮 3D 翻转效果 === */
@@ -2579,7 +2623,7 @@ export const addStyles = () => {
             left: 50%;
             width: 0;
             height: 0;
-            background: radial-gradient(circle, rgba(255, 219, 133, 0.4) 0%, transparent 70%);
+            background: radial-gradient(circle, var(--dnd-selected-bg) 0%, transparent 70%);
             transition: all 0.4s ease;
             transform: translate(-50%, -50%);
             border-radius: 50%;
@@ -2592,8 +2636,7 @@ export const addStyles = () => {
         
         .dnd-dice-btn:hover {
             transform: translateY(-3px) rotateX(-10deg) scale(1.08) !important;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4),
-                        0 0 15px rgba(255, 219, 133, 0.3) !important;
+            box-shadow: var(--dnd-shadow-md), var(--dnd-selected-glow) !important;
         }
         
         .dnd-dice-btn:active {
@@ -2617,14 +2660,14 @@ export const addStyles = () => {
         /* 骰子结果特效 - NAT20 发光脉冲 */
         @keyframes dnd-nat20-glow {
             0% {
-                text-shadow: 0 0 30px rgba(46, 204, 113, 0.8),
-                             0 0 60px rgba(46, 204, 113, 0.4);
+                text-shadow: 0 0 30px var(--dnd-accent-green),
+                             0 0 60px var(--dnd-accent-green);
                 transform: scale(1);
             }
             100% {
-                text-shadow: 0 0 50px rgba(46, 204, 113, 1),
-                             0 0 100px rgba(46, 204, 113, 0.6),
-                             0 0 150px rgba(46, 204, 113, 0.3);
+                text-shadow: 0 0 50px var(--dnd-accent-green),
+                             0 0 100px var(--dnd-accent-green),
+                             0 0 150px var(--dnd-accent-green);
                 transform: scale(1.05);
             }
         }
@@ -2644,13 +2687,13 @@ export const addStyles = () => {
         }
         
         .dnd-nat20-result {
-            background: linear-gradient(135deg, rgba(46, 204, 113, 0.15), rgba(39, 174, 96, 0.1)) !important;
-            border-color: rgba(46, 204, 113, 0.6) !important;
+            background: linear-gradient(135deg, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
+            border-color: var(--dnd-accent-green) !important;
         }
         
         .dnd-nat1-result {
-            background: linear-gradient(135deg, rgba(231, 76, 60, 0.15), rgba(192, 57, 43, 0.1)) !important;
-            border-color: rgba(231, 76, 60, 0.6) !important;
+            background: linear-gradient(135deg, var(--dnd-bg-tertiary), var(--dnd-bg-secondary)) !important;
+            border-color: var(--dnd-accent-red) !important;
         }
         
         /* 骰子结果数字弹跳入场 */
@@ -2749,7 +2792,7 @@ export const addStyles = () => {
         .dnd-btn-ripple .dnd-ripple-effect {
             position: absolute;
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 219, 133, 0.6) 0%, rgba(255, 219, 133, 0) 70%); /* 更柔和的径向渐变 */
+            background: radial-gradient(circle, var(--dnd-selected-bg) 0%, transparent 70%); /* 更柔和的径向渐变 */
             pointer-events: none;
             animation: dnd-ripple 0.6s ease-out forwards;
             mix-blend-mode: screen; /* 混合模式让光效更亮 */
@@ -3400,6 +3443,24 @@ export const addStyles = () => {
             color: var(--dnd-text-highlight) !important;
             background: rgba(255, 255, 255, 0.05) !important;
         }
+        
+        /* ============================================
+           浮动球隐藏模式样式
+           ============================================ */
+        
+        /* 强制隐藏浮动球 */
+        #dnd-toggle-btn.dnd-force-hidden {
+            display: none !important;
+        }
+        
+        /* 隐藏球模式下 Mini HUD 可拖拽 */
+        #dnd-mini-hud.dnd-independent-mode {
+            cursor: move !important;
+        }
+        
+        #dnd-mini-hud.dnd-independent-mode .dnd-hud-header {
+            cursor: move !important;
+        }
     `;
-    $('head').append(`<style id="${SCRIPT_ID}-styles">${css}</style>`);
+    $root(doc.head || doc.documentElement).append(`<style id="${SCRIPT_ID}-styles">${css}</style>`);
 };

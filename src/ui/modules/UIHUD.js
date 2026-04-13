@@ -6,11 +6,65 @@ import { DataManager } from '../../data/DataManager.js';
 import { PresetSwitcher } from '../../features/PresetSwitcher.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
 import { UITableManager } from './UITableManager.js';
+import { NotificationSystem } from './UIUtils.js';
 import UICore from './UICore.js';
 import { ICONS, getWeatherIcon } from '../SVGIcons.js';
 
+async function invokeManualUpdate(event) {
+    const { $, getDB } = getCore();
+    const $btn = event ? $(event.currentTarget).closest('.dnd-footer-btn') : $();
+    const $icon = $btn.find('.dnd-refresh-icon i');
+    const api = typeof getDB === 'function' ? getDB() : null;
+
+    if (!api || typeof api.manualUpdate !== 'function') {
+        Logger.warn('[UIHUD] 当前数据库插件未提供 manualUpdate 接口');
+        NotificationSystem.error('当前数据库插件未提供手动更新接口，请先更新数据库插件');
+        return false;
+    }
+
+    try {
+        $btn.css({
+            pointerEvents: 'none',
+            opacity: '0.7'
+        });
+        $icon.removeClass('fa-sync').addClass('fa-spinner fa-spin');
+
+        const success = await api.manualUpdate();
+        if (success === false) {
+            throw new Error('数据库插件返回失败');
+        }
+
+        const globalUI = window.DND_Dashboard_UI || getCore().window?.DND_Dashboard_UI;
+        if (globalUI) {
+            if (globalUI.state === 'mini' && typeof globalUI.renderHUD === 'function') {
+                setTimeout(() => globalUI.renderHUD(), 50);
+            } else if (globalUI.state === 'full' && typeof globalUI.renderPanel === 'function') {
+                const activeTarget = $('.dnd-nav-item.active').data('target');
+                if (activeTarget) {
+                    setTimeout(() => globalUI.renderPanel(activeTarget), 50);
+                }
+            }
+        }
+
+        Logger.info('[UIHUD] 已触发数据库手动更新');
+        NotificationSystem.success('已触发数据库手动更新');
+        return true;
+    } catch (err) {
+        const message = err?.message || '未知错误';
+        Logger.error('[UIHUD] 手动更新失败:', err);
+        NotificationSystem.error(`手动更新失败：${message}`);
+        return false;
+    } finally {
+        $btn.css({
+            pointerEvents: '',
+            opacity: ''
+        });
+        $icon.removeClass('fa-spinner fa-spin').addClass('fa-sync');
+    }
+}
+
 export default {
-    renderHUD() {
+    async renderHUD() {
         const { $ } = getCore();
         const $hud = $('#dnd-mini-hud');
         const $body = $('#dnd-hud-body');
@@ -20,6 +74,10 @@ export default {
         
         // 仅在 mini 状态下渲染
         if (this.state !== 'mini') return;
+
+        // 获取迷你地图显示设置（提前获取，传递给子渲染函数）
+        const showMiniMapSetting = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP);
+        const showMiniMap = showMiniMapSetting !== false && showMiniMapSetting !== 'false'; // 默认开启
 
         // 获取全局状态
         const global = DataManager.getTable('SYS_GlobalState');
@@ -59,11 +117,11 @@ export default {
         
         // 添加展开按钮 (如果尚未存在)
         if ($('#dnd-hud-toggle-bar').length === 0) {
-            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:linear-gradient(to bottom, #1a1a1a, #0a0a0a);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#666;font-size:8px;transition:all 0.2s;" title="展开/收起表格管理">▼</div>`);
+            const $toggleBar = $(`<div id="dnd-hud-toggle-bar" style="height:12px;background:var(--dnd-bg-tertiary);border-bottom:1px solid var(--dnd-border-inner);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dnd-text-dim);font-size:8px;transition:all 0.2s;" title="展开/收起表格管理">▼</div>`);
             
             $toggleBar.hover(
-                function() { $(this).css({color: 'var(--dnd-text-highlight)', background: 'rgba(255,255,255,0.05)'}); },
-                function() { $(this).css({color: '#666', background: 'linear-gradient(to bottom, #1a1a1a, #0a0a0a)'}); }
+                function() { $(this).css({color: 'var(--dnd-text-highlight)', background: 'var(--dnd-selected-bg)'}); },
+                function() { $(this).css({color: 'var(--dnd-text-dim)', background: 'var(--dnd-bg-tertiary)'}); }
             );
             
             const self = this;
@@ -101,10 +159,10 @@ export default {
         // [美化] 添加/移除战斗模式特殊样式类
         if (isCombat) {
             $hud.addClass('dnd-combat-mode');
-            this.renderCombatHUD($body);
+            this.renderCombatHUD($body, showMiniMap);
         } else {
             $hud.removeClass('dnd-combat-mode');
-            this.renderExploreHUD($body);
+            this.renderExploreHUD($body, showMiniMap);
         }
         
         // [美化] 为主体内容添加交错入场动画
@@ -125,15 +183,15 @@ export default {
         // [新增] 渲染行动队列面板 (如果有待执行行动)
         if (this._actionQueue && this._actionQueue.length > 0) {
             const $queuePanel = $(`
-                <div style="margin-top:10px;background:rgba(0,0,0,0.3);border:1px solid var(--dnd-border-gold);border-radius:4px;overflow:hidden;">
-                    <div style="background:rgba(197, 160, 89, 0.1);padding:5px 10px;font-weight:bold;color:var(--dnd-text-highlight);display:flex;justify-content:space-between;align-items:center;">
+                <div style="margin-top:10px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-gold);border-radius:4px;overflow:hidden;">
+                    <div style="background:var(--dnd-bg-secondary);padding:5px 10px;font-weight:bold;color:var(--dnd-text-highlight);display:flex;justify-content:space-between;align-items:center;">
                         <span><i class="fa-solid fa-hourglass-half"></i> 待执行行动 (${this._actionQueue.length})</span>
                         <div style="display:flex;gap:5px;">
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-check"></i> 执行</button>
-                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:#fff;padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-times"></i> 清空</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.commitActions()" style="background:var(--dnd-accent-green);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-check"></i> 执行</button>
+                            <button class="dnd-clickable" onclick="window.DND_Dashboard_UI.clearActions()" style="background:var(--dnd-accent-red);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;cursor:pointer;"><i class="fa-solid fa-times"></i> 清空</button>
                         </div>
                     </div>
-                    <div style="padding:5px 10px;font-size:12px;color:#ccc;">
+                    <div style="padding:5px 10px;font-size:12px;color:var(--dnd-text-dim);">
                         ${this._actionQueue.map((a, i) => `<div style="margin-bottom:2px;">${i+1}. ${a.desc}</div>`).join('')}
                     </div>
                 </div>
@@ -153,9 +211,12 @@ export default {
         
         // 每次渲染后更新位置
         this.updateHUDPosition();
+        
+        // [新增] 初始化独立拖拽功能（隐藏球模式下使用）
+        this.initIndependentDrag();
     },
 
-    // [新增] 更新 HUD 位置使其跟随悬浮球
+        // [新增] 更新 HUD 位置使其跟随悬浮球
     updateHUDPosition() {
         const { $, window: coreWin } = getCore(); // 获取正确的 window 对象
         // [修复] 使用 coreWin 获取尺寸，确保与 DOM 元素所在的文档一致 (兼容 iframe)
@@ -174,7 +235,32 @@ export default {
         const $btn = $('#dnd-toggle-btn');
         const $hud = $('#dnd-mini-hud');
         
-        if (!$btn.length || !$hud.length) return;
+        if (!$hud.length) return;
+        
+        // [新增] 检查是否隐藏球模式
+        const hideFloatingBall = $btn.hasClass('dnd-force-hidden') || 
+            (UICore._hideFloatingBall === true);
+        
+        if (hideFloatingBall) {
+            // 隐藏球模式：使用独立位置
+            $hud.addClass('dnd-independent-mode');
+
+            const hudRect = $hud[0].getBoundingClientRect();
+            const hudW = hudRect.width || 360;
+            const savedPos = UICore._miniHudPos;
+
+            const top = savedPos?.top || '20px';
+            const left = savedPos?.left || `${Math.max(20, winW - hudW - 20)}px`;
+
+            $hud[0].style.setProperty('top', top, 'important');
+            $hud[0].style.setProperty('left', left, 'important');
+            return;
+        }
+        
+        // 正常模式：跟随浮动球
+        $hud.removeClass('dnd-independent-mode');
+        
+        if (!$btn.length) return;
         
         const btnRect = $btn[0].getBoundingClientRect();
         const hudRect = $hud[0].getBoundingClientRect();
@@ -220,6 +306,119 @@ export default {
         $hud[0].style.setProperty('left', left + 'px', 'important');
     },
 
+    // [新增] 初始化 Mini HUD 独立拖拽功能
+    initIndependentDrag() {
+        const { $, window: coreWin } = getCore();
+        const $hud = $('#dnd-mini-hud');
+        const $header = $hud.find('.dnd-hud-header');
+        
+        if (!$hud.length || !$header.length) return;
+        
+        // 检查是否已初始化
+        if ($hud.data('dnd-independent-drag-init')) return;
+        $hud.data('dnd-independent-drag-init', true);
+        
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let hudStartX = 0, hudStartY = 0;
+        const DRAG_THRESHOLD = 5;
+        
+        const handlePointerDown = (e) => {
+            // 只在独立模式下响应
+            if (!UICore._hideFloatingBall) return;
+            if (e.button !== 0 && e.pointerType === 'mouse') return;
+            if ($(e.target).closest('#dnd-logo-container, #dnd-hud-theme, #dnd-hud-toggle-bar, button').length) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isDragging = false;
+            dragStartX = e.screenX;
+            dragStartY = e.screenY;
+            
+            const rect = $hud[0].getBoundingClientRect();
+            hudStartX = rect.left;
+            hudStartY = rect.top;
+            
+            if ($hud[0].setPointerCapture) {
+                try { $hud[0].setPointerCapture(e.pointerId); } catch(err) {}
+            }
+            
+            const win = $hud[0].ownerDocument.defaultView || window;
+            win.addEventListener('pointermove', handlePointerMove);
+            win.addEventListener('pointerup', handlePointerUp);
+            win.addEventListener('pointercancel', handlePointerUp);
+        };
+        
+        const handlePointerMove = (e) => {
+            if (!UICore._hideFloatingBall) return;
+            
+            e.preventDefault();
+            
+            const dx = e.screenX - dragStartX;
+            const dy = e.screenY - dragStartY;
+            
+            if (!isDragging && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+                isDragging = true;
+                $hud.addClass('is-dragging');
+            }
+            
+            if (isDragging) {
+                const uiScale = UICore.currentScale || 1;
+                const browserZoom = window.devicePixelRatio || 1;
+                const totalScale = browserZoom * uiScale;
+                
+                let newLeft = hudStartX + dx / totalScale;
+                let newTop = hudStartY + dy / totalScale;
+                
+                const win = $hud[0].ownerDocument.defaultView || window;
+                const winW = win.innerWidth;
+                const winH = win.innerHeight;
+                const hudRect = $hud[0].getBoundingClientRect();
+                const hudW = hudRect.width || 360;
+                const hudH = hudRect.height || 400;
+                
+                // 边界限制
+                newLeft = Math.max(5, Math.min(newLeft, winW - hudW - 5));
+                newTop = Math.max(5, Math.min(newTop, winH - hudH - 5));
+                
+                $hud[0].style.setProperty('left', newLeft + 'px', 'important');
+                $hud[0].style.setProperty('top', newTop + 'px', 'important');
+            }
+        };
+        
+        const handlePointerUp = (e) => {
+            const win = $hud[0].ownerDocument.defaultView || window;
+            win.removeEventListener('pointermove', handlePointerMove);
+            win.removeEventListener('pointerup', handlePointerUp);
+            win.removeEventListener('pointercancel', handlePointerUp);
+            
+            if ($hud[0].releasePointerCapture) {
+                try { $hud[0].releasePointerCapture(e.pointerId); } catch(err) {}
+            }
+            
+            if (isDragging) {
+                // 保存位置
+                const rect = $hud[0].getBoundingClientRect();
+                const nextPos = {
+                    left: rect.left + 'px',
+                    top: rect.top + 'px'
+                };
+
+                UICore._miniHudPos = nextPos;
+                safeSave(CONFIG.STORAGE_KEYS.MINI_HUD_POS, JSON.stringify(nextPos));
+                setTimeout(() => $hud.removeClass('is-dragging'), 50);
+            }
+            
+            isDragging = false;
+        };
+        
+        // 在 header 上绑定拖拽事件
+        $header[0].addEventListener('pointerdown', handlePointerDown);
+        
+        Logger.info('[UIHUD] Mini HUD 独立拖拽已初始化');
+    },
+
     // [新增] 显示位置设置对话框
     showPositionDialog() {
         const { $, window: coreWin } = getCore();
@@ -245,19 +444,19 @@ export default {
         ];
         
         let btnsHtml = positions.map(p => 
-            `<button class="dnd-pos-btn" data-left="${p.left}" data-top="${p.top}" style="padding:8px;background:#2a2a2c;border:1px solid #444;color:#ccc;border-radius:4px;cursor:pointer;">${p.label}</button>`
+            `<button class="dnd-pos-btn" data-left="${p.left}" data-top="${p.top}" style="padding:8px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;cursor:pointer;">${p.label}</button>`
         ).join('');
         
         const html = `
-            <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#161618;border:1px solid #9d8b6c;border-radius:8px;padding:15px;z-index:2147483650;box-shadow:0 10px 40px rgba(0,0,0,0.8);min-width:280px;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid #444;padding-bottom:8px;">
-                    <span style="color:#ffdb85;font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
-                    <span id="dnd-pos-close" style="cursor:pointer;color:#888;"><i class="fa-solid fa-times"></i></span>
+            <div id="dnd-position-dialog" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--dnd-bg-popup);border:1px solid var(--dnd-border-gold);border-radius:8px;padding:15px;z-index:2147483650;box-shadow:var(--dnd-shadow-lg);min-width:280px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:8px;">
+                    <span style="color:var(--dnd-text-highlight);font-weight:bold;">${ICONS.LOCATION} 悬浮球位置</span>
+                    <span id="dnd-pos-close" style="cursor:pointer;color:var(--dnd-text-dim);"><i class="fa-solid fa-times"></i></span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px;">${btnsHtml}</div>
-                <div style="font-size:11px;color:#666;text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);text-align:center;">单击=切换HUD | 双击/长按=此设置</div>
             </div>
-            <div id="dnd-pos-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:2147483646;"></div>
+            <div id="dnd-pos-backdrop" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--dnd-bg-main);opacity:0.85;z-index:2147483646;"></div>
         `;
         
         $('body').append(html);
@@ -299,41 +498,43 @@ export default {
         
         // 辅助样式效果
         $(document).on('mouseover', '.dnd-pos-btn', function() {
-            $(this).css({ 'border-color': '#9d8b6c', 'color': '#ffdb85' });
+            $(this).css({ 'border-color': 'var(--dnd-border-gold)', 'color': 'var(--dnd-text-highlight)' });
         }).on('mouseout', '.dnd-pos-btn', function() {
-            $(this).css({ 'border-color': '#444', 'color': '#ccc' });
+            $(this).css({ 'border-color': 'var(--dnd-border-subtle)', 'color': 'var(--dnd-text-main)' });
         });
     },
 
-    renderCombatHUD($container) {
+    renderCombatHUD($container, showMiniMap) {
         const { $ } = getCore();
         const encounters = DataManager.getTable('COMBAT_Encounter');
+        const partyData = DataManager.getPartyData() || [];
         const global = DataManager.getTable('SYS_GlobalState');
         const round = (global && global[0]) ? global[0]['当前回合'] : 0;
         
         // 布局
         let html = `<div class="dnd-hud-combat-layout">`;
         
-        // 左侧：迷你地图
+        // 左侧：迷你地图（根据设置决定是否显示）
         const turnRes = this._turnResources || { action: 1, bonus: 1, reaction: 1, movement: 30 };
+        
         html += `
             <div style="display:flex;flex-direction:column;gap:5px;">
-                <div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:180px;height:180px;"></div>
+                ${showMiniMap ? '<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:180px;height:180px;"></div>' : ''}
                 
                 <!-- 动作经济展示 -->
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;background:rgba(0,0,0,0.3);padding:4px;border-radius:4px;">
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'#2ecc71':'#555'}"><i class="fa-solid fa-bolt"></i> 动作: ${turnRes.action}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'#e67e22':'#555'}"><i class="fa-solid fa-plus-circle"></i> 附赠: ${turnRes.bonus}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'#f1c40f':'#555'}"><i class="fa-solid fa-rotate"></i> 反应: ${turnRes.reaction}</div>
-                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'#3498db':'#555'}"><i class="fa-solid fa-shoe-prints"></i> 移动: ${turnRes.movement}</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;background:var(--dnd-bg-secondary);padding:4px;border-radius:4px;">
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('action')" title="点击增加动作" style="cursor:pointer;color:${turnRes.action>0?'var(--dnd-accent-green)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-bolt"></i> 动作: ${turnRes.action}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('bonus')" title="点击增加附赠动作" style="cursor:pointer;color:${turnRes.bonus>0?'var(--dnd-text-highlight)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-plus-circle"></i> 附赠: ${turnRes.bonus}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('reaction')" title="点击增加反应" style="cursor:pointer;color:${turnRes.reaction>0?'var(--dnd-border-gold)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-rotate"></i> 反应: ${turnRes.reaction}</div>
+                    <div class="dnd-clickable" onclick="window.DND_Dashboard_UI.adjustTurnResource('movement')" title="点击增加30尺移动力" style="cursor:pointer;color:${turnRes.movement>0?'var(--dnd-accent-blue)':'var(--dnd-text-dim)'}"><i class="fa-solid fa-shoe-prints"></i> 移动: ${turnRes.movement}</div>
                 </div>
 
                 <div style="display:flex;gap:5px;">
                     <button class="dnd-clickable" style="
                         flex: 1;
-                        background: linear-gradient(135deg, #2c3e50, #2980b9);
-                        border: 1px solid #3498db;
-                        color: #fff;
+                        background: linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-accent-blue));
+                        border: 1px solid var(--dnd-accent-blue);
+                        color: var(--dnd-btn-text);
                         padding: 5px;
                         border-radius: 4px;
                         cursor: pointer;
@@ -347,9 +548,9 @@ export default {
                     })"><i class="fa-solid fa-person-walking"></i> 移动</button>
                     <button class="dnd-clickable" style="
                         flex: 1;
-                        background: linear-gradient(135deg, #8e44ad, #9b59b6);
-                        border: 1px solid #9b59b6;
-                        color: #fff;
+                        background: linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-text-highlight));
+                        border: 1px solid var(--dnd-text-highlight);
+                        color: var(--dnd-btn-text);
                         padding: 5px;
                         border-radius: 4px;
                         cursor: pointer;
@@ -392,11 +593,13 @@ export default {
                 const acVal = acMatch ? acMatch[1] : (defInfo.length < 5 ? defInfo : '??');
                 
                 const charIdCombat = unit['单位名称'];
+                const avatarIdentity = partyData.find(p => p['姓名'] === unit['单位名称']) || { '单位名称': unit['单位名称'] };
+                const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, unit['单位名称']);
                 const initialCombat = this.getNameInitial(unit['单位名称']);
                 const uid = `combat-avatar-${charIdCombat.replace(/[^a-zA-Z0-9]/g, '_')}-${Math.random().toString(36).substr(2,5)}`;
                 
                 // Trigger async load
-                setTimeout(() => this.loadAvatarAsync(charIdCombat, uid), 0);
+                setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, unit['单位名称']), 0);
                 
                 let nameColor = 'var(--dnd-text-main)';
                 if (isEnemy) nameColor = 'var(--dnd-accent-red)';
@@ -404,24 +607,24 @@ export default {
                 
                 html += `
                     <div class="dnd-mini-char dnd-hud-entry ${isActive ? 'active' : ''}" style="${isEnemy ? 'border-left-color:var(--dnd-accent-red) !important;' : ''}">
-                        <div id="${uid}" class="dnd-mini-char-avatar dnd-avatar-container ${isActive ? 'dnd-active-turn' : ''}" data-char-id="${charIdCombat}" style="overflow:hidden;background:linear-gradient(135deg, #2a2a2e 0%, #1a1a1c 100%);position:relative;cursor:pointer;border-color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-border-gold)'};" title="${unit['单位名称']}">
-                            <div class="dnd-avatar-initial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${isEnemy?'#ff6b6b':'var(--dnd-text-highlight)'};font-weight:bold;font-size:16px;">${initialCombat}</div>
+                        <div id="${uid}" class="dnd-mini-char-avatar dnd-avatar-container ${isActive ? 'dnd-active-turn' : ''}" data-char-id="${charIdCombat}" data-avatar-key="${avatarInfo.domKey}" style="overflow:hidden;background:linear-gradient(135deg, var(--dnd-bg-tertiary) 0%, var(--dnd-bg-secondary) 100%);position:relative;cursor:pointer;border-color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-border-gold)'};" title="${unit['单位名称']}">
+                            <div class="dnd-avatar-initial" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-text-highlight)'};font-weight:bold;font-size:16px;">${initialCombat}</div>
                         </div>
                         <div class="dnd-mini-char-info">
                             <div style="display:flex;justify-content:space-between">
                                 <div class="dnd-mini-name" style="color:${nameColor}">${unit['单位名称']} ${isActive ? '<i class="fa-solid fa-bolt"></i>' : ''}</div>
-                                <div style="font-size:11px;color:#888">AC: ${acVal}</div>
+                                <div style="font-size:11px;color:var(--dnd-text-dim)">AC: ${acVal}</div>
                             </div>
                             <div class="dnd-mini-bars">
-                                <div class="dnd-micro-bar hp dnd-bar-shimmer" title="${hpStr}"><div class="dnd-micro-bar-fill" style="width:${hpPercent}%;background:${isEnemy?'#c0392b':'var(--dnd-accent-green)'} !important;"></div></div>
+                                <div class="dnd-micro-bar hp dnd-bar-shimmer" title="${hpStr}"><div class="dnd-micro-bar-fill" style="width:${hpPercent}%;background:${isEnemy?'var(--dnd-accent-red)':'var(--dnd-accent-green)'} !important;"></div></div>
                             </div>
-                            ${buffs ? `<div style="font-size:10px;color:#aaa;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${buffs}</div>` : ''}
+                            ${buffs ? `<div style="font-size:10px;color:var(--dnd-text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${buffs}</div>` : ''}
                         </div>
                     </div>
                 `;
             });
         } else {
-            html += `<div style="color:#666;text-align:center;padding:10px;">等待战斗数据...</div>`;
+            html += `<div style="color:var(--dnd-text-dim);text-align:center;padding:10px;">等待战斗数据...</div>`;
         }
         
         html += `</div></div>`;
@@ -442,19 +645,24 @@ export default {
             this.renderResourceConsumption($('#dnd-combat-resource-panel'));
         }
 
-        this.renderMiniMap($('#dnd-hud-minimap-content'));
+        // 渲染地图（如果启用）
+        if (showMiniMap) {
+            this.renderMiniMap($('#dnd-hud-minimap-content'));
+        }
     },
 
-    renderExploreHUD($container) {
+    renderExploreHUD($container, showMiniMap) {
         const { $ } = getCore();
 
-        // 0. 渲染探索地图 (新增)
-        // 使用 100% 宽度，高度设为 240px 以便更好地展示艺术地图
-        const $mapContainer = $('<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:100% !important; height:240px !important; margin-bottom:10px; border:1px solid var(--dnd-border-gold);"></div>');
-        $container.append($mapContainer);
-        
-        // 异步渲染地图
-        this.renderMiniMap($mapContainer);
+        // 0. 渲染探索地图 (根据设置决定是否显示)
+        if (showMiniMap) {
+            // 使用 100% 宽度，高度设为 240px 以便更好地展示艺术地图
+            const $mapContainer = $('<div class="dnd-hud-minimap" id="dnd-hud-minimap-content" style="width:100% !important; height:240px !important; margin-bottom:10px; border:1px solid var(--dnd-border-gold);"></div>');
+            $container.append($mapContainer);
+            
+            // 异步渲染地图
+            this.renderMiniMap($mapContainer);
+        }
         
         // 1. 渲染行动选项 (优先)
         // [修复] 使用独立容器并移除 await，确保渲染顺序正确（地图 -> 选项 -> 任务 -> 其他）
@@ -473,15 +681,15 @@ export default {
             const timeLimit = activeQ['时限'] || '';
             
             const qHtml = `
-                <div class="dnd-hud-quests dnd-hud-entry" style="animation-delay:0.2s; margin-top:5px;background:rgba(0,0,0,0.2);padding:6px;border-radius:4px;border-left:2px solid var(--dnd-border-gold);cursor:pointer;">
+                <div class="dnd-hud-quests dnd-hud-entry" style="animation-delay:0.2s; margin-top:5px;background:var(--dnd-bg-secondary);padding:6px;border-radius:4px;border-left:2px solid var(--dnd-border-gold);cursor:pointer;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
                         <div style="font-weight:bold;color:var(--dnd-text-header);font-size:12px;display:flex;align-items:center;gap:5px;">
                             <span><i class="fa-solid fa-thumbtack dnd-icon-notify"></i> ${activeQ['任务名称']}</span>
-                            ${type ? `<span style="font-size:10px;background:rgba(255,255,255,0.1);padding:0 4px;border-radius:2px;color:var(--dnd-text-dim);">${type}</span>` : ''}
+                            ${type ? `<span style="font-size:10px;background:var(--dnd-bg-tertiary);padding:0 4px;border-radius:2px;color:var(--dnd-text-dim);">${type}</span>` : ''}
                         </div>
-                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:#e67e22;"><i class="fa-solid fa-clock"></i> ${timeLimit}</div>` : ''}
+                        ${timeLimit && timeLimit !== '无限制' ? `<div style="font-size:10px;color:var(--dnd-text-highlight);"><i class="fa-solid fa-clock"></i> ${timeLimit}</div>` : ''}
                     </div>
-                    <div style="font-size:11px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    <div style="font-size:11px;color:var(--dnd-text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                         ${activeQ['当前进度'] || activeQ['目标描述'] || '...'}
                     </div>
                 </div>
@@ -524,7 +732,7 @@ export default {
         validOpts.forEach((opt, idx) => {
             html += `
                 <button class="dnd-action-btn dnd-clickable dnd-hud-entry dnd-hover-lift" data-text="${opt.text}" style="animation-delay:${idx * 0.05}s;
-                    background: linear-gradient(to bottom, #2a2a2c, #1a1a1c);
+                    background: linear-gradient(to bottom, var(--dnd-bg-tertiary), var(--dnd-bg-secondary));
                     border: 1px solid var(--dnd-border-inner);
                     color: var(--dnd-text-main);
                     padding: 8px 5px;
@@ -591,11 +799,13 @@ export default {
             const level = char['等级'] || 1;
             
             const charId = char['PC_ID'] || char['CHAR_ID'] || char['姓名'];
+            const avatarIdentity = char;
+            const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, char['姓名']);
             const initial = this.getNameInitial(char['姓名']);
             const avatarUid = `party-avatar-${charId}-${idx}`;
             
             // 触发异步头像加载
-            setTimeout(() => this.loadAvatarAsync(charId, avatarUid), 0);
+            setTimeout(() => this.loadAvatarAsync(avatarIdentity, avatarUid, char['姓名']), 0);
             
             // [新增] 检查是否为当前操控角色
             const isControlled = (this._controlledCharId === charId);
@@ -614,7 +824,7 @@ export default {
             html += `
                 <div class="party-bar-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-idx="${idx}" style="animation-delay:${idx * 0.05}s;">
                     <div style="position:relative;">
-                        <div id="${avatarUid}" class="dnd-avatar-container party-avatar-container" data-char-id="${charId}" title="${char['姓名']}">
+                        <div id="${avatarUid}" class="dnd-avatar-container party-avatar-container" data-char-id="${charId}" data-avatar-key="${avatarInfo.domKey}" title="${char['姓名']}">
                             <span style="color:var(--dnd-text-highlight);font-weight:bold;font-size:16px;">${initial}</span>
                         </div>
                         <div class="party-lvl-badge">Lv.${level}</div>
@@ -634,14 +844,14 @@ export default {
                     </div>
                     
                     <!-- HP条 -->
-                    <div class="dnd-bar-shimmer" style="width:100%;height:4px;background:#333;border-radius:2px;overflow:hidden;margin-top:2px;">
-                        <div class="dnd-bar-fill" style="width:${hpPercent}%;height:100%;background:${hpPercent < 30 ? '#c0392b' : 'var(--dnd-accent-green)'};transition:width 0.3s;"></div>
+                    <div class="dnd-bar-shimmer" style="width:100%;height:4px;background:var(--dnd-bg-secondary);border-radius:2px;overflow:hidden;margin-top:2px;">
+                        <div class="dnd-bar-fill" style="width:${hpPercent}%;height:100%;background:${hpPercent < 30 ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)'};transition:width 0.3s;"></div>
                     </div>
                     
                     <!-- XP条 -->
                     ${xpText ? `
-                    <div class="dnd-bar-shimmer" style="width:100%;height:2px;background:#222;border-radius:1px;overflow:hidden;margin-top:1px;" title="XP: ${xpText}">
-                        <div class="dnd-bar-fill" style="width:${xpPercent}%;height:100%;background:#8e44ad;transition:width 0.3s;"></div>
+                    <div class="dnd-bar-shimmer" style="width:100%;height:2px;background:var(--dnd-bg-input);border-radius:1px;overflow:hidden;margin-top:1px;" title="XP: ${xpText}">
+                        <div class="dnd-bar-fill" style="width:${xpPercent}%;height:100%;background:var(--dnd-text-highlight);transition:width 0.3s;"></div>
                     </div>` : ''}
                 </div>
             `;
@@ -811,7 +1021,7 @@ export default {
                 case 'spellbook': self.showSpellBook(e); break;
                 case 'npclist': self.showNPCListPanel(e); break;
                 case 'dice': self.showQuickDice(e); break;
-                case 'manual-update': self.triggerManualUpdate(e); break;
+                case 'manual-update': void invokeManualUpdate(e); break;
                 case 'settings':
                     // 切换到完整面板并打开设置页
                     $('.dnd-nav-item').removeClass('active');
@@ -822,6 +1032,11 @@ export default {
         });
         
         $container.append($footerEl);
+    },
+
+    // [新增] 手动触发神数据库更新
+    async triggerManualUpdate(event) {
+        return invokeManualUpdate(event);
     },
 
     // [新增] 显示NPC列表面板

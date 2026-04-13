@@ -55,7 +55,7 @@ export default {
         
         // 缩放指示器
         if ($container.find('.dnd-map-zoom-indicator').length === 0) {
-            $container.append(`<div class="dnd-map-zoom-indicator" style="position:absolute;top:2px;right:4px;font-size:8px;color:rgba(255,255,255,0.6);background:rgba(0,0,0,0.4);padding:1px 3px;border-radius:2px;pointer-events:none;z-index:31;">100%</div>`);
+            $container.append(`<div class="dnd-map-zoom-indicator" style="position:absolute;top:2px;right:4px;font-size:8px;color:var(--dnd-text-dim);background:var(--dnd-bg-secondary);padding:1px 3px;border-radius:2px;pointer-events:none;z-index:31;">100%</div>`);
         }
         const updateIndicator = () => {
             $container.find('.dnd-map-zoom-indicator').text(`${Math.round(state.scale * 100)}%`);
@@ -254,7 +254,7 @@ export default {
                 $el.empty();
                 $el.css({
                     position: 'relative',
-                    background: '#0a0a0c',
+                    background: 'var(--dnd-bg-main)',
                     overflow: 'hidden'
                 });
                 
@@ -280,8 +280,8 @@ export default {
             const containerId = 'dnd-exploration-map-loader';
             // 如果内容为空，显示加载中
             if ($innerMap.is(':empty')) {
-                    $innerMap.html(`<div id="${containerId}" style="display:flex;align-items:center;justify-content:center;color:#666;flex-direction:column;gap:5px;">
-                    <div class="dnd-spinner" style="width:20px;height:20px;border:2px solid #333;border-top:2px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
+                    $innerMap.html(`<div id="${containerId}" style="display:flex;align-items:center;justify-content:center;color:var(--dnd-text-dim);flex-direction:column;gap:5px;">
+                    <div class="dnd-spinner" style="width:20px;height:20px;border:2px solid var(--dnd-border-subtle);border-top:2px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
                     <div style="font-size:10px;">加载地图...</div>
                 </div>`);
             }
@@ -341,11 +341,13 @@ export default {
                         } catch(e) { console.warn('Auto-zoom failed', e); }
                     }, 50);
 
+                    const safeLocationArg = JSON.stringify(locationName);
+
                     // 添加控制层 (悬浮显示) - 添加到外层 $el
                     if ($el.find('.dnd-map-controls').length === 0) {
                         const overlayHtml = `
                             <div class="dnd-map-controls" style="position:absolute;top:5px;right:5px;display:flex;gap:5px;opacity:0;transition:opacity 0.2s;z-index:10;">
-                                <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="保持结构重绘图片" style="background:rgba(0,0,0,0.6);border:1px solid #555;color:#fff;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
+                                <button type="button" onclick='window.DND_Dashboard_UI.regenerateMap(${safeLocationArg}, "svg")' title="保持结构重绘图片" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10px;"><i class="fa-solid fa-palette"></i> 重绘</button>
                             </div>
                         `;
                         $el.append(overlayHtml);
@@ -359,17 +361,17 @@ export default {
                 } else if (mapResult.type === 'error' && mapResult.message.includes('结构')) {
                     // 尚未生成
                         $innerMap.html(`
-                        <div style="text-align:center;color:#888;">
+                        <div style="text-align:center;color:var(--dnd-text-dim);">
                             <div style="font-size:24px;margin-bottom:5px;">${ICONS.MAP}</div>
                             <div style="font-size:10px;margin-bottom:10px;">${mapResult.message}</div>
                         </div>
                     `);
                 } else {
                         // 其他错误
-                        $innerMap.html(`<div style="color:#e74c3c;font-size:10px;padding:10px;text-align:center;">${mapResult.message}</div>`);
+                        $innerMap.html(`<div style="color:var(--dnd-accent-red);font-size:10px;padding:10px;text-align:center;">${mapResult.message}</div>`);
                 }
             } catch (e) {
-                $innerMap.html(`<div style="color:#e74c3c;font-size:10px;">加载错误: ${e.message}</div>`);
+                $innerMap.html(`<div style="color:var(--dnd-accent-red);font-size:10px;">加载错误: ${e.message}</div>`);
             }
             
             return;
@@ -382,7 +384,7 @@ export default {
         const encounters = DataManager.getTable('COMBAT_Encounter');
         
         if (!mapData) {
-            $el.html('<div style="color:#666;display:flex;align-items:center;justify-content:center;height:100%;">无战斗数据</div>');
+            $el.html('<div style="color:var(--dnd-text-dim);display:flex;align-items:center;justify-content:center;height:100%;">无战斗数据</div>');
             return;
         }
 
@@ -405,26 +407,34 @@ export default {
         const mapHeight = rows * cellSize;
         const offsetX = (containerSize - mapWidth) / 2;
         const offsetY = (containerSize - mapHeight) / 2;
+        const cachedCombatLocationName = $el.data('combat-location-name');
+        const combatLocationChanged = cachedCombatLocationName && cachedCombatLocationName !== locationName;
 
         // 2. 检查或初始化内部容器 (Static Layer)
         let $innerMap = $el.find('.dnd-minimap-inner');
         let needsFullRedraw = false;
 
-        // 如果尺寸变了，或者容器不存在，则全量重绘
+        // 如果尺寸或场景变了，或者容器不存在，则全量重绘
         if ($innerMap.length === 0 ||
             parseFloat($innerMap.data('cols')) !== cols ||
-            parseFloat($innerMap.data('rows')) !== rows) {
+            parseFloat($innerMap.data('rows')) !== rows ||
+            combatLocationChanged) {
             
             $el.empty(); // 彻底清空
             needsFullRedraw = true;
             
             $innerMap = $(`<div class="dnd-minimap-inner"
-                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:#1a1a1c;"
+                style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${mapWidth}px;height:${mapHeight}px;background:var(--dnd-bg-secondary);"
                 data-cell-size="${cellSize}" data-cols="${cols}" data-rows="${rows}"></div>`);
             $el.append($innerMap);
 
             // [新增] 战斗底图层 (Background Layer)
-            const bgId = `dnd-battle-bg-${locationName.replace(/\s+/g,'_')}`;
+            // [修复] 安全转义场景名称中的 CSS 选择器特殊字符，防止查询失败
+            const sanitizeId = (name) => {
+                // 移除或替换所有非安全字符，生成合法的 CSS ID
+                return 'bg-' + name.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '-').replace(/^-+|-+$/g, '');
+            };
+            const bgId = sanitizeId(locationName);
             // 移除 opacity 限制，移除滤镜，确保亮度正常
             $innerMap.append(`<div id="${bgId}" class="dnd-battle-bg-container" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;"></div>`);
             
@@ -434,21 +444,23 @@ export default {
                     const $bg = $innerMap.find(`#${bgId}`);
                     $bg.html(res.content);
                     // 强制 SVG 拉伸适应 Grid
-                    $bg.find('svg').css({
+                    const $svg = $bg.find('svg');
+                    $svg.attr('preserveAspectRatio', 'none');
+                    $svg.css({
                         width: '100%',
-                        height: '100%',
-                        preserveAspectRatio: 'none'
+                        height: '100%'
                         // 移除滤镜，防止过暗
                     });
                 }
             });
 
             // 绘制 Grid (SVG)
+            // [修复] 移除内联 opacity，使用 CSS 类控制；使用更明亮的边框颜色呈现透明线条效果
             const gridSvg = `
-                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;opacity:0.3;z-index:5;">
+                <svg class="dnd-minimap-grid" width="${mapWidth}" height="${mapHeight}" style="position:absolute;top:0;left:0;pointer-events:none;z-index:5;">
                     <defs>
                         <pattern id="miniGrid" width="${cellSize}" height="${cellSize}" patternUnits="userSpaceOnUse">
-                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                            <path d="M ${cellSize} 0 L 0 0 0 ${cellSize}" fill="none" stroke="var(--dnd-border-inner)" stroke-width="1"/>
                         </pattern>
                     </defs>
                     <rect width="100%" height="100%" fill="url(#miniGrid)"/>
@@ -474,11 +486,12 @@ export default {
 
                 let el = '';
                 if (item['类型'] === 'Wall') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:#3a3a3a;border:1px solid #555;z-index:1;"></div>`;
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-subtle);z-index:1;"></div>`;
                 } else if (item['类型'] === 'Terrain') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(46, 204, 113, 0.2);border:1px dashed rgba(46, 204, 113, 0.4);z-index:0;"></div>`;
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:var(--dnd-bg-tertiary);border:1px dashed var(--dnd-accent-green);z-index:0;"></div>`;
                 } else if (item['类型'] === 'Zone') {
-                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:rgba(155, 89, 182, 0.25);border:2px solid rgba(155, 89, 182, 0.5);border-radius:50%;z-index:2;"></div>`;
+                    // [修复] 移除灰色填充，仅保留高亮边框作为透明区域指示
+                    el = `<div style="position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;background:transparent;border:2px solid var(--dnd-text-highlight);border-radius:50%;z-index:2;"></div>`;
                 }
                 if (el) $innerMap.append(el);
             });
@@ -510,23 +523,26 @@ export default {
 
             // 绑定缩放 (仅在创建时绑定一次)
             this.bindMapZoom($el, $innerMap);
+            $el.data('combat-location-name', locationName);
             
             // UI Overlay (Round Info + Controls)
+            const safeLocationArg = JSON.stringify(locationName);
             $el.append(`
                 <div class="dnd-hud-overlay" style="pointer-events:none;z-index:30;">
-                    <div style="position:absolute;top:2px;left:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">A1</div>
-                    <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:rgba(255,255,255,0.5);text-shadow:1px 1px 2px #000;">${String.fromCharCode(64 + Math.min(cols, 26))}${rows}</div>
-                    <div id="dnd-map-round-info" style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--dnd-text-highlight);background:rgba(0,0,0,0.5);padding:0 4px;border-radius:2px;">第 ${round} 回合</div>
+                    <div style="position:absolute;top:2px;left:4px;font-size:9px;color:var(--dnd-text-dim);text-shadow:1px 1px 2px var(--dnd-bg-main);">${String.fromCharCode(64 + 1)}1</div>
+                    <div style="position:absolute;bottom:2px;right:4px;font-size:9px;color:var(--dnd-text-dim);text-shadow:1px 1px 2px var(--dnd-bg-main);">${String.fromCharCode(64 + Math.min(cols, 26))}${rows}</div>
+                    <div id="dnd-map-round-info" style="position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--dnd-text-highlight);background:var(--dnd-bg-secondary);padding:0 4px;border-radius:2px;">第 ${round} 回合</div>
                     
                     <!-- Battle Map Controls -->
                     <div class="dnd-map-controls" style="position:absolute;top:2px;right:2px;display:flex;gap:2px;pointer-events:auto;opacity:0.8;">
-                        <button type="button" onclick="window.DND_Dashboard_UI.regenerateMap('${locationName}', 'svg')" title="生成/刷新 战斗底图" style="background:rgba(0,0,0,0.6);border:1px solid #444;color:#fff;border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
+                        <button type="button" onclick='window.DND_Dashboard_UI.regenerateMap(${safeLocationArg}, "svg")' title="生成/刷新 战斗底图" style="background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);border-radius:3px;padding:1px 4px;cursor:pointer;font-size:9px;"><i class="fa-solid fa-palette"></i> AI底图</button>
                     </div>
                 </div>
             `);
         } else {
             // 仅更新回合数
             $el.find('#dnd-map-round-info').text(`第 ${round} 回合`);
+            $el.data('combat-location-name', locationName);
         }
 
         // 3. 增量更新 Token (Dynamic Layer)
@@ -549,8 +565,8 @@ export default {
             const isActive = enc ? enc['是否为当前行动者'] === '是' : false;
 
             const tokenSize = Math.max(cellSize * size.w - 2, 4);
-            const bgColor = isEnemy ? '#c0392b' : '#27ae60';
-            const borderColor = isActive ? '#ffdb85' : 'transparent';
+            const bgColor = isEnemy ? 'var(--dnd-accent-red)' : 'var(--dnd-accent-green)';
+            const borderColor = isActive ? 'var(--dnd-border-gold)' : 'transparent';
             
             // 生成唯一且合法的 DOM ID
             const safeId = 'dnd-token-' + item['单位名称'].replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_');
@@ -578,27 +594,28 @@ export default {
                 
             } else {
                 // 创建新 Token
-                // [新增] 尝试解析正确的 Avatar Key (CHAR_ID)
-                let avatarKey = item['单位名称'];
+                // [新增] 优先携带完整身份上下文，以便头像按聊天 + CHAR_ID 绑定
+                let avatarIdentity = { '单位名称': item['单位名称'] };
                 if (partyData) {
                     const match = partyData.find(p => p['姓名'] === item['单位名称']);
                     if (match) {
-                        avatarKey = match['CHAR_ID'] || match['PC_ID'] || match['姓名'];
+                        avatarIdentity = match;
                     }
                 }
+                const avatarInfo = this.resolveAvatarStorageKeys(avatarIdentity, item['单位名称']);
                 
                 const initialToken = this.getNameInitial(item['单位名称']);
                 const uid = `token-content-${safeId}`;
                 
                 $token = $(`<div id="${safeId}" class="dnd-minimap-token ${isActive ? 'active' : ''}" title="${item['单位名称']}">
-                    <div id="${uid}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;font-size:${Math.floor(tokenSize*0.6)}px;text-shadow:0 0 2px #000;pointer-events:none;">
+                    <div id="${uid}" data-avatar-key="${avatarInfo.domKey}" title="${item['单位名称']}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:var(--dnd-btn-text);font-size:${Math.floor(tokenSize*0.6)}px;text-shadow:0 0 2px var(--dnd-bg-main);pointer-events:none;">
                         ${initialToken}
                     </div>
                 </div>`);
                 $token.css(targetCss);
                 
                 // [新增] 异步加载头像
-                setTimeout(() => this.loadAvatarAsync(avatarKey, uid), 0);
+                setTimeout(() => this.loadAvatarAsync(avatarIdentity, uid, item['单位名称']), 0);
                 
                 // 绑定点击事件
                 const self = this;
@@ -654,7 +671,8 @@ export default {
             const vPxX = (sourcePos.x - 1) * cellSize;
             const vPxY = (sourcePos.y - 1) * cellSize;
             
-            const ghostHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${vPxX}px;top:${vPxY}px;width:${cellSize}px;height:${cellSize}px;border:2px dashed var(--dnd-text-highlight);border-radius:50%;background:rgba(255, 219, 133, 0.2);pointer-events:none;z-index:20;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;">👻</div>`;
+            // [修复] 移除灰色填充，仅保留虚线边框作为透明覆盖层
+            const ghostHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${vPxX}px;top:${vPxY}px;width:${cellSize}px;height:${cellSize}px;border:2px dashed var(--dnd-text-highlight);border-radius:50%;background:transparent;pointer-events:none;z-index:20;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--dnd-btn-text);">👻</div>`;
             $innerMap.append(ghostHtml);
 
             if (realPos) {
@@ -681,7 +699,8 @@ export default {
             const srcPxX = (sourcePos.x - 1) * cellSize + cellSize / 2;
             const srcPxY = (sourcePos.y - 1) * cellSize + cellSize / 2;
             
-            const rangeHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${srcPxX - rangePx}px;top:${srcPxY - rangePx}px;width:${rangePx * 2}px;height:${rangePx * 2}px;border:2px solid var(--dnd-accent-green);background:rgba(46, 204, 113, 0.1);border-radius:50%;pointer-events:none;z-index:25;box-shadow: 0 0 15px rgba(46, 204, 113, 0.3);"></div>`;
+            // [修复] 使用正确的 box-shadow 语法，使用绿色光晕匹配边框颜色
+            const rangeHtml = `<div class="dnd-map-overlay" style="position:absolute;left:${srcPxX - rangePx}px;top:${srcPxY - rangePx}px;width:${rangePx * 2}px;height:${rangePx * 2}px;border:2px solid var(--dnd-accent-green);background:transparent;border-radius:50%;pointer-events:none;z-index:25;box-shadow: 0 0 10px rgba(58, 107, 74, 0.4);"></div>`;
             $innerMap.append(rangeHtml);
         }
     },
@@ -712,16 +731,16 @@ export default {
              const $bg = $('.dnd-minimap-inner');
              if ($bg.length) {
                  // Add loading overlay to map only
-                 $bg.append(`<div id="dnd-map-loading-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;color:#fff;">
+                 $bg.append(`<div id="dnd-map-loading-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;background:var(--dnd-bg-secondary);z-index:100;display:flex;align-items:center;justify-content:center;color:var(--dnd-text-main);">
                     <div style="text-align:center;">
-                        <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;margin:0 auto 5px;"></div>
+                        <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid var(--dnd-border-subtle);border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;margin:0 auto 5px;"></div>
                         <div style="font-size:10px;">AI 正在构筑战场...</div>
                     </div>
                  </div>`);
              }
         } else {
-             $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;flex-direction:column;gap:5px;">
-                <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid #333;border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
+             $container.html(`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--dnd-text-main);flex-direction:column;gap:5px;">
+                <div class="dnd-spinner" style="width:24px;height:24px;border:3px solid var(--dnd-border-subtle);border-top:3px solid var(--dnd-border-gold);border-radius:50%;animation:dnd-spin 1s infinite linear;"></div>
                 <div style="font-size:11px;">AI 正在绘图...</div>
             </div>`);
         }
@@ -827,10 +846,10 @@ export default {
         // --- B. 普通模式 (点击空地) ---
         // 显示简易菜单: "移动到这里"
         const menuHtml = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:5px;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:5px;">
                 <i class="fa-solid fa-location-dot"></i> 位置: ${String.fromCharCode(64 + gridX)}${gridY}
             </div>
-            <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:rgba(46, 204, 113, 0.2);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;"
+            <div class="dnd-clickable" style="padding:8px;cursor:pointer;border-radius:4px;background:var(--dnd-bg-tertiary);border:1px solid var(--dnd-accent-green);text-align:center;font-weight:bold;color:var(--dnd-text-main);"
                 onclick="window.DND_Dashboard_UI.executeAction('move', { x: ${gridX}, y: ${gridY} }); window.DND_Dashboard_UI.hideDetailPopup();">
                 👣 移动到此
             </div>

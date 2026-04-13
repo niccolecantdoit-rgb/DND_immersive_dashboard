@@ -12,9 +12,9 @@ export default {
         if (!spell) return;
         
         const html = `
-            <div style="color:var(--dnd-text-highlight);font-weight:bold;border-bottom:1px solid #444;margin-bottom:5px;padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
-                <span>${spell['法术名称']} <span style="font-size:10px;color:#888;font-weight:normal">(${spell['环阶'] === '0' || spell['环阶'] === 0 ? '戏法' : spell['环阶']+'环'})</span></span>
-                <button class="dnd-clickable" style="background:var(--dnd-accent-green);border:none;color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
+            <div style="color:var(--dnd-text-highlight);font-weight:bold;border-bottom:1px solid var(--dnd-border-subtle);margin-bottom:5px;padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">
+                <span>${spell['法术名称']} <span style="font-size:10px;color:var(--dnd-text-dim);font-weight:normal">(${spell['环阶'] === '0' || spell['环阶'] === 0 ? '戏法' : spell['环阶']+'环'})</span></span>
+                <button class="dnd-clickable" style="background:var(--dnd-btn-primary);border:none;color:var(--dnd-btn-text);padding:2px 8px;border-radius:3px;font-size:11px;cursor:pointer;"
                     onclick="window.DND_Dashboard_UI.prepareCast(
                         '${spell['法术名称']}',
                         '${spell['射程']||'接触'}',
@@ -23,13 +23,13 @@ export default {
                     <i class="fa-solid fa-bolt"></i> 施放
                 </button>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:#aaa;margin-bottom:8px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:11px;color:var(--dnd-text-dim);margin-bottom:8px;">
                 <div>时间: ${spell['施法时间']||'-'}</div>
                 <div>射程: ${spell['射程']||'-'}</div>
                 <div>成分: ${spell['成分']||'-'}</div>
                 <div>持续: ${spell['持续时间']||'-'}</div>
             </div>
-            <div style="line-height:1.4;color:#ccc;">${spell['效果描述']||'无描述'}</div>
+            <div style="line-height:1.4;color:var(--dnd-text-main);">${spell['效果描述']||'无描述'}</div>
         `;
         
         this.showItemDetailPopup(html, event.clientX, event.clientY);
@@ -52,7 +52,7 @@ export default {
                             align-items: center;
                             margin-right: 10px;
                             margin-top: 8px;
-                            background: rgba(0,0,0,0.2);
+                            background: var(--dnd-bg-tertiary);
                             min-width: 34px;
                             vertical-align: top;
                         }
@@ -94,9 +94,9 @@ export default {
                         .dnd-spell-pip {
                             width: 10px;
                             height: 10px;
-                            background: #222;
-                            border: 1px solid #000;
-                            box-shadow: inset 0 0 2px #000;
+                            background: var(--dnd-bg-secondary);
+                            border: 1px solid var(--dnd-border-subtle);
+                            box-shadow: inset 0 0 2px var(--dnd-border-subtle);
                             transition: all 0.2s;
                         }
                         .dnd-spell-group.mini .dnd-spell-pip {
@@ -104,9 +104,9 @@ export default {
                             height: 6px;
                         }
                         .dnd-spell-pip.available {
-                            background: linear-gradient(135deg, #3498db, #2980b9);
-                            border-color: #5dade2;
-                            box-shadow: 0 0 5px rgba(52, 152, 219, 0.6);
+                            background: linear-gradient(135deg, var(--dnd-accent), var(--dnd-text-highlight));
+                            border-color: var(--dnd-border-gold);
+                            box-shadow: 0 0 5px var(--dnd-selected-bg);
                         }
                     </style>
                 `;
@@ -153,7 +153,7 @@ export default {
             return html;
         } catch(e) {
             console.error('Spell slot format error:', e);
-            return '<span style="color:#8a2c2c">资源解析错误</span>';
+            return '<span style="color:var(--dnd-accent-red)">资源解析错误</span>';
         }
     },
 
@@ -170,13 +170,13 @@ export default {
             byLevel[level].push(s);
         });
         
-        let html = `<div style="font-weight:bold;color:#aab;border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-book"></i> 法术书</div>`;
+        let html = `<div style="font-weight:bold;color:var(--dnd-text-header);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;"><i class="fa-solid fa-book"></i> 法术书</div>`;
         
         // 搜索和筛选
         html += `
             <div style="display:flex;gap:5px;margin-bottom:10px;">
-                <input type="text" id="dnd-spell-search" placeholder="搜索法术..." style="flex:1;background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterSpells()">
-                <select id="dnd-spell-filter" style="background:#1a1a1c;border:1px solid #444;color:#ccc;padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterSpells()">
+                <input type="text" id="dnd-spell-search" placeholder="搜索法术..." style="flex:1;background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px 8px;border-radius:4px;font-size:12px;" oninput="window.DND_Dashboard_UI.filterSpells()">
+                <select id="dnd-spell-filter" style="background:var(--dnd-bg-input);border:1px solid var(--dnd-border-subtle);color:var(--dnd-text-main);padding:4px;border-radius:4px;font-size:12px;" onchange="window.DND_Dashboard_UI.filterSpells()">
                     <option value="">全部环阶</option>
                     ${Object.keys(byLevel).sort().map(l => `<option value="${l}">${l}</option>`).join('')}
                 </select>
@@ -186,18 +186,18 @@ export default {
         html += `<div style="max-height:300px;overflow-y:auto;" id="dnd-spell-list">`;
         
         Object.keys(byLevel).sort().forEach(lvl => {
-            html += `<div class="dnd-spell-group-header" data-level="${lvl}" style="color:var(--dnd-text-highlight);font-size:12px;margin:8px 0 4px 0;border-bottom:1px dashed #444;">${lvl}</div>`;
+            html += `<div class="dnd-spell-group-header" data-level="${lvl}" style="color:var(--dnd-text-highlight);font-size:12px;margin:8px 0 4px 0;border-bottom:1px dashed var(--dnd-border-subtle);">${lvl}</div>`;
             byLevel[lvl].forEach(s => {
                 const isPrep = s['已准备'] === '是' || s['已准备'] === true || lvl === '戏法';
                 const prepIcon = isPrep ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-regular fa-circle"></i>';
                 const safeName = (s['法术名称'] || '').replace(/'/g, "\\'");
                 html += `
                     <div class="dnd-spell-item" data-name="${s['法术名称']}" data-level="${lvl}" style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px;cursor:pointer;"
-                        onmouseover="this.style.background='rgba(255,255,255,0.05)'"
+                        onmouseover="this.style.background='var(--dnd-bg-tertiary)'"
                         onmouseout="this.style.background='transparent'"
                         onclick="window.DND_Dashboard_UI.handleSpellClick('${safeName}', event)">
-                        <span style="color:${isPrep ? '#e6dcca' : '#888'}">${prepIcon} ${s['法术名称']}</span>
-                        <span style="color:#666;font-size:10px;">${s['施法时间']}</span>
+                        <span style="color:${isPrep ? 'var(--dnd-text-main)' : 'var(--dnd-text-dim)'}">${prepIcon} ${s['法术名称']}</span>
+                        <span style="color:var(--dnd-text-dim);font-size:10px;">${s['施法时间']}</span>
                     </div>
                 `;
             });

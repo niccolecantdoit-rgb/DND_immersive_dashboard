@@ -1,0 +1,5 @@
+{
+  "npm.autoDetect": "on",
+  "npm.enableScriptExplorer": true,
+  "npm.packageManager": "npm"
+}

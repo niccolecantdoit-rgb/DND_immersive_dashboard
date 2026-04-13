@@ -1,7 +1,7 @@
 # DND Immersive Dashboard (DND 沉浸式仪表盘)
 
 [![GitHub license](https://img.shields.io/github/license/niccolecantdoit-rgb/DND_immersive_dashboard)](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/blob/master/LICENSE)
-[![Version](https://img.shields.io/badge/version-1.9.2-blue)](package.json)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue)](package.json)
 [![Downloads](https://img.shields.io/github/downloads/niccolecantdoit-rgb/DND_immersive_dashboard/total)](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/releases)
 
 ## 简介 (Introduction)
@@ -44,16 +44,14 @@
 
 *   [SillyTavern](https://github.com/SillyTavern/SillyTavern) - AI 角色扮演前端
 *   [酒馆助手 (JS-Slash-Runner)](https://github.com/N0VI028/JS-Slash-Runner) - 类脑社区开发的 SillyTavern 扩展插件，提供 JS 脚本运行环境
-*   [神数据库 (AutoCardUpdaterExtension)](https://github.com/1830488003/AutoCardUpdaterExtension) - 角色卡自动更新扩展，通过 AI 自动分析对话并动态更新角色世界书，本插件通过其 API 读取角色数据和切换预设
 
 ## 安装说明 (Installation)
 
 1.  **安装酒馆助手**: 确保您的 SillyTavern 已安装 [酒馆助手 (JS-Slash-Runner)](https://github.com/N0VI028/JS-Slash-Runner) 插件。
-2.  **安装神数据库**: 安装 [神数据库 (AutoCardUpdaterExtension)](https://github.com/1830488003/AutoCardUpdaterExtension) 扩展，本插件依赖其提供的 `AutoCardUpdaterAPI` 来读取和管理角色数据。
-3.  **安装 Userscript 管理器**: 确保您的浏览器（推荐 Chrome 或 Firefox）已安装 Userscript 管理器扩展，例如 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/get-it/)。
-4.  **下载脚本**: 前往 [Releases](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/releases) 页面下载最新版本的 `DND_Dashboard_Immersive.user.js` 文件。
-5.  **安装脚本**: 将下载的 `.user.js` 文件拖拽到您的 Userscript 管理器扩展图标上，或通过管理器界面选择"从本地文件安装"。
-6.  **打开 SillyTavern**: 确保 Userscript、酒馆助手和神数据库插件均已启用，然后打开您的 SillyTavern 页面。脚本应会自动加载并显示仪表盘。
+2.  **安装 Userscript 管理器**: 确保您的浏览器（推荐 Chrome 或 Firefox）已安装 Userscript 管理器扩展，例如 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/get-it/)。
+3.  **下载脚本**: 前往 [Releases](https://github.com/niccolecantdoit-rgb/DND_immersive_dashboard/releases) 页面下载最新版本的 `DND_Dashboard_Immersive.user.js` 文件。
+4.  **安装脚本**: 将下载的 `.user.js` 文件拖拽到您的 Userscript 管理器扩展图标上，或通过管理器界面选择"从本地文件安装"。
+5.  **打开 SillyTavern**: 确保 Userscript 和酒馆助手插件均已启用，然后打开您的 SillyTavern 页面。脚本应会自动加载并显示仪表盘。
 
 ## 使用指南 (Usage)
 
@@ -87,7 +85,7 @@ npm run dev
 
 ### 构建生产版本 (Build Production)
 
-要构建用于发布的压缩版本脚本，请运行：
+要构建用于发布的脚本，请运行：
 
 ```bash
 npm run build
@@ -97,11 +95,18 @@ npm run build
 
 ### 脚本压缩 (Minify Script)
 
-除了 `npm run build` 生成的压缩版本外，您还可以手动运行 `minify` 脚本进行额外的压缩（如果需要）：
+每次完成生产构建后，发布/交付前都应立即运行压缩脚本，确保 `.min.js` 与最新构建同步：
 
 ```bash
 npm run minify
 ```
+
+最终分发时请确认以下两个文件都已更新：
+
+- `dist/DND_Dashboard_Immersive.user.js`
+- `dist/DND_Dashboard_Immersive.min.js`
+
+如果 VSCode 没有显示 npm scripts，请确认打开的是项目根目录（包含 `package.json` 的 `插件/` 目录）。仓库已包含 `.vscode/settings.json`，用于显式开启 npm 脚本探测与脚本资源管理器。
 
 ## 贡献 (Contributing)
 

@@ -14,20 +14,20 @@ export default {
         const poolData = this.getDicePoolData();
         const poolCount = poolData ? poolData.length : 0;
         const poolStatus = poolCount >= 15 ? 'good' : (poolCount >= 6 ? 'warning' : 'low');
-        const statusColor = poolStatus === 'good' ? 'var(--dnd-accent-green)' : (poolStatus === 'warning' ? '#e67e22' : 'var(--dnd-accent-red)');
+        const statusColor = poolStatus === 'good' ? 'var(--dnd-accent-green)' : (poolStatus === 'warning' ? 'var(--dnd-text-highlight)' : 'var(--dnd-accent-red)');
         const statusText = poolStatus === 'good' ? '充足' : (poolStatus === 'warning' ? '适中' : '不足');
         
         let html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
                 <span>${ICONS.DICE} 快速投掷</span>
-                <span style="font-size:11px;color:${statusColor};background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">
+                <span style="font-size:11px;color:${statusColor};background:var(--dnd-bg-tertiary);padding:2px 6px;border-radius:3px;">
                     池: ${poolCount} (${statusText})
                 </span>
             </div>
             
             <!-- 骰子池可视化 -->
-            <div style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;margin-bottom:12px;">
-                <div style="font-size:11px;color:#888;margin-bottom:6px;display:flex;justify-content:space-between;">
+            <div style="background:var(--dnd-bg-tertiary);padding:8px;border-radius:4px;margin-bottom:12px;">
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:6px;display:flex;justify-content:space-between;">
                     <span>预投骰子池</span>
                     <span onclick="window.DND_Dashboard_UI.refreshDicePool()" style="cursor:pointer;color:var(--dnd-text-highlight);">${ICONS.SYNC} 补充</span>
                 </div>
@@ -36,15 +36,15 @@ export default {
                         const d20 = row.D20 || row[7] || '?';
                         const isNat20 = d20 == 20;
                         const isNat1 = d20 == 1;
-                        const bgColor = isNat20 ? 'var(--dnd-accent-green)' : (isNat1 ? 'var(--dnd-accent-red)' : 'rgba(255,255,255,0.1)');
+                        const bgColor = isNat20 ? 'var(--dnd-accent-green)' : (isNat1 ? 'var(--dnd-accent-red)' : 'var(--dnd-bg-secondary)');
                         const textColor = (isNat20 || isNat1) ? '#fff' : 'var(--dnd-text-main)';
                         return `<div title="D20:${d20} D12:${row.D12||row[6]||'?'} D10:${row.D10||row[5]||'?'}" 
-                            style="width:22px;height:22px;background:${bgColor};border:1px solid #555;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${textColor};font-weight:bold;cursor:help;">
+                            style="width:22px;height:22px;background:${bgColor};border:1px solid var(--dnd-border-inner);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${textColor};font-weight:bold;cursor:help;">
                             ${d20}
                         </div>`;
-                    }).join('') : '<div style="color:#666;font-size:11px;">骰子池为空</div>'}
+                    }).join('') : '<div style="color:var(--dnd-text-dim);font-size:11px;">骰子池为空</div>'}
                 </div>
-                <div style="font-size:10px;color:#666;margin-top:4px;">显示 D20 值 (悬停查看其他骰子)</div>
+                <div style="font-size:10px;color:var(--dnd-text-dim);margin-top:4px;">显示 D20 值 (悬停查看其他骰子)</div>
             </div>
             
             <!-- 快速投掷按钮 -->
@@ -60,16 +60,16 @@ export default {
             <div style="margin-top:8px;">
                 <button class="dnd-dice-btn" data-sides="100" style="
                     width:100%;
-                    background:linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1));
-                    border:1px solid #9b59b6;
-                    color:#bb8fce;
+                    background:var(--dnd-bg-secondary);
+                    border:1px solid var(--dnd-border-gold);
+                    color:var(--dnd-text-highlight);
                     padding:8px;
                     border-radius:4px;
                     cursor:pointer;
                     transition:all 0.2s;
                     font-size:12px;
-                " onmouseover="this.style.background='rgba(155, 89, 182, 0.3)'" 
-                onmouseout="this.style.background='linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(155, 89, 182, 0.1))'"
+                " onmouseover="this.style.background='var(--dnd-bg-tertiary)'" 
+                onmouseout="this.style.background='var(--dnd-bg-secondary)'"
                 onclick="window.DND_Dashboard_UI.rollDice(100, event)">
                     ${ICONS.TARGET} D100 (百分骰)
                 </button>
@@ -77,7 +77,7 @@ export default {
             
             <!-- 自定义投掷 -->
             <div class="dnd-dice-custom-area">
-                <div style="font-size:11px;color:#888;margin-bottom:5px;">自定义投掷</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-bottom:5px;">自定义投掷</div>
                 <div class="dnd-dice-input-row">
                     <input type="text" id="dnd-custom-dice" placeholder="2d6+3" class="dnd-dice-input">
                     <button onclick="window.DND_Dashboard_UI.rollCustomDice()" class="dnd-dice-submit-btn">投掷</button>
@@ -135,7 +135,7 @@ export default {
         // 显示加载状态
         const $poolArea = $('#dnd-detail-popup-el').find('.dnd-dice-pool-visual');
         if ($poolArea.length) {
-            $poolArea.html('<div style="text-align:center;color:#888;padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
+            $poolArea.html('<div style="text-align:center;color:var(--dnd-text-dim);padding:10px;"><i class="fa-solid fa-sync fa-spin"></i> 补充中...</div>');
         }
         
         // 强制补充
@@ -173,19 +173,19 @@ export default {
         if (isNat20) {
             specialClass = 'dnd-nat20-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 30px rgba(46, 204, 113, 0.8), 0 0 60px rgba(46, 204, 113, 0.4);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-green);text-shadow:0 0 24px var(--dnd-accent-green), 0 0 48px var(--dnd-selected-bg);animation:dnd-nat20-glow 0.8s ease-in-out infinite alternate;">${ICONS.SPARKLES} ${result} ${ICONS.SPARKLES}</div>
                 <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-text-highlight);margin-top:8px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;">大成功！NATURAL 20!</div>
             </div>`;
         } else if (isNat1) {
             specialClass = 'dnd-nat1-result';
             resultHtml = `<div style="text-align:center;padding:20px;">
-                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 30px rgba(192, 57, 43, 0.8), 0 0 60px rgba(192, 57, 43, 0.4);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
-                <div class="dnd-text-reveal" style="font-size:16px;color:#e74c3c;margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
+                <div class="dnd-dice-result-number" style="font-size:56px;color:var(--dnd-accent-red);text-shadow:0 0 24px var(--dnd-accent-red), 0 0 48px var(--dnd-selected-bg);animation:dnd-shake 0.5s ease-in-out;">${ICONS.SKULL} ${result} ${ICONS.SKULL}</div>
+                <div class="dnd-text-reveal" style="font-size:16px;color:var(--dnd-accent-red);margin-top:8px;font-weight:bold;">大失败... NATURAL 1</div>
             </div>`;
         } else {
             resultHtml = `<div style="text-align:center;padding:15px;">
-                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px rgba(255, 219, 133, 0.3);">${ICONS.DICE} ${result}</div>
-                <div style="font-size:12px;color:#888;margin-top:5px;">D${sides} 投掷结果</div>
+                <div class="dnd-dice-result-number" style="font-size:42px;color:var(--dnd-text-highlight);text-shadow:0 0 15px var(--dnd-selected-bg);">${ICONS.DICE} ${result}</div>
+                <div style="font-size:12px;color:var(--dnd-text-dim);margin-top:5px;">D${sides} 投掷结果</div>
             </div>`;
         }
         
@@ -193,7 +193,7 @@ export default {
         const $popup = $('#dnd-detail-popup-el');
         if ($popup.length) {
             // 在现有内容前插入结果
-            const $result = $(`<div class="dnd-roll-result ${specialClass}" style="margin-bottom:10px;background:linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3));border-radius:8px;border:1px solid var(--dnd-border-gold);box-shadow:0 4px 15px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);">${resultHtml}</div>`);
+            const $result = $(`<div class="dnd-roll-result ${specialClass}" style="margin-bottom:10px;background:linear-gradient(135deg, var(--dnd-bg-secondary), var(--dnd-bg-tertiary));border-radius:8px;border:1px solid var(--dnd-border-gold);box-shadow:0 4px 12px var(--dnd-border-inner), inset 0 1px 0 var(--dnd-border-gold);">${resultHtml}</div>`);
             
             // 移除之前的结果
             $popup.find('.dnd-roll-result').remove();
@@ -253,13 +253,13 @@ export default {
             
             const resultHtml = `<div style="text-align:center;padding:15px;">
                 <div style="font-size:32px;color:var(--dnd-text-highlight);">${ICONS.DICE} ${total}</div>
-                <div style="font-size:11px;color:#888;margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
+                <div style="font-size:11px;color:var(--dnd-text-dim);margin-top:5px;">${expr.toUpperCase()}: (${rollsStr})${modStr}</div>
             </div>`;
             
             const $popup = $('#dnd-detail-popup-el');
             if ($popup.length) {
                 $popup.find('.dnd-roll-result').remove();
-                const $result = $(`<div class="dnd-roll-result" style="margin-bottom:10px;background:rgba(0,0,0,0.4);border-radius:6px;border:1px solid var(--dnd-border-gold);">${resultHtml}</div>`);
+                const $result = $(`<div class="dnd-roll-result" style="margin-bottom:10px;background:var(--dnd-bg-secondary);border-radius:6px;border:1px solid var(--dnd-border-gold);">${resultHtml}</div>`);
                 $popup.find('> div').first().after($result);
                 $result.css({ opacity: 0, transform: 'scale(0.8)' });
                 setTimeout(() => {
@@ -377,14 +377,14 @@ export default {
         
         // 构建 HTML
         const html = `
-            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid #555;padding-bottom:10px;margin-bottom:15px;text-align:center;">
+            <div style="font-weight:bold;color:var(--dnd-text-highlight);border-bottom:1px solid var(--dnd-border-subtle);padding-bottom:10px;margin-bottom:15px;text-align:center;">
                 添加快捷方式
             </div>
             
-            <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div style="display:flex;gap:10px;margin-bottom:15px;border-bottom:1px solid var(--dnd-border-subtle);">
                 <div class="dnd-tab-btn active" data-tab="items" onclick="window.DND_Dashboard_UI.switchQuickTab('items')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid var(--dnd-border-gold);">${ICONS.BACKPACK} 物品</div>
-                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SPARKLES} 技能</div>
-                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:#888;">${ICONS.SCROLL} 法书</div>
+                <div class="dnd-tab-btn" data-tab="skills" onclick="window.DND_Dashboard_UI.switchQuickTab('skills')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:var(--dnd-text-dim);">${ICONS.SPARKLES} 技能</div>
+                <div class="dnd-tab-btn" data-tab="spells" onclick="window.DND_Dashboard_UI.switchQuickTab('spells')" style="padding:8px 15px;cursor:pointer;border-bottom:2px solid transparent;color:var(--dnd-text-dim);">${ICONS.SCROLL} 法书</div>
             </div>
             
             <div id="dnd-quick-tab-items" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;">
@@ -392,10 +392,10 @@ export default {
                     const name = i['物品名称'];
                     const id = i['物品ID'] || name;
                     // 使用 data 属性传递数据，避免 HTML 生成错误
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;"
                             data-type="item" data-name="${esc(name)}" data-id="${esc(id)}" data-icon="backpack" data-level=""
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">${name}</div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无物品</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无物品</div>'}
             </div>
             
             <div id="dnd-quick-tab-skills" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:none;flex-direction:column;gap:5px;">
@@ -404,24 +404,24 @@ export default {
                     const level = s['环阶'] || s['等级'] || '';
                     const levelLabel = (level && level !== '0' && level !== '戏法') ? `(${level}环)` : '';
                     
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
                             data-type="skill" data-name="${esc(name)}" data-id="" data-icon="sparkles" data-level="${esc(level)}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
-                            <span>${name}</span> <span style="font-size:11px;color:#888;">${levelLabel}</span>
+                            <span>${name}</span> <span style="font-size:11px;color:var(--dnd-text-dim);">${levelLabel}</span>
                             </div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无技能</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无技能</div>'}
             </div>
             
             <div id="dnd-quick-tab-spells" class="dnd-quick-tab-content" style="max-height:300px;overflow-y:auto;display:none;flex-direction:column;gap:5px;">
                 ${spells.map(s => {
                     const name = s['法术名称'];
                     const level = s['环阶'] === '0' || s['环阶'] === 0 ? '戏法' : (s['环阶']+'环');
-                    return `<div class="dnd-clickable" style="padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
+                    return `<div class="dnd-clickable" style="padding:8px;background:var(--dnd-bg-secondary);border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;"
                             data-type="skill" data-name="${esc(name)}" data-id="" data-icon="scroll" data-level="${esc(s['环阶'])}"
                             onclick="window.DND_Dashboard_UI.handleAddClick(this)">
-                            <span>${name}</span><span style="color:#888;font-size:11px;">${level}</span>
+                            <span>${name}</span><span style="color:var(--dnd-text-dim);font-size:11px;">${level}</span>
                             </div>`;
-                }).join('') || '<div style="text-align:center;color:#666">无法术</div>'}
+                }).join('') || '<div style="text-align:center;color:var(--dnd-text-dim)">无法术</div>'}
             </div>
         `;
         
@@ -433,8 +433,8 @@ export default {
 
     switchQuickTab(tabName) {
         const { $ } = getCore();
-        $('.dnd-tab-btn').css({borderBottomColor:'transparent', color:'#888'}).removeClass('active');
-        $(`.dnd-tab-btn[data-tab="${tabName}"]`).css({borderBottomColor:'var(--dnd-border-gold)', color:'#fff'}).addClass('active');
+        $('.dnd-tab-btn').css({borderBottomColor:'transparent', color:'var(--dnd-text-dim)'}).removeClass('active');
+        $(`.dnd-tab-btn[data-tab="${tabName}"]`).css({borderBottomColor:'var(--dnd-border-gold)', color:'var(--dnd-text-main)'}).addClass('active');
         
         $('.dnd-quick-tab-content').hide();
         $(`#dnd-quick-tab-${tabName}`).css('display', 'flex');
@@ -492,7 +492,7 @@ export default {
         // 反馈提示
         const { $ } = getCore();
         const $hud = $('#dnd-mini-hud');
-        const $toast = $('<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(46, 204, 113, 0.9);color:white;padding:5px 10px;border-radius:4px;font-size:12px;z-index:9999;">已添加</div>');
+        const $toast = $('<div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:var(--dnd-bg-tertiary);color:var(--dnd-text-main);padding:5px 10px;border-radius:4px;font-size:12px;z-index:9999;border:1px solid var(--dnd-border-gold);">已添加</div>');
         $hud.append($toast);
         setTimeout(() => $toast.fadeOut(500, () => $toast.remove()), 1000);
     },
@@ -575,7 +575,7 @@ export default {
                             : `我以 ${i} 级使用了技能：${slot.data.name}`;
                             
                         html += `
-                            <button class="dnd-clickable" style="background:rgba(255,255,255,0.05);border:1px solid #555;color:#ccc;padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;"
+                            <button class="dnd-clickable" style="background:var(--dnd-bg-secondary);border:1px solid var(--dnd-border-inner);color:var(--dnd-text-main);padding:8px;border-radius:4px;cursor:pointer;font-weight:bold;"
                                 onclick="window.DND_Dashboard_UI.fillChatInput('${chatText}'); window.DND_Dashboard_UI.hideDetailPopup();">
                                 ${i} ${isSpell ? '环' : '级'}
                             </button>
