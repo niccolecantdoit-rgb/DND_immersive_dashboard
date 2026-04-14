@@ -820,6 +820,17 @@ export default {
                     if (curr >= max && max > 0) canLevelUp = true;
                 }
             }
+            
+            // [新增] 解析角色状态
+            const charStatuses = DataManager.parseCharacterStatus(char);
+            let statusHtml = '';
+            if (charStatuses && charStatuses.length > 0) {
+                statusHtml = `<div class="dnd-party-status-bar">`;
+                charStatuses.forEach(status => {
+                    statusHtml += `<span class="dnd-party-status-pill ${status.type}" title="${status.label}"><i class="fa-solid ${status.icon}"></i>${status.label}</span>`;
+                });
+                statusHtml += `</div>`;
+            }
                 
             html += `
                 <div class="party-bar-item dnd-clickable dnd-hud-entry dnd-hover-lift" data-idx="${idx}" style="animation-delay:${idx * 0.05}s;">
@@ -853,6 +864,9 @@ export default {
                     <div class="dnd-bar-shimmer" style="width:100%;height:2px;background:var(--dnd-bg-input);border-radius:1px;overflow:hidden;margin-top:1px;" title="XP: ${xpText}">
                         <div class="dnd-bar-fill" style="width:${xpPercent}%;height:100%;background:var(--dnd-text-highlight);transition:width 0.3s;"></div>
                     </div>` : ''}
+                    
+                    <!-- [新增] 状态栏 -->
+                    ${statusHtml}
                 </div>
             `;
         });

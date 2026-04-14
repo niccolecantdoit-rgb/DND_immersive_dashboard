@@ -1745,6 +1745,40 @@ export const addStyles = () => {
             background: var(--dnd-selected-bg);
         }
 
+        /* Status Pills for Party Bar */
+        .dnd-party-status-bar {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 2px !important;
+            justify-content: center !important;
+            margin-top: 2px !important;
+            max-width: 60px !important;
+        }
+        .dnd-party-status-pill {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 1px 4px !important;
+            border-radius: 3px !important;
+            font-size: 8px !important;
+            font-weight: bold !important;
+            gap: 2px !important;
+            white-space: nowrap !important;
+        }
+        .dnd-party-status-pill.buff {
+            background: rgba(58, 107, 74, 0.4) !important;
+            border: 1px solid var(--dnd-accent-green) !important;
+            color: #7fff7f !important;
+        }
+        .dnd-party-status-pill.debuff {
+            background: rgba(138, 44, 44, 0.4) !important;
+            border: 1px solid var(--dnd-accent-red) !important;
+            color: #ff7f7f !important;
+        }
+        .dnd-party-status-pill i {
+            font-size: 7px !important;
+        }
+
         .dnd-item-damage {
             color: var(--dnd-accent-red);
             font-weight: bold;

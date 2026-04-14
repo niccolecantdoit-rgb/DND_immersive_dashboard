@@ -610,6 +610,107 @@ export const DataManager = {
     },
     
 
+    // [新增] 解析角色状态数据 (用于状态栏显示)
+    // 支持的状态类型: concentration(专注), exhaustion(力竭), 以及其他可能的buff/debuff
+    parseCharacterStatus: (char) => {
+        if (!char) return [];
+        
+        const statuses = [];
+        
+        // 定义支持的状态类型及其显示配置
+        const statusConfig = {
+            '专注': { key: 'concentration', icon: 'fa-eye', color: 'var(--dnd-accent-blue)', label: '专注' },
+            '力竭': { key: 'exhaustion', icon: 'fa-battery-quarter', color: 'var(--dnd-accent-red)', label: '力竭' },
+            '专注中': { key: 'concentration', icon: 'fa-eye', color: 'var(--dnd-accent-blue)', label: '专注' },
+            'concentration': { key: 'concentration', icon: 'fa-eye', color: 'var(--dnd-accent-blue)', label: '专注' },
+            'exhaustion': { key: 'exhaustion', icon: 'fa-battery-quarter', color: 'var(--dnd-accent-red)', label: '力竭' }
+        };
+        
+        // 解析力竭等级 (如果有)
+        const parseExhaustionLevel = (val) => {
+            if (!val) return null;
+            const match = val.toString().match(/力竭[：:\s]*(\d)/);
+            if (match) return parseInt(match[1]);
+            return null;
+        };
+        
+        // 1. 检查 "附着状态" 字段 (战斗中的buff/debuff)
+        if (char['附着状态']) {
+            const statusStr = char['附着状态'].toString();
+            
+            // 检查专注状态
+            if (statusStr.includes('专注')) {
+                statuses.push({ ...statusConfig['专注'], type: 'buff' });
+            }
+            
+            // 检查力竭状态
+            if (statusStr.includes('力竭')) {
+                const level = parseExhaustionLevel(statusStr);
+                statuses.push({ 
+                    ...statusConfig['力竭'], 
+                    type: 'debuff',
+                    level: level,
+                    label: level ? `力竭${level}` : '力竭'
+                });
+            }
+        }
+        
+        // 2. 检查其他可能的状态字段
+        // 检查 "状态" 字段
+        if (char['状态']) {
+            const statusStr = char['状态'].toString();
+            Object.keys(statusConfig).forEach(key => {
+                if (statusStr.includes(key) && !statuses.find(s => s.key === statusConfig[key].key)) {
+                    const level = key === '力竭' || key === 'exhaustion' ? parseExhaustionLevel(statusStr) : null;
+                    statuses.push({
+                        ...statusConfig[key],
+                        type: key === '力竭' || key === 'exhaustion' ? 'debuff' : 'buff',
+                        level: level,
+                        label: level ? `${statusConfig[key].label}${level}` : statusConfig[key].label
+                    });
+                }
+            });
+        }
+        
+        // 3. 检查 "当前状态" 字段
+        if (char['当前状态']) {
+            const statusStr = char['当前状态'].toString();
+            Object.keys(statusConfig).forEach(key => {
+                if (statusStr.includes(key) && !statuses.find(s => s.key === statusConfig[key].key)) {
+                    const level = key === '力竭' || key === 'exhaustion' ? parseExhaustionLevel(statusStr) : null;
+                    statuses.push({
+                        ...statusConfig[key],
+                        type: key === '力竭' || key === 'exhaustion' ? 'debuff' : 'buff',
+                        level: level,
+                        label: level ? `${statusConfig[key].label}${level}` : statusConfig[key].label
+                    });
+                }
+            });
+        }
+        
+        // 4. 检查是否有单独的力竭等级字段
+        if (char['力竭等级'] || char['exhaustion_level']) {
+            const level = parseInt(char['力竭等级'] || char['exhaustion_level']);
+            if (level > 0 && !statuses.find(s => s.key === 'exhaustion')) {
+                statuses.push({
+                    ...statusConfig['力竭'],
+                    type: 'debuff',
+                    level: level,
+                    label: `力竭${level}`
+                });
+            }
+        }
+        
+        // 5. 检查专注状态字段
+        if (char['专注中'] === '是' || char['专注中'] === true || char['专注中'] === 'true' || char['专注中'] === 1 || char['专注中'] === '1') {
+            if (!statuses.find(s => s.key === 'concentration')) {
+                statuses.push({ ...statusConfig['专注'], type: 'buff' });
+            }
+        }
+        
+        return statuses;
+    },
+
     // [新增] 导入 FVTT 角色数据
     importFVTTData: async (json) => {
         try {
