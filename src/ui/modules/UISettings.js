@@ -12,6 +12,7 @@ import UICore from './UICore.js';
 import { DynamicBackground } from '../DynamicBackground.js';
 import { ThemeManager } from '../../features/ThemeManager.js';
 import { StyleManager } from '../../features/StyleManager.js';
+import { DiceRulesInjector } from '../../features/DiceRulesInjector.js';
 import { ICONS } from '../SVGIcons.js';
 
 export default {
@@ -48,6 +49,10 @@ export default {
         // 获取隐藏浮动球设置
         const savedHideFloatingBall = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
         const hideFloatingBallEnabled = savedHideFloatingBall === true || savedHideFloatingBall === 'true'; // 默认关闭
+        
+        // 获取骰子规则注入设置
+        const savedInjectDiceRules = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES);
+        const injectDiceRulesEnabled = savedInjectDiceRules === true || savedInjectDiceRules === 'true'; // 默认关闭
         
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
@@ -135,6 +140,16 @@ export default {
                         </label>
                         <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
                             启用后隐藏浮动球，Mini HUD 将独立显示并可拖拽。需配合酒馆助手按钮使用。
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-inject-dice-rules" ${injectDiceRulesEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">注入 DND 5E 骰子规则</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后将自动把修正后的 DND 5E 骰子检定规则注入到当前聊天，确保 AI 遵循正确的规则（属性检定无自动成功/失败、攻击Nat20自动命中等）。
                         </p>
                     </div>
                 </div>
@@ -772,6 +787,13 @@ export default {
             }
         });
 
+        // 骰子规则注入设置
+        $c.find('#dnd-inject-dice-rules').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DiceRulesInjector.setEnabled(checked);
+            NotificationSystem.notify(checked ? '已启用骰子规则注入' : '已禁用骰子规则注入', { type: 'success', duration: 2000 });
+        });
+
         // 配色模板设置
         const $themePreset = $c.find('#dnd-theme-preset');
         const $customColorEnabled = $c.find('#dnd-custom-color-enabled');
@@ -1093,6 +1115,7 @@ export default {
             await safeSave(CONFIG.STORAGE_KEYS.OPTION_WRAP, $c.find('#dnd-option-wrap').prop('checked'));
             await safeSave(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, $c.find('#dnd-show-mini-map').prop('checked'));
             await safeSave(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, $c.find('#dnd-hide-floating-ball').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES, $c.find('#dnd-inject-dice-rules').prop('checked'));
 
             // 0.5 保存配色设置
             if ($customColorEnabled.prop('checked')) {

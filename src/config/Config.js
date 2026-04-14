@@ -55,7 +55,9 @@ export const CONFIG = {
         // Mini HUD 独立位置 (隐藏球模式下)
         MINI_HUD_POS: 'dnd_mini_hud_pos',
         // 已同步的模板版本
-        TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version'
+        TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version',
+        // 骰子规则注入开关
+        INJECT_DICE_RULES: 'dnd_inject_dice_rules'
     },
     // 界面缩放配置
     UI_SCALE: {

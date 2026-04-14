@@ -15,6 +15,7 @@ import { DataManager } from './data/DataManager.js';
 import { TavernSettingsSync } from './core/TavernSettingsSync.js';
 import { TemplateSync } from './features/TemplateSync.js';
 import { NotificationSystem } from './ui/modules/UIUtils.js';
+import { DiceRulesInjector } from './features/DiceRulesInjector.js';
 
 (function () {
     'use strict';
@@ -96,6 +97,9 @@ import { NotificationSystem } from './ui/modules/UIUtils.js';
                 });
                 // 延迟初始化以确保酒馆环境加载完成
                 setTimeout(() => TavernSettingsSync.init(), 1000);
+                
+                // 初始化骰子规则注入器（延迟启动以确保酒馆API就绪）
+                setTimeout(() => DiceRulesInjector.init(), 1500);
                 
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
