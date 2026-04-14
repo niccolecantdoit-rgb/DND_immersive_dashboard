@@ -74,7 +74,7 @@ export const CONFIG = {
     },
     // 模板同步配置
     TEMPLATE_SYNC: {
-        CURRENT_VERSION: '2.0.1'
+        CURRENT_VERSION: '2.0.2'
     },
     // 地图缩放配置
     MAP_ZOOM: {
