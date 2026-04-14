@@ -917,7 +917,9 @@ const CONFIG = {
         // Mini HUD 独立位置 (隐藏球模式下)
         MINI_HUD_POS: 'dnd_mini_hud_pos',
         // 已同步的模板版本
-        TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version'
+        TEMPLATE_SYNCED_VERSION: 'dnd_template_synced_version',
+        // 骰子规则注入开关
+        INJECT_DICE_RULES: 'dnd_inject_dice_rules'
     },
     // 界面缩放配置
     UI_SCALE: {
@@ -38158,7 +38160,225 @@ ${JSON.stringify(state.characterData, null, 2)}
     }
 });
 
+;// ./骰子世界书（DND）.json
+const _DND_namespaceObject = /*#__PURE__*/JSON.parse('{"entries":{"0":{"uid":0,"key":[],"keysecondary":[],"comment":"DND5e骰子系统","content":"<额外剧情思考>\\n<request>\\n# Pre-Generated D20 Rolls (Shared Pool)\\n1. {{roll: d20}} as [d20_1]\\n2. {{roll: d20}} as [d20_2]\\n3. {{roll: d20}} as [d20_3]\\n4. {{roll: d20}} as [d20_4]\\n5. {{roll: d20}} as [d20_5]\\n6. {{roll: d20}} as [d20_6]\\n7. {{roll: d20}} as [d20_7]\\n\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n# DND 5E 检定规则（严格版）\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n\\n在需要判定是否成功时，先判断检定类型：属性/技能检定、豁免检定、先攻检定、攻击检定、伤害检定、专注检定。\\n\\n## 通用 d20 规则\\n- 默认使用下一个可用的预生成 d20 结果 `[d20_X]`。\\n- 若存在优势或劣势，则按顺序消耗两个 d20。\\n- 优势取较高值，劣势取较低值。\\n- 若同一检定同时具有优势与劣势，则两者抵消，只掷一个 d20。\\n- 优势与劣势都不叠加。\\n- 若无需检定，则不要强行制造检定。\\n\\n## 属性检定 / 技能检定\\n- 公式：d20 + 属性调整值 + 熟练加值（如适用） + 其他加值。\\n- 与 DC 比较，总值达到或超过 DC 即成功。\\n- **重要：属性检定与技能检定不存在 Nat20 自动成功，也不存在 Nat1 自动失败。**\\n- 对抗检定时，双方都掷骰；总值较高者胜，平手则局势保持不变。\\n- 若是被动检定，直接使用 10 + 常规修正值，而不是掷骰。\\n\\n## 豁免检定\\n- 公式：d20 + 对应属性调整值 + 熟练加值（若该豁免熟练） + 其他加值。\\n- 与 DC 比较，总值达到或超过 DC 即成功。\\n- **重要：豁免检定也不存在 Nat20 自动成功，也不存在 Nat1 自动失败。**\\n\\n## 先攻检定\\n- 先攻本质上是敏捷检定。\\n- 公式：d20 + 敏捷调整值 + 其他加值。\\n- 按总值从高到低排序。\\n\\n## 攻击检定\\n- 公式：d20 + 攻击调整值 + 其他加值，对比目标 AC。\\n- **Nat20：自动命中，并造成重击。**\\n- **Nat1：自动失手。**\\n- 若非 Nat20 / Nat1，则按总值是否达到 AC 判定命中。\\n\\n## 伤害检定\\n- 正常命中时按技能、法术或武器的伤害骰掷骰。\\n- 重击时：所有伤害骰都掷两次；固定调整值只加一次。\\n- 抗性伤害减半，易伤伤害翻倍，免疫伤害为 0。\\n\\n## 专注检定\\n- 当处于专注中的目标受到伤害时，进行一次体质豁免。\\n- DC = max(10, 本次伤害值的一半，向下取整)。\\n- 每一个独立伤害来源都分别触发一次专注检定。\\n- 失败则专注中断。\\n\\n## 力竭等级\\n- 1级：属性检定劣势。\\n- 2级：速度减半。\\n- 3级：攻击检定与豁免检定劣势。\\n- 4级：生命值上限减半。\\n- 5级：速度变为 0。\\n- 6级：死亡。\\n\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n# 输出格式（全部使用中文，保留 HTML 注释块）\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\n\\n# 属性 / 技能检定\\n<!--\\n━━━◇ D20 (Attribute/Skill) Check ◇━━━\\n• Check Type: \\n• Difficulty Class: \\n• Roll Outcome: [d20_X] / 20\\n• Advantage State: 普通 / 优势 / 劣势\\n━━━◇ Ability Modifier\\n→ + / -\\n━━━◇ Proficiency Bonus\\n→ + / - / 0\\n━━━◇ Other Bonuses\\n→ + / - / 0\\nTotal: (Total) [Pass/Fail]-->\\n\\n# 豁免检定\\n<!--\\n━━━◇ D20 (Saving Throw) Check ◇━━━\\n• Save Type: \\n• Difficulty Class: \\n• Roll Outcome: [d20_X] / 20\\n• Advantage State: 普通 / 优势 / 劣势\\n━━━◇ Ability Modifier\\n→ + / -\\n━━━◇ Proficiency Bonus\\n→ + / - / 0\\n━━━◇ Other Bonuses\\n→ + / - / 0\\nTotal: (Total) [Pass/Fail]-->\\n\\n# 先攻检定\\n<!--\\n━━━◇ D20 (Initiative) Check ◇━━━\\n• Character: \\n• Roll Outcome: [d20_X] / 20\\n• Advantage State: 普通 / 优势 / 劣势\\n━━━◇ Dexterity Modifier\\n→ + / -\\n━━━◇ Other Bonuses\\n→ + / - / 0\\nTotal: (Total)-->\\n\\n# 攻击检定\\n<!--\\n━━━◇ D20 (Attack Roll) Check ◇━━━\\n• Target AC: \\n• Roll Outcome: [d20_X] / 20\\n• Advantage State: 普通 / 优势 / 劣势\\n━━━◇ Attack Modifier\\n→ + / -\\n━━━◇ Other Bonuses\\n→ + / - / 0\\nTotal: (Total) [Hit/Miss/Critical Hit]-->\\n\\n# 伤害检定\\n<!--\\n━━━◇ Damage Roll ◇━━━\\n• Damage Formula: \\n• Roll Outcome: \\n━━━◇ Static Modifier\\n→ + / - / 0\\n━━━◇ Resistance / Vulnerability / Immunity\\n→ ×2 / ×0.5 / ×0 / 无\\nTotal: (Total)-->\\n\\n# 专注检定\\n<!--\\n━━━◇ D20 (Concentration) Check ◇━━━\\n• Damage Taken: \\n• Difficulty Class: \\n• Roll Outcome: [d20_X] / 20\\n━━━◇ Constitution Modifier\\n→ + / -\\n━━━◇ Proficiency Bonus\\n→ + / - / 0\\n━━━◇ Other Bonuses\\n→ + / - / 0\\nTotal: (Total) [Pass/Fail]-->\\n\\n# 执行要求\\n- 只在确实需要 DND 判定时使用这些规则。\\n- 不要为普通叙述强行追加检定。\\n- 对属性检定和豁免检定，不得捏造 Nat20 自动成功或 Nat1 自动失败。\\n- 对攻击检定，必须正确处理 Nat20 自动命中与 Nat1 自动失手。\\n- 若存在专注或力竭，必须把对应影响计入检定。\\n- 保持注释块格式，方便前端 beautify 脚本后处理。\\n</request>\\n</额外剧情思考>"}}}');
+;// ./src/features/DiceRulesInjector.js
+// src/features/DiceRulesInjector.js
+
+
+
+
+
+
+
+const PROMPT_ID = 'dnd_dice_rules';
+const INJECTION_DEPTH = 2;
+const RETRY_DELAY = 1000;
+const RETRY_LIMIT = 10;
+
+const DiceRulesInjector = {
+    _initialized: false,
+    _settingsBound: false,
+    _runtimeEventsBound: false,
+    _runtimePromptSynced: false,
+    _chatChangedHandler: null,
+    _generationHandler: null,
+
+    getPromptText() {
+        const entries = _DND_namespaceObject?.entries || {};
+        const primaryEntry = entries['0'] || Object.values(entries)[0];
+        return typeof primaryEntry?.content === 'string' ? primaryEntry.content.trim() : '';
+    },
+
+    async isEnabled() {
+        const saved = await TavernSettingsSync.getSetting(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES, false);
+        return saved === true || saved === 'true';
+    },
+
+    _getRuntime() {
+        const { SillyTavern, TavernHelper } = TavernAPI.getCore();
+        return { SillyTavern, TavernHelper };
+    },
+
+    async init() {
+        if (this._initialized) return;
+
+        this._initialized = true;
+        this._bindSettingsChanged();
+        void this._syncWhenPromptApiReady('init');
+        this._scheduleRuntimeBinding(0);
+    },
+
+    _hasPromptApi() {
+        const { TavernHelper, SillyTavern } = this._getRuntime();
+        return !!(
+            (TavernHelper?.injectPrompts && TavernHelper?.uninjectPrompts)
+            || typeof SillyTavern?.setExtensionPrompt === 'function'
+        );
+    },
+
+    async _syncWhenPromptApiReady(reason = 'runtime-ready') {
+        if (!this._hasPromptApi()) {
+            this._runtimePromptSynced = false;
+            return false;
+        }
+
+        if (this._runtimePromptSynced) {
+            return true;
+        }
+
+        this._runtimePromptSynced = true;
+        await this.syncPrompt(reason);
+        return true;
+    },
+
+    _bindSettingsChanged() {
+        if (this._settingsBound) return;
+
+        const { $ } = getCore();
+        if (!$) return;
+
+        $(document)
+            .off('dnd:settings-changed.diceRules')
+            .on('dnd:settings-changed.diceRules', () => {
+                void this.syncPrompt('settings-changed');
+            });
+
+        this._settingsBound = true;
+    },
+
+    _scheduleRuntimeBinding(attempt) {
+        void this._syncWhenPromptApiReady(`runtime-ready-${attempt}`);
+
+        if (this._bindRuntimeEvents()) {
+            return;
+        }
+
+        if (attempt >= RETRY_LIMIT) {
+            Logger.warn('[DiceRulesInjector] 运行时事件未就绪，将仅响应本地设置变更');
+            return;
+        }
+
+        window.setTimeout(() => this._scheduleRuntimeBinding(attempt + 1), RETRY_DELAY);
+    },
+
+    _bindRuntimeEvents() {
+        if (this._runtimeEventsBound) return true;
+
+        const { SillyTavern } = this._getRuntime();
+        const eventSource = SillyTavern?.eventSource;
+        const eventTypes = SillyTavern?.eventTypes;
+
+        if (!eventSource?.on || !eventTypes) {
+            return false;
+        }
+
+        this._chatChangedHandler = () => {
+            void this.syncPrompt('chat-changed');
+        };
+        this._generationHandler = () => {
+            void this.syncPrompt('generation-after-commands');
+        };
+
+        eventSource.on(eventTypes.CHAT_CHANGED, this._chatChangedHandler);
+        eventSource.on(eventTypes.GENERATION_AFTER_COMMANDS, this._generationHandler);
+
+        this._runtimeEventsBound = true;
+        Logger.info('[DiceRulesInjector] 已绑定 CHAT_CHANGED / GENERATION_AFTER_COMMANDS 事件');
+        return true;
+    },
+
+    async syncPrompt(reason = 'manual') {
+        const enabled = await this.isEnabled();
+        if (!enabled) {
+            return this.uninject(reason);
+        }
+
+        const promptText = this.getPromptText();
+        if (!promptText) {
+            Logger.warn('[DiceRulesInjector] 规则文本为空，跳过注入');
+            return false;
+        }
+
+        const { TavernHelper, SillyTavern } = this._getRuntime();
+
+        try {
+            if (TavernHelper?.injectPrompts && TavernHelper?.uninjectPrompts) {
+                TavernHelper.uninjectPrompts([PROMPT_ID]);
+
+                if (typeof SillyTavern?.setExtensionPrompt === 'function') {
+                    await SillyTavern.setExtensionPrompt(PROMPT_ID, '', -1, INJECTION_DEPTH, false, 0, () => false);
+                }
+
+                TavernHelper.injectPrompts([
+                    {
+                        id: PROMPT_ID,
+                        position: 'in_chat',
+                        depth: INJECTION_DEPTH,
+                        role: 'system',
+                        content: promptText,
+                        should_scan: false
+                    }
+                ]);
+                Logger.info(`[DiceRulesInjector] 已通过 TavernHelper 注入规则 (${reason})`);
+                return true;
+            }
+
+            if (typeof SillyTavern?.setExtensionPrompt === 'function') {
+                await SillyTavern.setExtensionPrompt(PROMPT_ID, promptText, 1, INJECTION_DEPTH, false, 0, () => true);
+                Logger.info(`[DiceRulesInjector] 已通过 SillyTavern 注入规则 (${reason})`);
+                return true;
+            }
+
+            Logger.warn('[DiceRulesInjector] 未找到可用的提示词注入 API');
+            return false;
+        } catch (error) {
+            Logger.error('[DiceRulesInjector] 注入失败:', error);
+            return false;
+        }
+    },
+
+    async inject(reason = 'manual') {
+        return this.syncPrompt(reason);
+    },
+
+    async setEnabled(enabled) {
+        await TavernSettingsSync.setSetting(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES, !!enabled);
+        return this.syncPrompt('toggle');
+    },
+
+    async uninject(reason = 'manual') {
+        const { TavernHelper, SillyTavern } = this._getRuntime();
+        let removed = false;
+
+        try {
+            if (TavernHelper?.uninjectPrompts) {
+                TavernHelper.uninjectPrompts([PROMPT_ID]);
+                removed = true;
+            }
+        } catch (error) {
+            Logger.warn('[DiceRulesInjector] TavernHelper 取消注入失败:', error);
+        }
+
+        try {
+            if (typeof SillyTavern?.setExtensionPrompt === 'function') {
+                await SillyTavern.setExtensionPrompt(PROMPT_ID, '', -1, INJECTION_DEPTH, false, 0, () => false);
+                removed = true;
+            }
+        } catch (error) {
+            Logger.warn('[DiceRulesInjector] SillyTavern 取消注入失败:', error);
+        }
+
+        if (removed) {
+            Logger.info(`[DiceRulesInjector] 已移除规则注入 (${reason})`);
+        }
+
+        return removed;
+    }
+};
+
 ;// ./src/ui/modules/UISettings.js
+
 
 
 
@@ -38209,6 +38429,10 @@ ${JSON.stringify(state.characterData, null, 2)}
         // 获取隐藏浮动球设置
         const savedHideFloatingBall = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL);
         const hideFloatingBallEnabled = savedHideFloatingBall === true || savedHideFloatingBall === 'true'; // 默认关闭
+        
+        // 获取骰子规则注入设置
+        const savedInjectDiceRules = await DBAdapter.getSetting(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES);
+        const injectDiceRulesEnabled = savedInjectDiceRules === true || savedInjectDiceRules === 'true'; // 默认关闭
         
         // 构建预设选项 HTML
         const buildOptions = (selected) => {
@@ -38296,6 +38520,16 @@ ${JSON.stringify(state.characterData, null, 2)}
                         </label>
                         <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
                             启用后隐藏浮动球，Mini HUD 将独立显示并可拖拽。需配合酒馆助手按钮使用。
+                        </p>
+                    </div>
+                    
+                    <div style="margin-bottom:10px;">
+                        <label style="display:flex;align-items:center;cursor:pointer;">
+                            <input type="checkbox" id="dnd-inject-dice-rules" ${injectDiceRulesEnabled ? 'checked' : ''} style="margin-right:10px;transform:scale(1.2);">
+                            <span style="color:var(--dnd-text-main);">注入 DND 5E 骰子规则</span>
+                        </label>
+                        <p style="color:#666;font-size:11px;margin:5px 0 0 26px;">
+                            启用后将自动把修正后的 DND 5E 骰子检定规则注入到当前聊天，确保 AI 遵循正确的规则（属性检定无自动成功/失败、攻击Nat20自动命中等）。
                         </p>
                     </div>
                 </div>
@@ -38933,6 +39167,13 @@ ${JSON.stringify(state.characterData, null, 2)}
             }
         });
 
+        // 骰子规则注入设置
+        $c.find('#dnd-inject-dice-rules').on('change', async function() {
+            const checked = $(this).prop('checked');
+            await DiceRulesInjector.setEnabled(checked);
+            NotificationSystem.notify(checked ? '已启用骰子规则注入' : '已禁用骰子规则注入', { type: 'success', duration: 2000 });
+        });
+
         // 配色模板设置
         const $themePreset = $c.find('#dnd-theme-preset');
         const $customColorEnabled = $c.find('#dnd-custom-color-enabled');
@@ -39254,6 +39495,7 @@ ${JSON.stringify(state.characterData, null, 2)}
             await safeSave(CONFIG.STORAGE_KEYS.OPTION_WRAP, $c.find('#dnd-option-wrap').prop('checked'));
             await safeSave(CONFIG.STORAGE_KEYS.SHOW_MINI_MAP, $c.find('#dnd-show-mini-map').prop('checked'));
             await safeSave(CONFIG.STORAGE_KEYS.HIDE_FLOATING_BALL, $c.find('#dnd-hide-floating-ball').prop('checked'));
+            await safeSave(CONFIG.STORAGE_KEYS.INJECT_DICE_RULES, $c.find('#dnd-inject-dice-rules').prop('checked'));
 
             // 0.5 保存配色设置
             if ($customColorEnabled.prop('checked')) {
@@ -42824,6 +43066,7 @@ try {
 
 
 
+
 (function () {
     'use strict';
 
@@ -42904,6 +43147,9 @@ try {
                 });
                 // 延迟初始化以确保酒馆环境加载完成
                 setTimeout(() => TavernSettingsSync.init(), 1000);
+                
+                // 初始化骰子规则注入器（延迟启动以确保酒馆API就绪）
+                setTimeout(() => DiceRulesInjector.init(), 1500);
                 
                 if (api) {
                     console.log('[DND Dashboard] Connected to Database API');
