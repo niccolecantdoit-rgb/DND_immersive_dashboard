@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DND 沉浸式仪表盘
 // @namespace    http://tampermonkey.net/
-// @version      2.0.2
+// @version      2.0.3
 // @description  专为 DND 模板设计的游戏风格仪表盘
 // @author       Niccole
 // @match        */*
@@ -936,7 +936,7 @@ const CONFIG = {
     },
     // 模板同步配置
     TEMPLATE_SYNC: {
-        CURRENT_VERSION: '2.0.2'
+        CURRENT_VERSION: '2.0.3'
     },
     // 地图缩放配置
     MAP_ZOOM: {
@@ -31805,6 +31805,7 @@ function getWeatherIcon(weatherText) {
                 this.registerHelperButtonEvent({ scheduleRetry: true });
             }
         } else {
+            this.unregisterHelperButtonEvent();
             $btn.removeClass('dnd-force-hidden');
             Logger.info('[UICore] 浮动球已显示');
         }
@@ -31857,10 +31858,39 @@ function getWeatherIcon(weatherText) {
         }, 1000);
     },
 
+    unregisterHelperButtonEvent() {
+        if (this._helperButtonStop && typeof this._helperButtonStop.stop === 'function') {
+            try {
+                this._helperButtonStop.stop();
+            } catch (e) {
+                Logger.warn('[UICore] Helper 按钮监听清理失败:', e);
+            }
+        }
+
+        this._helperButtonStop = null;
+        this._helperButtonRegistered = false;
+
+        if (this._helperButtonRetryTimer) {
+            clearTimeout(this._helperButtonRetryTimer);
+            this._helperButtonRetryTimer = null;
+        }
+
+        this._helperButtonRetryCount = 0;
+    },
+
     // [新增] 注册 Tavern Helper 按钮事件
     registerHelperButtonEvent(options = {}) {
+        if (!this._hideFloatingBall) {
+            Logger.debug('[UICore] 隐藏浮动球未启用，跳过 Helper 按钮注册');
+            return;
+        }
+
         if (this._helperButtonRegistered) return;
         const { scheduleRetry = false } = options;
+
+        if (this._helperButtonStop) {
+            this.unregisterHelperButtonEvent();
+        }
         
         try {
             // 安全检查 Helper API 是否存在
@@ -31887,15 +31917,16 @@ function getWeatherIcon(weatherText) {
             const buttonEvent = getButtonEvent('DND仪表盘');
             if (buttonEvent) {
                 this._helperButtonStop = eventOn(buttonEvent, () => {
-                    Logger.info('[UICore] Helper 按钮被点击');
-                    
-                    if (this._hideFloatingBall) {
-                        // 隐藏浮动球模式下，助手按钮承担主开关职责：
-                        // collapsed -> mini，mini/full -> collapsed
-                        this.toggleDashboard();
-                    } else {
-                        this.toggleDashboard();
+                    if (!this._hideFloatingBall) {
+                        Logger.debug('[UICore] Helper 按钮点击已忽略：隐藏浮动球模式未启用');
+                        return;
                     }
+
+                    Logger.info('[UICore] Helper 按钮被点击');
+
+                    // 隐藏浮动球模式下，助手按钮承担主开关职责：
+                    // collapsed -> mini，mini/full -> collapsed
+                    this.toggleDashboard('helper-button');
                 });
                 
                 this._helperButtonRegistered = true;
@@ -32010,15 +32041,25 @@ function getWeatherIcon(weatherText) {
     },
 
     // [新增] 切换仪表盘状态的辅助方法
-    toggleDashboard() {
-        Logger.info('toggleDashboard 被调用，当前状态:', this.state);
-        this._lastToggleTime = Date.now();
+    toggleDashboard(trigger = 'manual') {
+        const now = Date.now();
+        const debounceDelay = CONFIG.ANIMATION?.DEBOUNCE_DELAY || 150;
+
+        if (now - this._lastToggleTime < debounceDelay) {
+            Logger.debug(`[UICore] 忽略过快的重复切换 (${trigger})`);
+            return false;
+        }
+
+        this._lastToggleTime = now;
+        Logger.info(`[UICore] toggleDashboard 被调用 (${trigger})，当前状态:`, this.state);
         
         if (this.state === 'collapsed') {
             this.setState('mini');
         } else {
             this.setState('collapsed');
         }
+
+        return true;
     },
 
     setState(newState) {
@@ -32207,20 +32248,7 @@ function getWeatherIcon(weatherText) {
             $(document).off('click.dndPos'); // 清除位置设置弹窗的监听器
         } catch (e) { console.warn('Event cleanup error:', e); }
 
-        if (this._helperButtonStop && typeof this._helperButtonStop.stop === 'function') {
-            try {
-                this._helperButtonStop.stop();
-            } catch (e) {
-                Logger.warn('[UICore] Helper 按钮监听清理失败:', e);
-            }
-        }
-        this._helperButtonStop = null;
-        this._helperButtonRegistered = false;
-        if (this._helperButtonRetryTimer) {
-            clearTimeout(this._helperButtonRetryTimer);
-            this._helperButtonRetryTimer = null;
-        }
-        this._helperButtonRetryCount = 0;
+        this.unregisterHelperButtonEvent();
 
         // 3. 清除 DOM 元素 (更彻底的清除)
         const selectorsToRemove = [
@@ -32504,11 +32532,7 @@ function getWeatherIcon(weatherText) {
                 setTimeout(() => $btn.removeClass('is-dragging'), 50);
             } else if (e.type === 'pointerup') {
                 // 仅 pointerup 时触发点击（排除 cancel/blur）
-                if (this.state === 'collapsed') {
-                    this.setState('mini');
-                } else {
-                    this.setState('collapsed');
-                }
+                this.toggleDashboard('floating-button');
             }
             
             isDragging = false;
